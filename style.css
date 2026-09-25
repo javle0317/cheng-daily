@@ -8,6 +8,8 @@
   --accent-soft: #e8ecfe;
   --border: #e5e7eb;
   --danger: #e0555f;
+  --success-bg: #d9f5e3;
+  --success-text: #1e7a4c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +23,8 @@
     --accent-soft: #262c45;
     --border: #333847;
     --danger: #e88b91;
+    --success-bg: #163826;
+    --success-text: #6fd9a0;
   }
 }
 
@@ -364,13 +368,14 @@ body {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%) translateY(8px);
-  background: var(--accent);
-  color: white;
+  top: 20px;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--success-bg);
+  color: var(--success-text);
   padding: 10px 20px;
   border-radius: 999px;
   font-size: 14px;
+  font-weight: 600;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   opacity: 0;
   transition: opacity 0.2s ease, transform 0.2s ease;
