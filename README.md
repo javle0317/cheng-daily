@@ -7,7 +7,7 @@
 
 ### 1. 建立 Google Sheet
 
-新增一個 Google Sheet，建立四個分頁：
+新增一個 Google Sheet，建立六個分頁：
 
 **Goals**（今日待辦，一次性手動輸入的項目）
 
@@ -46,6 +46,24 @@
 icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承」），改 [app.js](app.js)
 的 `OWNER_META` 跟 `index.html` 的 `#eventOwner` 下拉選項文字即可，不用動 Sheet 或
 `Code.gs`。
+
+**RecurringEvents**（固定週期規則，例如「每週三打球」「每月15號幫咪嚕點藥」）
+
+| id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | active | createdAt |
+|----|-------|-------|------|-------|-----------|-----------|------------|--------|-----------|
+
+- `frequency`：`weekly` / `monthly`
+- `dayOfWeek`：0-6（0=日、1=一...6=六），只有 `weekly` 用得到
+- `dayOfMonth`：1-31，只有 `monthly` 用得到
+- `owner`：跟 Events 一樣的值域
+- 只存規則本身，不會預先展開成很多列——前端跟 `sendDailyNotifications` 都是
+  即時判斷「今天符不符合」，改規則不用擔心舊資料沒同步，但也代表**沒有「跳過
+  這一次」的例外功能**，只能整條規則停用或刪除
+
+**ShoppingList**（購物清單，不綁日期、買了就勾掉）
+
+| id | item | done | createdAt |
+|----|------|------|-----------|
 
 第一列填欄位名稱（跟上面一樣），下面留空即可。
 
@@ -108,3 +126,4 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
   改成 `FALSE`）
 - 每週/每月目標的次數改成新增當下可調整以外，還能事後編輯
 - 工作日判斷加入請假/國定假日例外（目前固定週一到週五）
+- 重複規則行程支援「跳過這一次」的例外，目前只能整條規則停用/刪除

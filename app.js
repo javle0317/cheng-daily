@@ -18,6 +18,8 @@ let state = {
   events: [],
   habits: [],
   habitLogs: [],
+  recurringEvents: [],
+  shoppingList: [],
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
@@ -75,6 +77,27 @@ function getPeriodKey(habit, dateStr) {
   if (habit.frequency === "weekly") return getWeekStart(dateStr);
   if (habit.frequency === "monthly") return getMonthKey(dateStr);
   return dateStr;
+}
+
+function matchesRecurringRule(rule, dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  if (rule.frequency === "weekly") return d.getDay() === Number(rule.dayOfWeek);
+  if (rule.frequency === "monthly") return d.getDate() === Number(rule.dayOfMonth);
+  return false;
+}
+
+function expandRecurringForDate(dateStr) {
+  return state.recurringEvents
+    .filter(r => isTruthy(r.active) && matchesRecurringRule(r, dateStr))
+    .map(r => ({
+      id: `rec_${r.id}_${dateStr}`,
+      date: dateStr,
+      owner: r.owner,
+      time: r.time,
+      title: r.title,
+      notes: r.notes,
+      recurring: true,
+    }));
 }
 
 function getHabitLogCount(habitId, periodKey) {
@@ -140,6 +163,8 @@ async function tryUnlock(password) {
     state.events = data.events || [];
     state.habits = data.habits || [];
     state.habitLogs = data.habitLogs || [];
+    state.recurringEvents = data.recurringEvents || [];
+    state.shoppingList = data.shoppingList || [];
     showApp();
     renderAll();
     setStatus("已連上 Google Sheet");
@@ -170,6 +195,8 @@ function renderAll() {
   renderWeeklyHabits();
   renderMonthlyHabits();
   renderCalendar();
+  renderRecurringList();
+  renderShoppingList();
   const dateInput = document.getElementById("eventDate");
   if (dateInput) dateInput.value = state.selectedDate;
   if (typeof updateEventFormValidity === "function") updateEventFormValidity();
@@ -351,6 +378,7 @@ function renderEvents() {
   list.innerHTML = "";
   const events = state.events
     .filter(e => e.date === state.selectedDate)
+    .concat(expandRecurringForDate(state.selectedDate))
     .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
 
   if (!events.length) {
@@ -360,7 +388,16 @@ function renderEvents() {
 
   events.forEach(ev => {
     const li = document.createElement("li");
-    li.className = "item-row";
+    li.className = "item-row" + (ev.recurring ? " recurring-row" : "");
+
+    if (ev.title && ev.title.includes("購物")) {
+      const shopBtn = document.createElement("button");
+      shopBtn.className = "event-shopping-btn";
+      shopBtn.title = "開啟購物清單";
+      shopBtn.textContent = "🛒";
+      shopBtn.addEventListener("click", openShoppingModal);
+      li.appendChild(shopBtn);
+    }
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "item-time";
@@ -395,20 +432,22 @@ function renderEvents() {
       li.appendChild(noteSpan);
     }
 
-    const delBtn = document.createElement("button");
-    delBtn.className = "delete-btn";
-    delBtn.title = "刪除";
-    delBtn.textContent = "✕";
-    delBtn.addEventListener("click", async () => {
-      try {
-        state.events = await api("deleteEvent", { id: ev.id });
-        renderEvents();
-        renderCalendar();
-      } catch (err) {
-        setStatus("刪除失敗：" + err.message, true);
-      }
-    });
-    li.appendChild(delBtn);
+    if (!ev.recurring) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete-btn";
+      delBtn.title = "刪除";
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("click", async () => {
+        try {
+          state.events = await api("deleteEvent", { id: ev.id });
+          renderEvents();
+          renderCalendar();
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
+      li.appendChild(delBtn);
+    }
 
     list.appendChild(li);
   });
@@ -459,6 +498,9 @@ function renderCalendar() {
     cell.appendChild(dayLabel);
 
     const colors = new Set(eventColorsByDate[dateStr] || []);
+    expandRecurringForDate(dateStr).forEach(ev => {
+      colors.add((OWNER_META[ev.owner] || {}).color || "var(--accent)");
+    });
     if (goalDates.has(dateStr)) colors.add("var(--accent)");
     if (colors.size) {
       const dotsWrap = document.createElement("div");
@@ -486,6 +528,184 @@ function renderCalendar() {
     grid.appendChild(cell);
   }
 }
+
+const RECURRING_WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+
+function renderRecurringList() {
+  const list = document.getElementById("recurringList");
+  list.innerHTML = "";
+
+  if (!state.recurringEvents.length) {
+    list.innerHTML = `<li class="empty-hint">還沒有重複行程</li>`;
+    return;
+  }
+
+  state.recurringEvents.forEach(rule => {
+    const li = document.createElement("li");
+    li.className = "item-row";
+
+    const scheduleText = rule.frequency === "weekly"
+      ? `每週${RECURRING_WEEKDAY_LABELS[Number(rule.dayOfWeek)]}`
+      : `每月${rule.dayOfMonth}號`;
+
+    const meta = OWNER_META[rule.owner] || { label: rule.owner || "", icon: "" };
+    const textSpan = document.createElement("span");
+    textSpan.className = "item-text";
+    textSpan.textContent = `${meta.icon} ${rule.title}`.trim();
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "item-time";
+    timeSpan.textContent = scheduleText + (rule.time ? ` ${rule.time}` : "");
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "delete-btn";
+    delBtn.title = "刪除";
+    delBtn.textContent = "✕";
+    delBtn.addEventListener("click", async () => {
+      try {
+        const data = await api("deleteRecurringEvent", { id: rule.id });
+        state.recurringEvents = data.recurringEvents;
+        renderRecurringList();
+        renderEvents();
+        renderCalendar();
+      } catch (err) {
+        setStatus("刪除失敗：" + err.message, true);
+      }
+    });
+
+    li.appendChild(textSpan);
+    li.appendChild(timeSpan);
+    li.appendChild(delBtn);
+    list.appendChild(li);
+  });
+}
+
+function updateRecurringFormValidity() {
+  const titleInput = document.getElementById("recurringTitle");
+  const submitBtn = document.getElementById("recurringSubmitBtn");
+  submitBtn.disabled = !titleInput.value.trim();
+}
+
+function updateRecurringFrequencyFields() {
+  const frequency = document.getElementById("recurringFrequency").value;
+  const dayOfWeekSelect = document.getElementById("recurringDayOfWeek");
+  const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
+  const isWeekly = frequency === "weekly";
+  dayOfWeekSelect.style.display = isWeekly ? "" : "none";
+  dayOfMonthInput.style.display = isWeekly ? "none" : "";
+}
+
+document.getElementById("recurringTitle").addEventListener("input", updateRecurringFormValidity);
+document.getElementById("recurringFrequency").addEventListener("change", updateRecurringFrequencyFields);
+updateRecurringFrequencyFields();
+
+document.getElementById("recurringForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ownerSelect = document.getElementById("recurringOwner");
+  const titleInput = document.getElementById("recurringTitle");
+  const frequencySelect = document.getElementById("recurringFrequency");
+  const dayOfWeekSelect = document.getElementById("recurringDayOfWeek");
+  const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
+  const timeInput = document.getElementById("recurringTime");
+  const noteInput = document.getElementById("recurringNote");
+  const title = titleInput.value.trim();
+  if (!title) return;
+  if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
+  try {
+    const data = await api("addRecurringEvent", {
+      owner: ownerSelect.value,
+      title,
+      time: timeInput.value || "",
+      notes: noteInput.value.trim(),
+      frequency: frequencySelect.value,
+      dayOfWeek: dayOfWeekSelect.value,
+      dayOfMonth: dayOfMonthInput.value,
+    });
+    state.recurringEvents = data.recurringEvents;
+    titleInput.value = "";
+    timeInput.value = "";
+    noteInput.value = "";
+    dayOfMonthInput.value = "";
+    updateRecurringFormValidity();
+    renderRecurringList();
+    renderEvents();
+    renderCalendar();
+    showToast("已新增重複行程");
+  } catch (err) {
+    setStatus("新增失敗：" + err.message, true);
+  }
+});
+
+// ====== 購物清單 ======
+function renderShoppingList() {
+  const list = document.getElementById("shoppingList");
+  list.innerHTML = "";
+
+  if (!state.shoppingList.length) {
+    list.innerHTML = `<li class="empty-hint">清單是空的</li>`;
+    return;
+  }
+
+  const rows = [...state.shoppingList].sort((a, b) => isTruthy(a.done) - isTruthy(b.done));
+
+  rows.forEach(item => {
+    const done = isTruthy(item.done);
+    const li = document.createElement("li");
+    li.className = "item-row" + (done ? " done" : "");
+    li.innerHTML = `
+      <input type="checkbox" ${done ? "checked" : ""}>
+      <span class="item-text"></span>
+      <button class="delete-btn" title="刪除">✕</button>
+    `;
+    li.querySelector(".item-text").textContent = item.item;
+    li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
+      try {
+        state.shoppingList = await api("toggleShoppingItem", { id: item.id });
+        renderShoppingList();
+      } catch (err) {
+        setStatus("更新失敗：" + err.message, true);
+      }
+    });
+    li.querySelector(".delete-btn").addEventListener("click", async () => {
+      try {
+        state.shoppingList = await api("deleteShoppingItem", { id: item.id });
+        renderShoppingList();
+      } catch (err) {
+        setStatus("刪除失敗：" + err.message, true);
+      }
+    });
+    list.appendChild(li);
+  });
+}
+
+function openShoppingModal() {
+  document.getElementById("shoppingModal").classList.remove("hidden");
+}
+
+function closeShoppingModal() {
+  document.getElementById("shoppingModal").classList.add("hidden");
+}
+
+document.getElementById("shoppingBtn").addEventListener("click", openShoppingModal);
+document.getElementById("shoppingCloseBtn").addEventListener("click", closeShoppingModal);
+document.getElementById("shoppingModal").addEventListener("click", (e) => {
+  if (e.target.id === "shoppingModal") closeShoppingModal();
+});
+
+document.getElementById("shoppingForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("shoppingInput");
+  const item = input.value.trim();
+  if (!item) return;
+  try {
+    state.shoppingList = await api("addShoppingItem", { item });
+    input.value = "";
+    renderShoppingList();
+    showToast("已新增購物項目");
+  } catch (err) {
+    setStatus("新增失敗：" + err.message, true);
+  }
+});
 
 // ====== Form handlers ======
 document.getElementById("goalForm").addEventListener("submit", async (e) => {

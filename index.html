@@ -23,7 +23,10 @@
         <h1 id="todayDate"></h1>
         <p id="progressLine" class="progress-line"></p>
       </div>
-      <button id="logoutBtn" class="ghost-btn">登出</button>
+      <div class="header-actions">
+        <button id="shoppingBtn" class="ghost-btn">🛒 購物清單</button>
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
     </header>
 
     <main class="grid">
@@ -100,12 +103,58 @@
           <button id="habitSubmitBtn" type="submit" disabled>新增</button>
         </form>
       </section>
+
+      <section class="card recurring-card">
+        <h2>重複行程</h2>
+        <form id="recurringForm" class="entry-form">
+          <select id="recurringOwner">
+            <option value="shared">🤝 一起</option>
+            <option value="me">🧑 承承</option>
+            <option value="wife">👩 君君</option>
+            <option value="林萌">🐕 林萌</option>
+            <option value="咪嚕">🐈 咪嚕</option>
+          </select>
+          <input id="recurringTitle" type="text" placeholder="項目…" required>
+          <select id="recurringFrequency">
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+          </select>
+          <select id="recurringDayOfWeek">
+            <option value="0">週日</option>
+            <option value="1">週一</option>
+            <option value="2">週二</option>
+            <option value="3">週三</option>
+            <option value="4">週四</option>
+            <option value="5">週五</option>
+            <option value="6">週六</option>
+          </select>
+          <input id="recurringDayOfMonth" type="number" min="1" max="31" placeholder="幾號">
+          <input id="recurringTime" type="time">
+          <input id="recurringNote" type="text" placeholder="備註/地點…">
+          <button id="recurringSubmitBtn" type="submit" disabled>新增</button>
+        </form>
+        <ul id="recurringList" class="item-list"></ul>
+      </section>
     </main>
 
     <p id="statusLine" class="status-line"></p>
   </div>
 
   <div id="toast" class="toast hidden"></div>
+
+  <div id="shoppingModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>🛒 購物清單</h2>
+        <button id="shoppingCloseBtn" class="ghost-btn">✕</button>
+      </div>
+      <form id="shoppingForm" class="inline-form">
+        <input id="shoppingInput" type="text" placeholder="新增購買項目…" required>
+        <button type="submit">新增</button>
+      </form>
+      <ul id="shoppingList" class="item-list"></ul>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

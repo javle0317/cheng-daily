@@ -8,11 +8,13 @@
  *   LINE_MY_ID     - 你的 LINE 使用者 ID
  *   LINE_WIFE_ID   - 太太的 LINE 使用者 ID
  *
- * Sheet 需要四個分頁：
- *   Goals    欄位: id | date | text | done | createdAt
- *   Events   欄位: id | date | owner | time | title | notes | createdAt
- *   Habits   欄位: id | name | frequency | workdaysOnly | target | active | createdAt
- *   HabitLog 欄位: id | habitId | periodKey | count | createdAt
+ * Sheet 需要六個分頁：
+ *   Goals           欄位: id | date | text | done | createdAt
+ *   Events          欄位: id | date | owner | time | title | notes | createdAt
+ *   Habits          欄位: id | name | frequency | workdaysOnly | target | active | createdAt
+ *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
+ *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | active | createdAt
+ *   ShoppingList    欄位: id | item | done | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -20,6 +22,12 @@
  * Habits 是「習慣定義」（例如每天手沖咖啡），frequency 是 daily/weekly/monthly；
  * HabitLog 是實際完成紀錄，periodKey 依 frequency 是當天日期/該週週一日期/該月，
  * 詳細規則見 app.js 的 getPeriodKey()。
+ *
+ * RecurringEvents 是「固定週期規則」（例如每週三打球、每月15號點藥），跟 Habits
+ * 不同的地方是它是「固定哪一天」而不是「這期間做滿幾次」，只存規則本身，不會
+ * 預先展開成很多列——實際「今天符不符合」是前端（日曆/當日清單）跟後端
+ * （sendDailyNotifications）各自即時算出來的，詳細規則見 app.js 的
+ * matchesRecurringRule()。
  *
  * 每日 LINE 通知：sendDailyNotifications()，需要另外設定時間驅動的觸發條件
  * （見 README.md），不會透過網頁前端呼叫。
@@ -64,6 +72,19 @@ function handleRequest(e) {
         return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
+      case "addRecurringEvent":
+        return respond({
+          ok: true,
+          data: addRecurringEvent(p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth),
+        });
+      case "deleteRecurringEvent":
+        return respond({ ok: true, data: deleteRecurringEvent(p.id) });
+      case "addShoppingItem":
+        return respond({ ok: true, data: addShoppingItem(p.item) });
+      case "toggleShoppingItem":
+        return respond({ ok: true, data: toggleShoppingItem(p.id) });
+      case "deleteShoppingItem":
+        return respond({ ok: true, data: deleteShoppingItem(p.id) });
       default:
         return respond({ ok: false, error: "unknown action" });
     }
@@ -114,6 +135,8 @@ function getData() {
     events: sheetToObjects(getSheet("Events")),
     habits: sheetToObjects(getSheet("Habits")),
     habitLogs: sheetToObjects(getSheet("HabitLog")),
+    recurringEvents: sheetToObjects(getSheet("RecurringEvents")),
+    shoppingList: sheetToObjects(getSheet("ShoppingList")),
   };
 }
 
@@ -155,6 +178,65 @@ function addEvent(date, time, title, notes, owner) {
 
 function deleteEvent(id) {
   var sheet = getSheet("Events");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getData();
+}
+
+function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth) {
+  var sheet = getSheet("RecurringEvents");
+  sheet.appendRow([
+    Utilities.getUuid(),
+    owner || "",
+    title,
+    time || "",
+    notes || "",
+    frequency,
+    dayOfWeek === undefined || dayOfWeek === "" ? "" : parseInt(dayOfWeek, 10),
+    dayOfMonth === undefined || dayOfMonth === "" ? "" : parseInt(dayOfMonth, 10),
+    true,
+    new Date(),
+  ]);
+  return getData();
+}
+
+function deleteRecurringEvent(id) {
+  var sheet = getSheet("RecurringEvents");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getData();
+}
+
+function addShoppingItem(item) {
+  var sheet = getSheet("ShoppingList");
+  sheet.appendRow([Utilities.getUuid(), item, false, new Date()]);
+  return getData();
+}
+
+function toggleShoppingItem(id) {
+  var sheet = getSheet("ShoppingList");
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, 3).setValue(!values[i][2]);
+      break;
+    }
+  }
+  return getData();
+}
+
+function deleteShoppingItem(id) {
+  var sheet = getSheet("ShoppingList");
   var values = sheet.getDataRange().getValues();
   for (var i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
@@ -224,6 +306,14 @@ function sendDailyNotifications() {
     return e.date === todayStr;
   });
 
+  var todayDate = new Date(todayStr + "T00:00:00");
+  var recurringToday = sheetToObjects(getSheet("RecurringEvents"))
+    .filter(function (r) { return isTruthy_(r.active) && matchesRecurringRule_(r, todayDate); })
+    .map(function (r) {
+      return { date: todayStr, owner: r.owner, time: r.time, title: r.title, notes: r.notes };
+    });
+  events = events.concat(recurringToday);
+
   var petLines = events
     .filter(function (e) { return PET_NAMES.indexOf(e.owner) !== -1; })
     .map(formatEventLine_);
@@ -254,6 +344,20 @@ function sendDailyNotifications() {
   if (wifeLines.length > 0) {
     sendLinePush_(token, wifeId, "【個人提醒】\n日期：" + todayStr + "\n\n" + wifeLines.join("\n\n"));
   }
+}
+
+function isTruthy_(v) {
+  return v === true || v === "TRUE";
+}
+
+function matchesRecurringRule_(rule, dateObj) {
+  if (rule.frequency === "weekly") {
+    return dateObj.getDay() === Number(rule.dayOfWeek);
+  }
+  if (rule.frequency === "monthly") {
+    return dateObj.getDate() === Number(rule.dayOfMonth);
+  }
+  return false;
 }
 
 function formatEventLine_(e) {
