@@ -5,7 +5,7 @@
  *
  * Sheet 需要三個分頁：
  *   Goals  欄位: id | date | text | done | createdAt
- *   Events 欄位: id | date | time | title | notes | createdAt | owner
+ *   Events 欄位: id | date | owner | time | title | notes | createdAt
  *   Pets   欄位: id | date | petName | type | time | location | createdAt
  *
  * 從舊的 pets Google Sheet 搬資料過來：見檔案最下面的 migrateFromPetsSheet()，
@@ -118,7 +118,7 @@ function deleteGoal(id) {
 
 function addEvent(date, time, title, notes, owner) {
   var sheet = getSheet("Events");
-  sheet.appendRow([Utilities.getUuid(), date, time, title, notes, new Date(), owner || ""]);
+  sheet.appendRow([Utilities.getUuid(), date, owner || "", time, title, notes, new Date()]);
   return getData();
 }
 
@@ -140,13 +140,22 @@ function deleteEvent(id) {
  * 按執行。第一次執行會跳出授權視窗（因為要讀另一份 Sheet），照畫面允許就好。
  * 執行後到「執行項目」/「Logs」看搬了幾筆。
  *
+ * 會同時讀「工作表1」（手動輸入/最新資料）跟「log」（手動歸檔的歷史資料）兩個
+ * 分頁，兩邊合併搬過來。
+ *
  * 分類邏輯：pet 欄位是 "his"/"her" 的，視為個人行程搬去 Events（owner 標成
  * me/wife）；其他（實際寵物名字，例如 咪嚕、林萌）搬去 Pets。
+ *
+ * 注意：這支只會「新增」，重複執行會重複搬移同一批資料。如果你已經跑過一次、
+ * 現在要重新跑修正過的版本，記得先把 Events / Pets 分頁裡先前搬進去的那些列
+ * 刪掉（只留標題列），再重新執行。
  */
 function migrateFromPetsSheet() {
   var OLD_PETS_SHEET_ID = "1_UFktfGUzYpPCYzxWStE0ZLn7GU8DjMRwS1lDG-h9lI";
-  var oldSheet = SpreadsheetApp.openById(OLD_PETS_SHEET_ID).getSheetByName("log");
-  var rows = sheetToObjects(oldSheet);
+  var oldSs = SpreadsheetApp.openById(OLD_PETS_SHEET_ID);
+  var rows = sheetToObjects(oldSs.getSheetByName("工作表1")).concat(
+    sheetToObjects(oldSs.getSheetByName("log"))
+  );
 
   var eventsSheet = getSheet("Events");
   var petsSheet = getSheet("Pets");
@@ -162,11 +171,11 @@ function migrateFromPetsSheet() {
       eventsSheet.appendRow([
         Utilities.getUuid(),
         row["date"] || "",
+        who === "his" ? "me" : "wife",
         row["時間"] || "",
         row["種類"] || "",
         row["地點"] || "",
         now,
-        who === "his" ? "me" : "wife",
       ]);
       eventCount++;
     } else {
