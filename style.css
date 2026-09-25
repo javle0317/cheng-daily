@@ -1,6 +1,7 @@
 :root {
-  --bg: #f4f5f7;
+  --bg: #eceef2;
   --card-bg: #ffffff;
+  --input-bg: #f4f5f7;
   --text: #1f2430;
   --text-dim: #6b7280;
   --accent: #4f6df5;
@@ -11,13 +12,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14161c;
-    --card-bg: #1d2029;
+    --bg: #0f1115;
+    --card-bg: #1c1f28;
+    --input-bg: #262b37;
     --text: #eef0f4;
     --text-dim: #9aa0ac;
     --accent: #7c93ff;
     --accent-soft: #262c45;
-    --border: #2b2f3a;
+    --border: #333847;
     --danger: #e88b91;
   }
 }
@@ -61,7 +63,7 @@ body {
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--input-bg);
   color: var(--text);
   font-size: 15px;
 }
@@ -160,7 +162,7 @@ body {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -176,7 +178,7 @@ body {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--input-bg);
   color: var(--text);
   font-size: 14px;
 }
@@ -188,6 +190,12 @@ body {
   background: var(--accent);
   color: white;
   cursor: pointer;
+}
+
+.entry-form button:disabled {
+  background: var(--border);
+  color: var(--text-dim);
+  cursor: not-allowed;
 }
 
 #eventDate { flex: 1 1 140px; }
@@ -300,6 +308,14 @@ body {
 .calendar-cell.empty { visibility: hidden; cursor: default; }
 .calendar-cell.today { border-color: var(--accent); }
 .calendar-cell.selected { background: var(--accent-soft); }
+
+.dot-row {
+  display: flex;
+  gap: 2px;
+  margin-top: 3px;
+}
+
+.dot-row .dot { margin-top: 0; }
 
 .calendar-cell .dot {
   width: 5px;

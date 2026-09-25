@@ -101,6 +101,7 @@ function renderAll() {
   renderCalendar();
   const dateInput = document.getElementById("eventDate");
   if (dateInput) dateInput.value = state.selectedDate;
+  if (typeof updateEventFormValidity === "function") updateEventFormValidity();
 }
 
 function renderHeader() {
@@ -208,7 +209,7 @@ function renderEvents() {
     } else if (ev.notes) {
       const noteSpan = document.createElement("span");
       noteSpan.className = "item-time";
-      noteSpan.textContent = ev.notes;
+      noteSpan.textContent = `📝 ${ev.notes}`;
       li.appendChild(noteSpan);
     }
 
@@ -250,10 +251,13 @@ function renderCalendar() {
   const daysInMonth = new Date(state.calendarYear, state.calendarMonth + 1, 0).getDate();
   const todayStr = toDateStr(new Date());
 
-  const datesWithData = new Set([
-    ...state.goals.map(g => g.date),
-    ...state.events.map(e => e.date),
-  ]);
+  const eventColorsByDate = {};
+  state.events.forEach(ev => {
+    const color = (OWNER_META[ev.owner] || {}).color || "var(--accent)";
+    if (!eventColorsByDate[ev.date]) eventColorsByDate[ev.date] = new Set();
+    eventColorsByDate[ev.date].add(color);
+  });
+  const goalDates = new Set(state.goals.map(g => g.date));
 
   for (let i = 0; i < startOffset; i++) {
     const el = document.createElement("div");
@@ -268,10 +272,24 @@ function renderCalendar() {
     if (dateStr === todayStr) cell.classList.add("today");
     if (dateStr === state.selectedDate) cell.classList.add("selected");
 
-    cell.innerHTML = `<span>${day}</span>`;
-    if (datesWithData.has(dateStr)) {
-      cell.innerHTML += `<span class="dot"></span>`;
+    const dayLabel = document.createElement("span");
+    dayLabel.textContent = day;
+    cell.appendChild(dayLabel);
+
+    const colors = new Set(eventColorsByDate[dateStr] || []);
+    if (goalDates.has(dateStr)) colors.add("var(--accent)");
+    if (colors.size) {
+      const dotsWrap = document.createElement("div");
+      dotsWrap.className = "dot-row";
+      [...colors].slice(0, 4).forEach(color => {
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = color;
+        dotsWrap.appendChild(dot);
+      });
+      cell.appendChild(dotsWrap);
     }
+
     cell.addEventListener("click", () => {
       state.selectedDate = dateStr;
       renderHeader();
@@ -280,6 +298,7 @@ function renderCalendar() {
       renderCalendar();
       const dateInput = document.getElementById("eventDate");
       if (dateInput) dateInput.value = state.selectedDate;
+      updateEventFormValidity();
       document.querySelector(".notes-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     grid.appendChild(cell);
@@ -303,6 +322,20 @@ document.getElementById("goalForm").addEventListener("submit", async (e) => {
   }
 });
 
+function updateEventFormValidity() {
+  const dateInput = document.getElementById("eventDate");
+  const titleInput = document.getElementById("eventTitle");
+  const ownerSelect = document.getElementById("eventOwner");
+  const submitBtn = document.getElementById("eventSubmitBtn");
+  const valid = !!dateInput.value && !!ownerSelect.value && !!titleInput.value.trim();
+  submitBtn.disabled = !valid;
+}
+
+["eventDate", "eventOwner", "eventTitle"].forEach(id => {
+  document.getElementById(id).addEventListener("input", updateEventFormValidity);
+  document.getElementById(id).addEventListener("change", updateEventFormValidity);
+});
+
 document.getElementById("eventForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const dateInput = document.getElementById("eventDate");
@@ -312,7 +345,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   const ownerSelect = document.getElementById("eventOwner");
   const title = titleInput.value.trim();
   const date = dateInput.value || state.selectedDate;
-  if (!title || !date) return;
+  if (!title || !date || !ownerSelect.value) return;
   try {
     state.events = await api("addEvent", {
       date,
@@ -324,6 +357,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
+    updateEventFormValidity();
     renderEvents();
     renderCalendar();
   } catch (err) {
