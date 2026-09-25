@@ -28,17 +28,9 @@
 
 第一列填欄位名稱（跟上面一樣），下面留空即可。
 
-### 從舊的 pets Google Sheet 搬資料
-
-如果你原本有一份單獨的 pets Google Sheet（寵物照護紀錄 + his/her 個人行程混在一起），
-把 `apps-script/Code.gs` 貼好、Goals/Events/Pets 三個分頁都建立好之後：
-
-1. 在 Apps Script 編輯器上方的函式下拉選單，選 **`migrateFromPetsSheet`**
-2. 按執行（第一次會跳出授權視窗，因為要讀另一份 Sheet，照畫面允許即可）
-3. 執行完到「執行項目」（Executions）看 log，確認搬了幾筆
-4. 這個函式只會「複製」資料過來，**不會動到舊的 pets Sheet**，原本的 LINE 每日通知
-   可以繼續正常運作，等之後把通知功能也搬過來、確認新架構都沒問題後，再自己決定
-   要不要清理舊檔案
+> 這份資料原本是從一個獨立的 pets Google Sheet 搬過來的（寵物照護紀錄 + his/her
+> 個人行程）。當時用的一次性搬移／補值函式已經跑完並從 `Code.gs` 移除，需要參考
+> 的話到 git 歷史紀錄找 `migrateFromPetsSheet` / `fillBlankEventOwners`。
 
 ### 2. 設定 Apps Script
 
