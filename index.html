@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="lockScreen" class="lock-screen">
+    <form id="lockForm" class="lock-card">
+      <h1>Daily Hub</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1 id="todayDate"></h1>
+        <p id="progressLine" class="progress-line"></p>
+      </div>
+      <button id="logoutBtn" class="ghost-btn">登出</button>
+    </header>
+
+    <main class="grid">
+      <section class="card goals-card">
+        <h2>每日目標 <span id="selectedDateLabel"></span></h2>
+        <form id="goalForm" class="inline-form">
+          <input id="goalInput" type="text" placeholder="新增一個目標…" required>
+          <button type="submit">新增</button>
+        </form>
+        <ul id="goalList" class="item-list"></ul>
+      </section>
+
+      <section class="card calendar-card">
+        <div class="calendar-nav">
+          <button id="prevMonth" class="ghost-btn">‹</button>
+          <h2 id="monthLabel"></h2>
+          <button id="nextMonth" class="ghost-btn">›</button>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+
+      <section class="card events-card">
+        <h2>行事曆事件 <span id="selectedDateLabel2"></span></h2>
+        <form id="eventForm" class="inline-form event-form">
+          <input id="eventTime" type="time">
+          <input id="eventTitle" type="text" placeholder="事件標題…" required>
+          <button type="submit">新增</button>
+        </form>
+        <ul id="eventList" class="item-list"></ul>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
