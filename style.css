@@ -235,6 +235,17 @@ body {
 #eventTime { flex: 0 1 110px; }
 #eventNote { flex: 2 1 160px; }
 
+.entry-form-rows {
+  flex-direction: column;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
 #recurringOwner { flex: 0 1 90px; }
 #recurringTitle { flex: 2 1 140px; }
 #recurringFrequency { flex: 0 1 80px; }
@@ -242,7 +253,6 @@ body {
 #recurringDayOfMonth { flex: 0 1 80px; }
 #recurringTime { flex: 0 1 110px; }
 #recurringNote { flex: 2 1 160px; }
-#recurringEndDate { flex: 1 1 140px; }
 
 .muted {
   font-size: 13px;

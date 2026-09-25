@@ -13,7 +13,7 @@
  *   Events          欄位: id | date | owner | time | title | notes | createdAt
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
- *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | endDate | createdAt
+ *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
@@ -78,7 +78,7 @@ function handleRequest(e) {
         return respond({
           ok: true,
           data: addRecurringEvent(
-            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth, p.endDate
+            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth
           ),
         });
       case "deleteRecurringEvent":
@@ -192,7 +192,7 @@ function deleteEvent(id) {
   return getData();
 }
 
-function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate) {
+function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth) {
   var sheet = getSheet("RecurringEvents");
   sheet.appendRow([
     Utilities.getUuid(),
@@ -203,7 +203,6 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     frequency,
     dayOfWeek === undefined || dayOfWeek === "" ? "" : parseInt(dayOfWeek, 10),
     dayOfMonth === undefined || dayOfMonth === "" ? "" : parseInt(dayOfMonth, 10),
-    endDate || "",
     new Date(),
   ]);
   return getData();
@@ -323,7 +322,7 @@ function sendDailyNotifications() {
 
   var todayDate = new Date(todayStr + "T00:00:00");
   var recurringToday = sheetToObjects(getSheet("RecurringEvents"))
-    .filter(function (r) { return matchesRecurringRule_(r, todayStr, todayDate); })
+    .filter(function (r) { return matchesRecurringRule_(r, todayDate); })
     .map(function (r) {
       return { date: todayStr, owner: r.owner, time: r.time, title: r.title, notes: r.notes };
     });
@@ -361,8 +360,7 @@ function sendDailyNotifications() {
   }
 }
 
-function matchesRecurringRule_(rule, dateStr, dateObj) {
-  if (rule.endDate && dateStr > rule.endDate) return false;
+function matchesRecurringRule_(rule, dateObj) {
   if (rule.frequency === "weekly") {
     return dateObj.getDay() === Number(rule.dayOfWeek);
   }

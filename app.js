@@ -80,7 +80,6 @@ function getPeriodKey(habit, dateStr) {
 }
 
 function matchesRecurringRule(rule, dateStr) {
-  if (rule.endDate && dateStr > rule.endDate) return false;
   const d = new Date(dateStr + "T00:00:00");
   if (rule.frequency === "weekly") return d.getDay() === Number(rule.dayOfWeek);
   if (rule.frequency === "monthly") return d.getDate() === Number(rule.dayOfMonth);
@@ -250,6 +249,7 @@ function renderGoals() {
       }
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
+      if (!confirm("確定要刪除這個待辦嗎？")) return;
       try {
         const data = await api("deleteGoal", { id: goal.id });
         state.goals = data;
@@ -320,6 +320,7 @@ function renderDailyHabits() {
       }
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
+      if (!confirm("確定要刪除這個習慣嗎？")) return;
       try {
         const data = await api("deleteHabit", { id: habit.id });
         state.habits = data.habits;
@@ -375,6 +376,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
     });
     li.querySelector(".delete-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (!confirm("確定要刪除這個習慣嗎？")) return;
       try {
         const data = await api("deleteHabit", { id: habit.id });
         state.habits = data.habits;
@@ -441,18 +443,25 @@ function renderEvents() {
     li.appendChild(textSpan);
     li.appendChild(badge);
 
-    if (ev.notes && /^https?:\/\//.test(ev.notes)) {
-      const link = document.createElement("a");
-      link.href = ev.notes;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "📍";
-      li.appendChild(link);
-    } else if (ev.notes) {
-      const noteSpan = document.createElement("span");
-      noteSpan.className = "item-time";
-      noteSpan.textContent = `📝 ${ev.notes}`;
-      li.appendChild(noteSpan);
+    if (ev.notes) {
+      const urlMatch = ev.notes.match(/https?:\/\/\S+/);
+      const restText = urlMatch ? ev.notes.replace(urlMatch[0], "").trim() : ev.notes;
+
+      if (restText) {
+        const noteSpan = document.createElement("span");
+        noteSpan.className = "item-time";
+        noteSpan.textContent = `📝 ${restText}`;
+        li.appendChild(noteSpan);
+      }
+
+      if (urlMatch) {
+        const link = document.createElement("a");
+        link.href = urlMatch[0];
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = "📍";
+        li.appendChild(link);
+      }
     }
 
     if (!ev.recurring) {
@@ -461,6 +470,7 @@ function renderEvents() {
       delBtn.title = "刪除";
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
+        if (!confirm("確定要刪除這筆事件嗎？")) return;
         try {
           state.events = await api("deleteEvent", { id: ev.id });
           renderEvents();
@@ -559,7 +569,7 @@ function renderRecurringList() {
   list.innerHTML = "";
 
   if (!state.recurringEvents.length) {
-    list.innerHTML = `<li class="empty-hint">還沒有重複行程</li>`;
+    list.innerHTML = `<li class="empty-hint">還沒有循環行程</li>`;
     return;
   }
 
@@ -578,15 +588,14 @@ function renderRecurringList() {
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "item-time";
-    timeSpan.textContent = scheduleText
-      + (rule.time ? ` ${rule.time}` : "")
-      + (rule.endDate ? ` · 至${rule.endDate}` : "");
+    timeSpan.textContent = scheduleText + (rule.time ? ` ${rule.time}` : "");
 
     const delBtn = document.createElement("button");
     delBtn.className = "delete-btn";
     delBtn.title = "刪除";
     delBtn.textContent = "✕";
     delBtn.addEventListener("click", async () => {
+      if (!confirm("確定要刪除這個循環行程嗎？")) return;
       try {
         const data = await api("deleteRecurringEvent", { id: rule.id });
         state.recurringEvents = data.recurringEvents;
@@ -633,7 +642,6 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
   const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
   const timeInput = document.getElementById("recurringTime");
   const noteInput = document.getElementById("recurringNote");
-  const endDateInput = document.getElementById("recurringEndDate");
   const title = titleInput.value.trim();
   if (!title) return;
   if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
@@ -646,19 +654,17 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
       frequency: frequencySelect.value,
       dayOfWeek: dayOfWeekSelect.value,
       dayOfMonth: dayOfMonthInput.value,
-      endDate: endDateInput.value || "",
     });
     state.recurringEvents = data.recurringEvents;
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
     dayOfMonthInput.value = "";
-    endDateInput.value = "";
     updateRecurringFormValidity();
     renderRecurringList();
     renderEvents();
     renderCalendar();
-    showToast("已新增重複行程");
+    showToast("已新增循環行程");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
   }
@@ -695,6 +701,7 @@ function renderShoppingList() {
       }
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
+      if (!confirm("確定要刪除這個購物項目嗎？")) return;
       try {
         state.shoppingList = await api("deleteShoppingItem", { id: item.id });
         renderShoppingList();
