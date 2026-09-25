@@ -42,6 +42,18 @@ function setStatus(msg, isError) {
   el.style.color = isError ? "var(--danger)" : "var(--text-dim)";
 }
 
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  requestAnimationFrame(() => el.classList.add("show"));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove("show");
+  }, 1800);
+}
+
 function isWorkday(dateStr) {
   const day = new Date(dateStr + "T00:00:00").getDay();
   return day >= 1 && day <= 5;
@@ -176,6 +188,7 @@ function renderHeader() {
 
   document.getElementById("selectedDateLabel").textContent = `(${formatDateLabel(state.selectedDate)})`;
   document.getElementById("selectedDateLabel2").textContent = `(${formatDateLabel(state.selectedDate)})`;
+  document.getElementById("selectedDateLabel3").textContent = `(${formatDateLabel(state.selectedDate)})`;
 }
 
 function renderGoals() {
@@ -227,7 +240,15 @@ function isTruthy(v) {
   return v === true || v === "TRUE";
 }
 
+function updateHabitsCardVisibility() {
+  const card = document.getElementById("habitsCard");
+  const anyVisible = ["dailyHabitSection", "weeklyHabitSection", "monthlyHabitSection"]
+    .some(id => !document.getElementById(id).classList.contains("hidden"));
+  card.classList.toggle("hidden", !anyVisible);
+}
+
 function renderDailyHabits() {
+  const section = document.getElementById("dailyHabitSection");
   const list = document.getElementById("dailyHabitList");
   list.innerHTML = "";
 
@@ -237,10 +258,10 @@ function renderDailyHabits() {
     (!isTruthy(h.workdaysOnly) || isWorkday(state.selectedDate))
   );
 
-  if (!habits.length) {
-    list.innerHTML = `<li class="empty-hint">這天沒有適用的每日習慣</li>`;
-    return;
-  }
+  section.classList.toggle("hidden", habits.length === 0);
+  updateHabitsCardVisibility();
+
+  if (!habits.length) return;
 
   const rows = habits.map(habit => {
     const periodKey = state.selectedDate;
@@ -274,16 +295,17 @@ function renderDailyHabits() {
   });
 }
 
-function renderPeriodHabits(frequency, listId) {
+function renderPeriodHabits(frequency, listId, sectionId) {
+  const section = document.getElementById(sectionId);
   const list = document.getElementById(listId);
   list.innerHTML = "";
 
   const habits = state.habits.filter(h => h.frequency === frequency && isTruthy(h.active));
 
-  if (!habits.length) {
-    list.innerHTML = `<li class="empty-hint">還沒有${frequency === "weekly" ? "每週" : "每月"}目標</li>`;
-    return;
-  }
+  section.classList.toggle("hidden", habits.length === 0);
+  updateHabitsCardVisibility();
+
+  if (!habits.length) return;
 
   const rows = habits.map(habit => {
     const periodKey = getPeriodKey(habit, state.selectedDate);
@@ -307,7 +329,7 @@ function renderPeriodHabits(frequency, listId) {
         const data = await api("toggleHabitLog", { habitId: habit.id, periodKey, target });
         state.habits = data.habits;
         state.habitLogs = data.habitLogs;
-        renderPeriodHabits(frequency, listId);
+        renderPeriodHabits(frequency, listId, sectionId);
       } catch (err) {
         setStatus("更新失敗：" + err.message, true);
       }
@@ -317,11 +339,11 @@ function renderPeriodHabits(frequency, listId) {
 }
 
 function renderWeeklyHabits() {
-  renderPeriodHabits("weekly", "weeklyHabitList");
+  renderPeriodHabits("weekly", "weeklyHabitList", "weeklyHabitSection");
 }
 
 function renderMonthlyHabits() {
-  renderPeriodHabits("monthly", "monthlyHabitList");
+  renderPeriodHabits("monthly", "monthlyHabitList", "monthlyHabitSection");
 }
 
 function renderEvents() {
@@ -477,6 +499,7 @@ document.getElementById("goalForm").addEventListener("submit", async (e) => {
     renderGoals();
     renderHeader();
     renderCalendar();
+    showToast("已新增待辦");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
   }
@@ -520,6 +543,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
     updateEventFormValidity();
     renderEvents();
     renderCalendar();
+    showToast("已新增記事");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
   }
@@ -568,6 +592,7 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
     renderDailyHabits();
     renderWeeklyHabits();
     renderMonthlyHabits();
+    showToast("已新增習慣");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
   }
