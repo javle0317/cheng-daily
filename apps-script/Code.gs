@@ -83,7 +83,13 @@ function sheetToObjects(sheet) {
     headers.forEach(function (h, i) {
       var v = row[i];
       if (Object.prototype.toString.call(v) === "[object Date]") {
-        v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
+        if (h === "time") {
+          v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
+        } else if (h === "date") {
+          v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
+        } else {
+          v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd HH:mm:ss");
+        }
       }
       obj[h] = v;
     });
@@ -243,6 +249,59 @@ function migratePetsIntoEvents() {
   });
 
   Logger.log("搬移完成：Events 新增 " + count + " 筆寵物紀錄");
+}
+
+/**
+ * 一次性整理用：把 Events 分頁的 date 欄統一成純文字 "yyyy-MM-dd"，並把整欄設成
+ * 純文字格式，避免之後 Sheets 又自動把某些列轉成日期型別、某些列不轉，兩種格式
+ * 混在一起造成比對失敗。用法跟其他一次性函式一樣：函式下拉選單選
+ * 「normalizeEventDates」，執行一次。
+ */
+function normalizeEventDates() {
+  var sheet = getSheet("Events");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var range = sheet.getRange(2, 2, lastRow - 1, 1); // B 欄，跳過標題列
+  var values = range.getValues();
+  var fixed = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    var v = values[i][0];
+    var normalized = normalizeDateValue_(v);
+    if (normalized !== null && normalized !== v) {
+      values[i][0] = normalized;
+      fixed++;
+    }
+  }
+
+  range.setNumberFormat("@"); // 整欄設成純文字，避免之後又被自動轉成日期型別
+  range.setValues(values);
+
+  Logger.log("日期格式統一完成，修正了 " + fixed + " 筆");
+}
+
+function normalizeDateValue_(v) {
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
+  }
+  if (typeof v !== "string") return null;
+
+  var s = v.trim();
+
+  // 標準 2026-9-26 或 2026/9/26 這種有分隔符號的
+  var m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m) {
+    return m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0");
+  }
+
+  // 像 2026/0720 這種缺一個斜線的舊資料（年/月日黏在一起）
+  m = s.match(/^(\d{4})\/(\d{2})(\d{2})$/);
+  if (m) {
+    return m[1] + "-" + m[2] + "-" + m[3];
+  }
+
+  return null; // 看不懂的格式，不動它，留著自己手動檢查
 }
 
 function sendLinePush_(token, userId, text) {
