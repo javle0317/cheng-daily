@@ -63,6 +63,8 @@ function respond(obj) {
   );
 }
 
+var TIME_ZONE = "Asia/Taipei"; // 寫死，不依賴這個 Apps Script 專案本身的時區設定
+
 function getSheet(name) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sheet) throw new Error("找不到分頁: " + name);
@@ -77,7 +79,7 @@ function sheetToObjects(sheet) {
     headers.forEach(function (h, i) {
       var v = row[i];
       if (v instanceof Date) {
-        v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+        v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
       }
       obj[h] = v;
     });
@@ -162,7 +164,7 @@ function sendDailyNotifications() {
     return;
   }
 
-  var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var todayStr = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
   var pets = sheetToObjects(getSheet("Pets")).filter(function (p) {
     return p.date === todayStr;
   });
