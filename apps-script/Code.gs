@@ -8,10 +8,12 @@
  *   LINE_MY_ID     - 你的 LINE 使用者 ID
  *   LINE_WIFE_ID   - 太太的 LINE 使用者 ID
  *
- * Sheet 需要三個分頁：
+ * Sheet 需要兩個分頁：
  *   Goals  欄位: id | date | text | done | createdAt
  *   Events 欄位: id | date | owner | time | title | notes | createdAt
- *   Pets   欄位: id | date | petName | type | time | location | createdAt
+ *
+ * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
+ * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
  *
  * 每日 LINE 通知：sendDailyNotifications()，需要另外設定時間驅動的觸發條件
  * （見 README.md），不會透過網頁前端呼叫。
@@ -19,6 +21,8 @@
  * （從舊 pets Sheet 搬資料、補 owner 空值的一次性函式已經跑完並移除，
  * 需要時可以到 git 歷史紀錄找回來。）
  */
+
+var PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡加名字就好
 
 function doGet(e) {
   return handleRequest(e);
@@ -91,7 +95,6 @@ function getData() {
   return {
     goals: sheetToObjects(getSheet("Goals")),
     events: sheetToObjects(getSheet("Events")),
-    pets: sheetToObjects(getSheet("Pets")),
   };
 }
 
@@ -149,9 +152,9 @@ function deleteEvent(id) {
  * 時間驅動 → 日計時器 → 選時段），見 README.md。
  *
  * 邏輯：
- *   - Pets 分頁今天的紀錄 + Events 分頁 owner="shared" 的今天行程 → 一起發給你們兩人
- *   - Events 分頁 owner="me" 今天的行程 → 只發給你
- *   - Events 分頁 owner="wife" 今天的行程 → 只發給太太
+ *   - owner 是寵物名字（PET_NAMES）或 "shared" 的今天行程 → 一起發給你們兩人
+ *   - owner="me" 的今天行程 → 只發給你
+ *   - owner="wife" 的今天行程 → 只發給太太
  */
 function sendDailyNotifications() {
   var props = PropertiesService.getScriptProperties();
@@ -165,17 +168,13 @@ function sendDailyNotifications() {
   }
 
   var todayStr = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
-  var allPets = sheetToObjects(getSheet("Pets"));
-  var allEvents = sheetToObjects(getSheet("Events"));
-
-  var pets = allPets.filter(function (p) {
-    return p.date === todayStr;
-  });
-  var events = allEvents.filter(function (e) {
+  var events = sheetToObjects(getSheet("Events")).filter(function (e) {
     return e.date === todayStr;
   });
 
-  var petLines = pets.map(formatPetLine_);
+  var petLines = events
+    .filter(function (e) { return PET_NAMES.indexOf(e.owner) !== -1; })
+    .map(formatEventLine_);
   var sharedLines = events
     .filter(function (e) { return e.owner === "shared"; })
     .map(formatEventLine_);
@@ -205,18 +204,45 @@ function sendDailyNotifications() {
   }
 }
 
-function formatPetLine_(p) {
-  var line = "🐾 " + (p.petName || "") + "：" + (p.type || "");
-  if (p.time) line += "\n   ⏰ 時間：" + p.time;
-  if (p.location) line += "\n   📍 地點：" + p.location;
-  return line;
-}
-
 function formatEventLine_(e) {
-  var line = "📅 " + (e.title || "");
+  var isPet = PET_NAMES.indexOf(e.owner) !== -1;
+  var line = (isPet ? "🐾 " + e.owner + "：" : "📅 ") + (e.title || "");
   if (e.time) line += "\n   ⏰ 時間：" + e.time;
   if (e.notes) line += "\n   📍 " + e.notes;
   return line;
+}
+
+/**
+ * 一次性搬移用：把 Pets 分頁的資料併進 Events（owner 填寵物名字），
+ * 只會「複製」，不會刪除或修改 Pets 分頁。搬完自己確認 Events 資料沒問題後，
+ * 再自己決定要不要把 Pets 分頁刪掉。用法跟之前的搬移函式一樣：函式下拉選單選
+ * 「migratePetsIntoEvents」，執行一次。
+ */
+function migratePetsIntoEvents() {
+  var petsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pets");
+  if (!petsSheet) {
+    Logger.log("找不到 Pets 分頁，可能已經刪掉了，不用再搬一次");
+    return;
+  }
+
+  var pets = sheetToObjects(petsSheet);
+  var eventsSheet = getSheet("Events");
+  var count = 0;
+
+  pets.forEach(function (p) {
+    eventsSheet.appendRow([
+      Utilities.getUuid(),
+      p.date || "",
+      p.petName || "",
+      p.time || "",
+      p.type || "",
+      p.location || "",
+      new Date(),
+    ]);
+    count++;
+  });
+
+  Logger.log("搬移完成：Events 新增 " + count + " 筆寵物紀錄");
 }
 
 function sendLinePush_(token, userId, text) {

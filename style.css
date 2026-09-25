@@ -164,22 +164,37 @@ body {
   color: var(--text);
 }
 
-.event-form input[type="time"] {
-  width: 110px;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
+.entry-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.event-form select {
+.entry-form input,
+.entry-form select {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
+  font-size: 14px;
 }
+
+.entry-form button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+
+#eventDate { flex: 1 1 140px; }
+#eventOwner { flex: 0 1 90px; }
+#eventTitle { flex: 2 1 140px; }
+#eventTime { flex: 0 1 110px; }
+#eventNote { flex: 2 1 160px; }
 
 .muted {
   font-size: 13px;

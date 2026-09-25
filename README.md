@@ -7,7 +7,7 @@
 
 ### 1. 建立 Google Sheet
 
-新增一個 Google Sheet，建立三個分頁：
+新增一個 Google Sheet，建立兩個分頁：
 
 **Goals**
 
@@ -19,18 +19,17 @@
 | id | date | owner | time | title | notes | createdAt |
 |----|------|-------|------|-------|-------|-----------|
 
-`owner` 是 `me` / `wife` / `shared` 其中一個，用來標記是誰的行程。
-
-**Pets**
-
-| id | date | petName | type | time | location | createdAt |
-|----|------|---------|------|------|----------|-----------|
+`owner` 是 `me` / `wife` / `shared` / 寵物名字（見 `Code.gs` 的 `PET_NAMES`）其中一個，
+用來標記這筆是誰的（人的行程或寵物照護紀錄現在是同一張表）。網頁上顯示的名稱可以
+跟這些內部值不一樣（例如 `me` 顯示成「承承」），改 [app.js](app.js) 的 `ownerLabels`
+跟 `index.html` 的 `#eventOwner` 下拉選項文字即可，不用動 Sheet 或 `Code.gs`。
 
 第一列填欄位名稱（跟上面一樣），下面留空即可。
 
-> 這份資料原本是從一個獨立的 pets Google Sheet 搬過來的（寵物照護紀錄 + his/her
-> 個人行程）。當時用的一次性搬移／補值函式已經跑完並從 `Code.gs` 移除，需要參考
-> 的話到 git 歷史紀錄找 `migrateFromPetsSheet` / `fillBlankEventOwners`。
+> 這份資料原本是從一個獨立的 pets Google Sheet 搬過來、先放在自己的 Pets 分頁，
+> 後來又併回 Events（owner 填寵物名字）。用過的一次性搬移／補值函式都已經跑完並
+> 從 `Code.gs` 移除，需要參考的話到 git 歷史紀錄找
+> `migrateFromPetsSheet` / `fillBlankEventOwners` / `migratePetsIntoEvents`。
 
 ### 2. 設定 Apps Script
 

@@ -36,6 +36,25 @@
         <ul id="goalList" class="item-list"></ul>
       </section>
 
+      <section class="card notes-card">
+        <h2>新增記事 <span id="selectedDateLabel2"></span></h2>
+        <form id="eventForm" class="entry-form">
+          <input id="eventDate" type="date" required>
+          <select id="eventOwner">
+            <option value="shared">一起</option>
+            <option value="me">承承</option>
+            <option value="wife">君君</option>
+            <option value="林萌">林萌</option>
+            <option value="咪嚕">咪嚕</option>
+          </select>
+          <input id="eventTitle" type="text" placeholder="項目…" required>
+          <input id="eventTime" type="time">
+          <input id="eventNote" type="text" placeholder="備註/地點…">
+          <button type="submit">新增</button>
+        </form>
+        <ul id="eventList" class="item-list"></ul>
+      </section>
+
       <section class="card calendar-card">
         <div class="calendar-nav">
           <button id="prevMonth" class="ghost-btn">‹</button>
@@ -43,26 +62,6 @@
           <button id="nextMonth" class="ghost-btn">›</button>
         </div>
         <div id="calendarGrid" class="calendar-grid"></div>
-      </section>
-
-      <section class="card events-card">
-        <h2>行事曆事件 <span id="selectedDateLabel2"></span></h2>
-        <form id="eventForm" class="inline-form event-form">
-          <input id="eventTime" type="time">
-          <input id="eventTitle" type="text" placeholder="事件標題…" required>
-          <select id="eventOwner">
-            <option value="shared">共同</option>
-            <option value="me">我</option>
-            <option value="wife">太太</option>
-          </select>
-          <button type="submit">新增</button>
-        </form>
-        <ul id="eventList" class="item-list"></ul>
-      </section>
-
-      <section class="card pets-card">
-        <h2>寵物照護 <span class="muted">(近期)</span></h2>
-        <ul id="petsList" class="item-list"></ul>
       </section>
     </main>
 
