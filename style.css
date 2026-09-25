@@ -278,17 +278,19 @@ body {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 3px;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 .calendar-cell {
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   background: var(--bg);
   border: 1px solid transparent;
@@ -309,7 +311,7 @@ body {
 
 .calendar-weekday {
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-dim);
   padding-bottom: 4px;
 }

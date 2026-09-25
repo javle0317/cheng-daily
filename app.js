@@ -4,6 +4,14 @@ const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbw-_yrxEFqaCI8WIKAPK
 
 const PASSWORD_KEY = "dailyhub_password";
 
+const OWNER_META = {
+  me: { label: "承承", icon: "🧑", color: "#4f6df5" },
+  wife: { label: "君君", icon: "👩", color: "#e0699a" },
+  "林萌": { label: "林萌", icon: "🐕", color: "#c9852f" },
+  "咪嚕": { label: "咪嚕", icon: "🐈", color: "#8a5fd6" },
+  shared: { label: "一起", icon: "🤝", color: "#3fa373" },
+};
+
 // ====== State ======
 let state = {
   goals: [],
@@ -167,8 +175,6 @@ function renderEvents() {
     return;
   }
 
-  const ownerLabels = { me: "承承", wife: "君君", shared: "一起" };
-
   events.forEach(ev => {
     const li = document.createElement("li");
     li.className = "item-row";
@@ -181,9 +187,12 @@ function renderEvents() {
     textSpan.className = "item-text";
     textSpan.textContent = ev.title;
 
+    const meta = OWNER_META[ev.owner] || { label: ev.owner || "", icon: "", color: "var(--accent)" };
     const badge = document.createElement("span");
     badge.className = "owner-badge";
-    badge.textContent = ownerLabels[ev.owner] || ev.owner || "";
+    badge.textContent = `${meta.icon} ${meta.label}`.trim();
+    badge.style.color = meta.color;
+    badge.style.background = meta.color + "22";
 
     li.appendChild(timeSpan);
     li.appendChild(textSpan);
@@ -271,6 +280,7 @@ function renderCalendar() {
       renderCalendar();
       const dateInput = document.getElementById("eventDate");
       if (dateInput) dateInput.value = state.selectedDate;
+      document.querySelector(".notes-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     grid.appendChild(cell);
   }
