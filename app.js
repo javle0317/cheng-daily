@@ -80,6 +80,7 @@ function getPeriodKey(habit, dateStr) {
 }
 
 function matchesRecurringRule(rule, dateStr) {
+  if (rule.endDate && dateStr > rule.endDate) return false;
   const d = new Date(dateStr + "T00:00:00");
   if (rule.frequency === "weekly") return d.getDay() === Number(rule.dayOfWeek);
   if (rule.frequency === "monthly") return d.getDate() === Number(rule.dayOfMonth);
@@ -281,7 +282,6 @@ function renderDailyHabits() {
 
   const habits = state.habits.filter(h =>
     h.frequency === "daily" &&
-    isTruthy(h.active) &&
     (!isTruthy(h.workdaysOnly) || isWorkday(state.selectedDate))
   );
 
@@ -304,6 +304,7 @@ function renderDailyHabits() {
       <input type="checkbox" ${done ? "checked" : ""}>
       <span class="item-text"></span>
       <span class="item-time"></span>
+      <button class="delete-btn" title="刪除">✕</button>
     `;
     li.querySelector(".item-text").textContent = habit.name;
     const streak = computeStreak(habit);
@@ -318,6 +319,16 @@ function renderDailyHabits() {
         setStatus("更新失敗：" + err.message, true);
       }
     });
+    li.querySelector(".delete-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("deleteHabit", { id: habit.id });
+        state.habits = data.habits;
+        state.habitLogs = data.habitLogs;
+        renderDailyHabits();
+      } catch (err) {
+        setStatus("刪除失敗：" + err.message, true);
+      }
+    });
     list.appendChild(li);
   });
 }
@@ -327,7 +338,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
   const list = document.getElementById(listId);
   list.innerHTML = "";
 
-  const habits = state.habits.filter(h => h.frequency === frequency && isTruthy(h.active));
+  const habits = state.habits.filter(h => h.frequency === frequency);
 
   section.classList.toggle("hidden", habits.length === 0);
   updateHabitsCardVisibility();
@@ -348,6 +359,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
     li.innerHTML = `
       <span class="item-text"></span>
       <span class="item-time"></span>
+      <button class="delete-btn" title="刪除">✕</button>
     `;
     li.querySelector(".item-text").textContent = habit.name;
     li.querySelector(".item-time").textContent = `${count}/${target}`;
@@ -359,6 +371,17 @@ function renderPeriodHabits(frequency, listId, sectionId) {
         renderPeriodHabits(frequency, listId, sectionId);
       } catch (err) {
         setStatus("更新失敗：" + err.message, true);
+      }
+    });
+    li.querySelector(".delete-btn").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        const data = await api("deleteHabit", { id: habit.id });
+        state.habits = data.habits;
+        state.habitLogs = data.habitLogs;
+        renderPeriodHabits(frequency, listId, sectionId);
+      } catch (err) {
+        setStatus("刪除失敗：" + err.message, true);
       }
     });
     list.appendChild(li);
@@ -555,7 +578,9 @@ function renderRecurringList() {
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "item-time";
-    timeSpan.textContent = scheduleText + (rule.time ? ` ${rule.time}` : "");
+    timeSpan.textContent = scheduleText
+      + (rule.time ? ` ${rule.time}` : "")
+      + (rule.endDate ? ` · 至${rule.endDate}` : "");
 
     const delBtn = document.createElement("button");
     delBtn.className = "delete-btn";
@@ -608,6 +633,7 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
   const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
   const timeInput = document.getElementById("recurringTime");
   const noteInput = document.getElementById("recurringNote");
+  const endDateInput = document.getElementById("recurringEndDate");
   const title = titleInput.value.trim();
   if (!title) return;
   if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
@@ -620,12 +646,14 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
       frequency: frequencySelect.value,
       dayOfWeek: dayOfWeekSelect.value,
       dayOfMonth: dayOfMonthInput.value,
+      endDate: endDateInput.value || "",
     });
     state.recurringEvents = data.recurringEvents;
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
     dayOfMonthInput.value = "";
+    endDateInput.value = "";
     updateRecurringFormValidity();
     renderRecurringList();
     renderEvents();

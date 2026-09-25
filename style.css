@@ -242,6 +242,7 @@ body {
 #recurringDayOfMonth { flex: 0 1 80px; }
 #recurringTime { flex: 0 1 110px; }
 #recurringNote { flex: 2 1 160px; }
+#recurringEndDate { flex: 1 1 140px; }
 
 .muted {
   font-size: 13px;

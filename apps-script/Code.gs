@@ -11,9 +11,9 @@
  * Sheet 需要六個分頁：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt
- *   Habits          欄位: id | name | frequency | workdaysOnly | target | active | createdAt
+ *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
- *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | active | createdAt
+ *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | endDate | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
@@ -72,10 +72,14 @@ function handleRequest(e) {
         return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
+      case "deleteHabit":
+        return respond({ ok: true, data: deleteHabit(p.id) });
       case "addRecurringEvent":
         return respond({
           ok: true,
-          data: addRecurringEvent(p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth),
+          data: addRecurringEvent(
+            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth, p.endDate
+          ),
         });
       case "deleteRecurringEvent":
         return respond({ ok: true, data: deleteRecurringEvent(p.id) });
@@ -188,7 +192,7 @@ function deleteEvent(id) {
   return getData();
 }
 
-function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth) {
+function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate) {
   var sheet = getSheet("RecurringEvents");
   sheet.appendRow([
     Utilities.getUuid(),
@@ -199,7 +203,7 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     frequency,
     dayOfWeek === undefined || dayOfWeek === "" ? "" : parseInt(dayOfWeek, 10),
     dayOfMonth === undefined || dayOfMonth === "" ? "" : parseInt(dayOfMonth, 10),
-    true,
+    endDate || "",
     new Date(),
   ]);
   return getData();
@@ -256,9 +260,20 @@ function addHabit(name, frequency, workdaysOnly, target) {
     frequency,
     workdaysOnly === "true" || workdaysOnly === true,
     finalTarget,
-    true,
     new Date(),
   ]);
+  return getData();
+}
+
+function deleteHabit(id) {
+  var sheet = getSheet("Habits");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
   return getData();
 }
 
@@ -308,7 +323,7 @@ function sendDailyNotifications() {
 
   var todayDate = new Date(todayStr + "T00:00:00");
   var recurringToday = sheetToObjects(getSheet("RecurringEvents"))
-    .filter(function (r) { return isTruthy_(r.active) && matchesRecurringRule_(r, todayDate); })
+    .filter(function (r) { return matchesRecurringRule_(r, todayStr, todayDate); })
     .map(function (r) {
       return { date: todayStr, owner: r.owner, time: r.time, title: r.title, notes: r.notes };
     });
@@ -346,11 +361,8 @@ function sendDailyNotifications() {
   }
 }
 
-function isTruthy_(v) {
-  return v === true || v === "TRUE";
-}
-
-function matchesRecurringRule_(rule, dateObj) {
+function matchesRecurringRule_(rule, dateStr, dateObj) {
+  if (rule.endDate && dateStr > rule.endDate) return false;
   if (rule.frequency === "weekly") {
     return dateObj.getDay() === Number(rule.dayOfWeek);
   }

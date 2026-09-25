@@ -16,15 +16,15 @@
 
 **Habits**（習慣定義，例如「工作日每天手沖咖啡」）
 
-| id | name | frequency | workdaysOnly | target | active | createdAt |
-|----|------|-----------|--------------|--------|--------|-----------|
+| id | name | frequency | workdaysOnly | target | createdAt |
+|----|------|-----------|--------------|--------|-----------|
 
 - `frequency`：`daily` / `weekly` / `monthly`
 - `workdaysOnly`：`TRUE`/`FALSE`，只有 `daily` 會用到（`TRUE` 代表週末不出現，
   工作日固定當週一到週五，不處理請假/國定假日例外）
 - `target`：目標次數，`daily` 固定是 1；`weekly`/`monthly` 是建立當下設定的固定值，
   之後想改用手動去 Sheet 改這一格
-- `active`：`TRUE`/`FALSE`，要停用某個習慣但保留歷史紀錄的話手動改這格成 `FALSE`
+- 不需要的習慣直接在網頁上刪除即可（沒有「停用但保留」的中間狀態）
 
 **HabitLog**（習慣的完成紀錄）
 
@@ -49,16 +49,18 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 
 **RecurringEvents**（固定週期規則，例如「每週三打球」「每月15號幫咪嚕點藥」）
 
-| id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | active | createdAt |
-|----|-------|-------|------|-------|-----------|-----------|------------|--------|-----------|
+| id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | endDate | createdAt |
+|----|-------|-------|------|-------|-----------|-----------|------------|---------|-----------|
 
 - `frequency`：`weekly` / `monthly`
 - `dayOfWeek`：0-6（0=日、1=一...6=六），只有 `weekly` 用得到
 - `dayOfMonth`：1-31，只有 `monthly` 用得到
+- `endDate`：選填，`yyyy-MM-dd`，超過這天就不再出現（也不會發 LINE 通知），
+  不填就是一直有效
 - `owner`：跟 Events 一樣的值域
 - 只存規則本身，不會預先展開成很多列——前端跟 `sendDailyNotifications` 都是
   即時判斷「今天符不符合」，改規則不用擔心舊資料沒同步，但也代表**沒有「跳過
-  這一次」的例外功能**，只能整條規則停用或刪除
+  這一次」的例外功能**，不想要了就直接刪除整條規則
 
 **ShoppingList**（購物清單，不綁日期、買了就勾掉）
 
@@ -122,8 +124,7 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
 
 ## 未來可以加的東西
 
-- 習慣支援編輯/停用的頁面 UI（目前要停用一個習慣得手動去 Habits 分頁把 `active`
-  改成 `FALSE`）
+- 習慣支援編輯（目前只能刪除重加，沒有修改現有習慣名稱/頻率/目標次數的介面）
 - 每週/每月目標的次數改成新增當下可調整以外，還能事後編輯
 - 工作日判斷加入請假/國定假日例外（目前固定週一到週五）
-- 重複規則行程支援「跳過這一次」的例外，目前只能整條規則停用/刪除
+- 重複規則行程支援「跳過這一次」的例外，目前只能設 `endDate` 或整條刪除
