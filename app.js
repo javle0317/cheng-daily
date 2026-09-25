@@ -1,6 +1,6 @@
 // ====== 設定 ======
 // 部署 Apps Script Web App 後，把網址貼在這裡（見 README.md 的步驟說明）
-const WEBAPP_URL = "PASTE_YOUR_APPS_SCRIPT_WEBAPP_URL_HERE";
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbw-_yrxEFqaCI8WIKAPKgMnHW0qUKhQxIw9on9_dwZeeeSznsKdPypk_XjWESKuLvem/exec";
 
 const PASSWORD_KEY = "dailyhub_password";
 
