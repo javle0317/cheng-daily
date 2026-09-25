@@ -194,3 +194,24 @@ function migrateFromPetsSheet() {
 
   Logger.log("搬移完成：Events 新增 " + eventCount + " 筆，Pets 新增 " + petCount + " 筆");
 }
+
+/**
+ * 一次性補值用：Events 分頁裡 owner 是空白的列，補成 "shared"（代表不確定是誰的/
+ * 算共同），不會刪除任何資料。用法跟 migrateFromPetsSheet 一樣：函式下拉選單選
+ * 「fillBlankEventOwners」，執行一次即可。
+ */
+function fillBlankEventOwners() {
+  var sheet = getSheet("Events");
+  var values = sheet.getDataRange().getValues();
+  var ownerCol = 3; // C 欄，1-indexed 給 getRange 用
+  var filled = 0;
+
+  for (var i = 1; i < values.length; i++) {
+    if (!values[i][ownerCol - 1]) {
+      sheet.getRange(i + 1, ownerCol).setValue("shared");
+      filled++;
+    }
+  }
+
+  Logger.log("補值完成：owner 從空白改成 shared 共 " + filled + " 筆");
+}
