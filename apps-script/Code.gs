@@ -1,7 +1,12 @@
 /**
  * Daily Hub 後端。部署方式見 repo 根目錄的 README.md。
- * 這支程式碼要貼到「這個 Google Sheet」綁定的 Apps Script 專案裡，
- * 且需要在「專案設定 > Script Properties」加一個 PASSWORD 屬性。
+ * 這支程式碼要貼到「這個 Google Sheet」綁定的 Apps Script 專案裡。
+ *
+ * 「專案設定 > Script Properties」需要這幾個屬性（值都不寫進程式碼/repo）：
+ *   PASSWORD       - 網頁前端的密碼
+ *   LINE_TOKEN     - LINE Messaging API 的 channel access token
+ *   LINE_MY_ID     - 你的 LINE 使用者 ID
+ *   LINE_WIFE_ID   - 太太的 LINE 使用者 ID
  *
  * Sheet 需要三個分頁：
  *   Goals  欄位: id | date | text | done | createdAt
@@ -11,6 +16,9 @@
  * 從舊的 pets Google Sheet 搬資料過來：見檔案最下面的 migrateFromPetsSheet()，
  * 在 Apps Script 編輯器上方函式下拉選單選它、手動按一次「執行」，
  * 只會「複製」資料過來，不會動到舊檔案。
+ *
+ * 每日 LINE 通知：sendDailyNotifications()，需要另外設定時間驅動的觸發條件
+ * （見 README.md），不會透過網頁前端呼叫。
  */
 
 function doGet(e) {
@@ -214,4 +222,92 @@ function fillBlankEventOwners() {
   }
 
   Logger.log("補值完成：owner 從空白改成 shared 共 " + filled + " 筆");
+}
+
+/**
+ * 每日 LINE 通知。需要另外設定時間驅動的觸發條件才會自動每天跑
+ * （Apps Script 編輯器左側時鐘圖示「觸發條件」→ 新增觸發條件 → 選這個函式 →
+ * 時間驅動 → 日計時器 → 選時段），見 README.md。
+ *
+ * 邏輯：
+ *   - Pets 分頁今天的紀錄 + Events 分頁 owner="shared" 的今天行程 → 一起發給你們兩人
+ *   - Events 分頁 owner="me" 今天的行程 → 只發給你
+ *   - Events 分頁 owner="wife" 今天的行程 → 只發給太太
+ */
+function sendDailyNotifications() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty("LINE_TOKEN");
+  var myId = props.getProperty("LINE_MY_ID");
+  var wifeId = props.getProperty("LINE_WIFE_ID");
+
+  if (!token || !myId || !wifeId) {
+    Logger.log("LINE 設定不完整，請確認 Script Properties 有 LINE_TOKEN / LINE_MY_ID / LINE_WIFE_ID");
+    return;
+  }
+
+  var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var pets = sheetToObjects(getSheet("Pets")).filter(function (p) {
+    return p.date === todayStr;
+  });
+  var events = sheetToObjects(getSheet("Events")).filter(function (e) {
+    return e.date === todayStr;
+  });
+
+  var petLines = pets.map(formatPetLine_);
+  var sharedLines = events
+    .filter(function (e) { return e.owner === "shared"; })
+    .map(formatEventLine_);
+  var meLines = events
+    .filter(function (e) { return e.owner === "me"; })
+    .map(formatEventLine_);
+  var wifeLines = events
+    .filter(function (e) { return e.owner === "wife"; })
+    .map(formatEventLine_);
+
+  var header = "【每日提醒】\n日期：" + todayStr + "\n\n";
+
+  var sharedAll = petLines.concat(sharedLines);
+  if (sharedAll.length > 0) {
+    var sharedMsg = header + sharedAll.join("\n\n");
+    [myId, wifeId].forEach(function (id) {
+      sendLinePush_(token, id, sharedMsg);
+    });
+  }
+
+  if (meLines.length > 0) {
+    sendLinePush_(token, myId, "【個人提醒】\n日期：" + todayStr + "\n\n" + meLines.join("\n\n"));
+  }
+
+  if (wifeLines.length > 0) {
+    sendLinePush_(token, wifeId, "【個人提醒】\n日期：" + todayStr + "\n\n" + wifeLines.join("\n\n"));
+  }
+}
+
+function formatPetLine_(p) {
+  var line = "🐾 " + (p.petName || "") + "：" + (p.type || "");
+  if (p.time) line += "\n   ⏰ 時間：" + p.time;
+  if (p.location) line += "\n   📍 地點：" + p.location;
+  return line;
+}
+
+function formatEventLine_(e) {
+  var line = "📅 " + (e.title || "");
+  if (e.time) line += "\n   ⏰ 時間：" + e.time;
+  if (e.notes) line += "\n   📍 " + e.notes;
+  return line;
+}
+
+function sendLinePush_(token, userId, text) {
+  var options = {
+    method: "post",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+    },
+    payload: JSON.stringify({
+      to: userId,
+      messages: [{ type: "text", text: text }],
+    }),
+  };
+  UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", options);
 }

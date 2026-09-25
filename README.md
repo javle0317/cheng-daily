@@ -16,8 +16,8 @@
 
 **Events**
 
-| id | date | time | title | notes | createdAt | owner |
-|----|------|------|-------|-------|-----------|-------|
+| id | date | owner | time | title | notes | createdAt |
+|----|------|-------|------|-------|-------|-----------|
 
 `owner` 是 `me` / `wife` / `shared` 其中一個，用來標記是誰的行程。
 
@@ -44,9 +44,12 @@
 
 1. Sheet 選單「擴充功能 → Apps Script」
 2. 把 `apps-script/Code.gs` 的內容整個貼進去（覆蓋預設的 `Code.gs`）
-3. 左側「專案設定」→ 「指令碼屬性」（Script Properties）→ 新增一筆：
-   - 屬性：`PASSWORD`
-   - 值：你想要的密碼（自己記住，不要寫進任何程式碼或 commit 裡）
+3. 左側「專案設定」→ 「指令碼屬性」（Script Properties）→ 新增這幾筆
+   （值都自己記住，不要寫進任何程式碼或 commit 裡）：
+   - `PASSWORD` — 網頁前端的密碼
+   - `LINE_TOKEN` — LINE Messaging API 的 channel access token
+   - `LINE_MY_ID` — 你的 LINE 使用者 ID
+   - `LINE_WIFE_ID` — 太太的 LINE 使用者 ID
 
 ### 3. 部署成 Web App
 
@@ -63,7 +66,17 @@
 > 之後每次改 `Code.gs` 存檔，網頁不會自動吃到新版——要到「部署 → 管理部署作業 →
 > 編輯（鉛筆圖示）→ 版本選『新版本』→ 部署」，網址不變但會套用最新程式碼。
 
-### 5. 啟用 GitHub Pages
+### 5. 設定每日 LINE 通知的觸發條件
+
+`sendDailyNotifications()` 不會被網頁呼叫，需要另外設定「每天自動跑一次」：
+
+1. Apps Script 編輯器左側**時鐘圖示「觸發條件」**
+2. 右下角「新增觸發條件」
+3. 選取執行的函式：`sendDailyNotifications`
+4. 選取活動來源：「時間驅動」→「日計時器」→ 選一個時段（例如上午 8-9 點）
+5. 儲存（第一次也會跳授權視窗，允許即可）
+
+### 6. 啟用 GitHub Pages
 
 Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後會得到一個公開網址
 （例如 `https://<你的帳號>.github.io/<repo 名稱>/`）。
@@ -79,5 +92,4 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
 
 - 目標支援「計數/百分比」等不同進度類型，不只是打勾完成
 - Google Sheet 再拆更多分頁（例如習慣追蹤），Apps Script 只要多加 action 對應新分頁
-- 把原本 pets Sheet 裡的 LINE 每日通知 Apps Script 也搬進這個專案，改成讀 Events/Pets
-  分頁，用 Apps Script 的「觸發條件（Triggers）」設定每日定時執行
+- 頁面上直接新增/編輯 Pets 紀錄（目前只有唯讀顯示）
