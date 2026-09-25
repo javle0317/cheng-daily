@@ -211,7 +211,7 @@ function renderHeader() {
   const todaysGoals = state.goals.filter(g => g.date === todayStr);
   const done = todaysGoals.filter(g => g.done === true || g.done === "TRUE").length;
   document.getElementById("progressLine").textContent =
-    todaysGoals.length ? `今日完成 ${done} / ${todaysGoals.length}` : "今天還沒有目標";
+    todaysGoals.length ? `今日待辦完成 ${done} / ${todaysGoals.length}` : "今天還沒有待辦";
 
   document.getElementById("selectedDateLabel").textContent = `(${formatDateLabel(state.selectedDate)})`;
   document.getElementById("selectedDateLabel2").textContent = `(${formatDateLabel(state.selectedDate)})`;
@@ -224,7 +224,7 @@ function renderGoals() {
   const goals = state.goals.filter(g => g.date === state.selectedDate);
 
   if (!goals.length) {
-    list.innerHTML = `<li class="empty-hint">這天還沒有目標，新增一個吧</li>`;
+    list.innerHTML = `<li class="empty-hint">這天還沒有待辦，新增一個吧</li>`;
     return;
   }
 
