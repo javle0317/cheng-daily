@@ -8,12 +8,18 @@
  *   LINE_MY_ID     - 你的 LINE 使用者 ID
  *   LINE_WIFE_ID   - 太太的 LINE 使用者 ID
  *
- * Sheet 需要兩個分頁：
- *   Goals  欄位: id | date | text | done | createdAt
- *   Events 欄位: id | date | owner | time | title | notes | createdAt
+ * Sheet 需要四個分頁：
+ *   Goals    欄位: id | date | text | done | createdAt
+ *   Events   欄位: id | date | owner | time | title | notes | createdAt
+ *   Habits   欄位: id | name | frequency | workdaysOnly | target | active | createdAt
+ *   HabitLog 欄位: id | habitId | periodKey | count | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
+ *
+ * Habits 是「習慣定義」（例如每天手沖咖啡），frequency 是 daily/weekly/monthly；
+ * HabitLog 是實際完成紀錄，periodKey 依 frequency 是當天日期/該週週一日期/該月，
+ * 詳細規則見 app.js 的 getPeriodKey()。
  *
  * 每日 LINE 通知：sendDailyNotifications()，需要另外設定時間驅動的觸發條件
  * （見 README.md），不會透過網頁前端呼叫。
@@ -53,6 +59,10 @@ function handleRequest(e) {
         return respond({ ok: true, data: addEvent(p.date, p.time, p.title, p.notes, p.owner) });
       case "deleteEvent":
         return respond({ ok: true, data: deleteEvent(p.id) });
+      case "addHabit":
+        return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
+      case "toggleHabitLog":
+        return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
       default:
         return respond({ ok: false, error: "unknown action" });
     }
@@ -101,6 +111,8 @@ function getData() {
   return {
     goals: sheetToObjects(getSheet("Goals")),
     events: sheetToObjects(getSheet("Events")),
+    habits: sheetToObjects(getSheet("Habits")),
+    habitLogs: sheetToObjects(getSheet("HabitLog")),
   };
 }
 
@@ -149,6 +161,39 @@ function deleteEvent(id) {
       break;
     }
   }
+  return getData();
+}
+
+function addHabit(name, frequency, workdaysOnly, target) {
+  var sheet = getSheet("Habits");
+  var finalTarget = frequency === "daily" ? 1 : (parseInt(target, 10) || 1);
+  sheet.appendRow([
+    Utilities.getUuid(),
+    name,
+    frequency,
+    workdaysOnly === "true" || workdaysOnly === true,
+    finalTarget,
+    true,
+    new Date(),
+  ]);
+  return getData();
+}
+
+function toggleHabitLog(habitId, periodKey, target) {
+  var sheet = getSheet("HabitLog");
+  var values = sheet.getDataRange().getValues();
+  var maxTarget = parseInt(target, 10) || 1;
+
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][1] === habitId && String(values[i][2]) === String(periodKey)) {
+      var next = (Number(values[i][3]) || 0) + 1;
+      if (next > maxTarget) next = 0;
+      sheet.getRange(i + 1, 4).setValue(next);
+      return getData();
+    }
+  }
+
+  sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
   return getData();
 }
 

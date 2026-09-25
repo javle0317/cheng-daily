@@ -16,6 +16,8 @@ const OWNER_META = {
 let state = {
   goals: [],
   events: [],
+  habits: [],
+  habitLogs: [],
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
@@ -38,6 +40,58 @@ function setStatus(msg, isError) {
   const el = document.getElementById("statusLine");
   el.textContent = msg || "";
   el.style.color = isError ? "var(--danger)" : "var(--text-dim)";
+}
+
+function isWorkday(dateStr) {
+  const day = new Date(dateStr + "T00:00:00").getDay();
+  return day >= 1 && day <= 5;
+}
+
+function getWeekStart(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
+  return toDateStr(d);
+}
+
+function getMonthKey(dateStr) {
+  return dateStr.slice(0, 7);
+}
+
+function getPeriodKey(habit, dateStr) {
+  if (habit.frequency === "weekly") return getWeekStart(dateStr);
+  if (habit.frequency === "monthly") return getMonthKey(dateStr);
+  return dateStr;
+}
+
+function getHabitLogCount(habitId, periodKey) {
+  const log = state.habitLogs.find(l => l.habitId === habitId && String(l.periodKey) === String(periodKey));
+  return log ? Number(log.count) || 0 : 0;
+}
+
+function computeStreak(habit) {
+  let streak = 0;
+  const cursor = new Date();
+  const workdaysOnly = habit.workdaysOnly === true || habit.workdaysOnly === "TRUE";
+  let isToday = true;
+  for (let i = 0; i < 365; i++) {
+    const dateStr = toDateStr(cursor);
+    if (workdaysOnly && !isWorkday(dateStr)) {
+      cursor.setDate(cursor.getDate() - 1);
+      continue;
+    }
+    const done = getHabitLogCount(habit.id, dateStr) >= Number(habit.target || 1);
+    if (!done) {
+      // 今天還沒做不算斷連續，從昨天開始往回算
+      if (isToday) { isToday = false; cursor.setDate(cursor.getDate() - 1); continue; }
+      break;
+    }
+    streak++;
+    isToday = false;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
 
 // ====== API ======
@@ -72,6 +126,8 @@ async function tryUnlock(password) {
     const data = await api("getData");
     state.goals = data.goals || [];
     state.events = data.events || [];
+    state.habits = data.habits || [];
+    state.habitLogs = data.habitLogs || [];
     showApp();
     renderAll();
     setStatus("已連上 Google Sheet");
@@ -98,6 +154,9 @@ function renderAll() {
   renderHeader();
   renderGoals();
   renderEvents();
+  renderDailyHabits();
+  renderWeeklyHabits();
+  renderMonthlyHabits();
   renderCalendar();
   const dateInput = document.getElementById("eventDate");
   if (dateInput) dateInput.value = state.selectedDate;
@@ -162,6 +221,107 @@ function renderGoals() {
     });
     list.appendChild(li);
   });
+}
+
+function isTruthy(v) {
+  return v === true || v === "TRUE";
+}
+
+function renderDailyHabits() {
+  const list = document.getElementById("dailyHabitList");
+  list.innerHTML = "";
+
+  const habits = state.habits.filter(h =>
+    h.frequency === "daily" &&
+    isTruthy(h.active) &&
+    (!isTruthy(h.workdaysOnly) || isWorkday(state.selectedDate))
+  );
+
+  if (!habits.length) {
+    list.innerHTML = `<li class="empty-hint">這天沒有適用的每日習慣</li>`;
+    return;
+  }
+
+  const rows = habits.map(habit => {
+    const periodKey = state.selectedDate;
+    const count = getHabitLogCount(habit.id, periodKey);
+    const done = count >= Number(habit.target || 1);
+    return { habit, periodKey, done };
+  }).sort((a, b) => a.done - b.done);
+
+  rows.forEach(({ habit, periodKey, done }) => {
+    const li = document.createElement("li");
+    li.className = "item-row" + (done ? " done" : "");
+    li.innerHTML = `
+      <input type="checkbox" ${done ? "checked" : ""}>
+      <span class="item-text"></span>
+      <span class="item-time"></span>
+    `;
+    li.querySelector(".item-text").textContent = habit.name;
+    const streak = computeStreak(habit);
+    if (streak > 0) li.querySelector(".item-time").textContent = `🔥 ${streak}`;
+    li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
+      try {
+        const data = await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 });
+        state.habits = data.habits;
+        state.habitLogs = data.habitLogs;
+        renderDailyHabits();
+      } catch (err) {
+        setStatus("更新失敗：" + err.message, true);
+      }
+    });
+    list.appendChild(li);
+  });
+}
+
+function renderPeriodHabits(frequency, listId) {
+  const list = document.getElementById(listId);
+  list.innerHTML = "";
+
+  const habits = state.habits.filter(h => h.frequency === frequency && isTruthy(h.active));
+
+  if (!habits.length) {
+    list.innerHTML = `<li class="empty-hint">還沒有${frequency === "weekly" ? "每週" : "每月"}目標</li>`;
+    return;
+  }
+
+  const rows = habits.map(habit => {
+    const periodKey = getPeriodKey(habit, state.selectedDate);
+    const count = getHabitLogCount(habit.id, periodKey);
+    const target = Number(habit.target || 1);
+    const done = count >= target;
+    return { habit, periodKey, count, target, done };
+  }).sort((a, b) => a.done - b.done);
+
+  rows.forEach(({ habit, periodKey, count, target, done }) => {
+    const li = document.createElement("li");
+    li.className = "item-row clickable" + (done ? " done" : "");
+    li.innerHTML = `
+      <span class="item-text"></span>
+      <span class="item-time"></span>
+    `;
+    li.querySelector(".item-text").textContent = habit.name;
+    li.querySelector(".item-time").textContent = `${count}/${target}`;
+    li.addEventListener("click", async () => {
+      try {
+        const data = await api("toggleHabitLog", { habitId: habit.id, periodKey, target });
+        state.habits = data.habits;
+        state.habitLogs = data.habitLogs;
+        renderPeriodHabits(frequency, listId);
+      } catch (err) {
+        setStatus("更新失敗：" + err.message, true);
+      }
+    });
+    list.appendChild(li);
+  });
+}
+
+function renderWeeklyHabits() {
+  renderPeriodHabits("weekly", "weeklyHabitList");
+}
+
+function renderMonthlyHabits() {
+  renderPeriodHabits("monthly", "monthlyHabitList");
 }
 
 function renderEvents() {
@@ -360,6 +520,54 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
     updateEventFormValidity();
     renderEvents();
     renderCalendar();
+  } catch (err) {
+    setStatus("新增失敗：" + err.message, true);
+  }
+});
+
+function updateHabitFormValidity() {
+  const nameInput = document.getElementById("habitName");
+  const submitBtn = document.getElementById("habitSubmitBtn");
+  submitBtn.disabled = !nameInput.value.trim();
+}
+
+function updateHabitFrequencyFields() {
+  const frequency = document.getElementById("habitFrequency").value;
+  const targetInput = document.getElementById("habitTarget");
+  const workdaysLabel = document.getElementById("habitWorkdaysLabel");
+  const isDaily = frequency === "daily";
+  targetInput.style.display = isDaily ? "none" : "";
+  workdaysLabel.style.display = isDaily ? "" : "none";
+}
+
+document.getElementById("habitName").addEventListener("input", updateHabitFormValidity);
+document.getElementById("habitFrequency").addEventListener("change", updateHabitFrequencyFields);
+updateHabitFrequencyFields();
+
+document.getElementById("habitForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nameInput = document.getElementById("habitName");
+  const frequencySelect = document.getElementById("habitFrequency");
+  const targetInput = document.getElementById("habitTarget");
+  const workdaysCheckbox = document.getElementById("habitWorkdaysOnly");
+  const name = nameInput.value.trim();
+  if (!name) return;
+  try {
+    const data = await api("addHabit", {
+      name,
+      frequency: frequencySelect.value,
+      workdaysOnly: workdaysCheckbox.checked,
+      target: targetInput.value || 1,
+    });
+    state.habits = data.habits;
+    state.habitLogs = data.habitLogs;
+    nameInput.value = "";
+    targetInput.value = "1";
+    workdaysCheckbox.checked = false;
+    updateHabitFormValidity();
+    renderDailyHabits();
+    renderWeeklyHabits();
+    renderMonthlyHabits();
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
   }

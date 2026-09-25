@@ -7,12 +7,34 @@
 
 ### 1. 建立 Google Sheet
 
-新增一個 Google Sheet，建立兩個分頁：
+新增一個 Google Sheet，建立四個分頁：
 
-**Goals**
+**Goals**（今日待辦，一次性手動輸入的項目）
 
 | id | date | text | done | createdAt |
 |----|------|------|------|-----------|
+
+**Habits**（習慣定義，例如「工作日每天手沖咖啡」）
+
+| id | name | frequency | workdaysOnly | target | active | createdAt |
+|----|------|-----------|--------------|--------|--------|-----------|
+
+- `frequency`：`daily` / `weekly` / `monthly`
+- `workdaysOnly`：`TRUE`/`FALSE`，只有 `daily` 會用到（`TRUE` 代表週末不出現，
+  工作日固定當週一到週五，不處理請假/國定假日例外）
+- `target`：目標次數，`daily` 固定是 1；`weekly`/`monthly` 是建立當下設定的固定值，
+  之後想改用手動去 Sheet 改這一格
+- `active`：`TRUE`/`FALSE`，要停用某個習慣但保留歷史紀錄的話手動改這格成 `FALSE`
+
+**HabitLog**（習慣的完成紀錄）
+
+| id | habitId | periodKey | count | createdAt |
+|----|---------|-----------|-------|-----------|
+
+- `periodKey`：`daily` 是當天日期；`weekly` 是那一週週一的日期；`monthly` 是
+  `yyyy-MM`
+- `count`：該週期目前完成次數，跟對應 Habit 的 `target` 比較來判斷是否達標；
+  網頁上每點一次會 +1，超過 `target` 會歸零（方便點錯復原）
 
 **Events**
 
@@ -20,9 +42,10 @@
 |----|------|-------|------|-------|-------|-----------|
 
 `owner` 是 `me` / `wife` / `shared` / 寵物名字（見 `Code.gs` 的 `PET_NAMES`）其中一個，
-用來標記這筆是誰的（人的行程或寵物照護紀錄現在是同一張表）。網頁上顯示的名稱可以
-跟這些內部值不一樣（例如 `me` 顯示成「承承」），改 [app.js](app.js) 的 `ownerLabels`
-跟 `index.html` 的 `#eventOwner` 下拉選項文字即可，不用動 Sheet 或 `Code.gs`。
+用來標記這筆是誰的（人的行程或寵物照護紀錄現在是同一張表）。網頁上顯示的名稱、
+icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承」），改 [app.js](app.js)
+的 `OWNER_META` 跟 `index.html` 的 `#eventOwner` 下拉選項文字即可，不用動 Sheet 或
+`Code.gs`。
 
 第一列填欄位名稱（跟上面一樣），下面留空即可。
 
@@ -81,6 +104,7 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
 
 ## 未來可以加的東西
 
-- 目標支援「計數/百分比」等不同進度類型，不只是打勾完成
-- Google Sheet 再拆更多分頁（例如習慣追蹤），Apps Script 只要多加 action 對應新分頁
-- 頁面上直接新增/編輯 Pets 紀錄（目前只有唯讀顯示）
+- 習慣支援編輯/停用的頁面 UI（目前要停用一個習慣得手動去 Habits 分頁把 `active`
+  改成 `FALSE`）
+- 每週/每月目標的次數改成新增當下可調整以外，還能事後編輯
+- 工作日判斷加入請假/國定假日例外（目前固定週一到週五）

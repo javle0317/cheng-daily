@@ -151,6 +151,28 @@ body {
   color: var(--text-dim);
 }
 
+.sub-heading {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sub-heading:first-of-type { margin-top: 0; }
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 0 4px;
+}
+
+.item-row.clickable { cursor: pointer; }
+
 .inline-form {
   display: flex;
   gap: 8px;

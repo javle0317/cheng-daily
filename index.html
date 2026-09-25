@@ -27,13 +27,40 @@
     </header>
 
     <main class="grid">
-      <section class="card goals-card">
-        <h2>每日目標 <span id="selectedDateLabel"></span></h2>
+      <section class="card habits-card">
+        <h2>習慣與目標 <span id="selectedDateLabel"></span></h2>
+
+        <h3 class="sub-heading">每日習慣</h3>
+        <ul id="dailyHabitList" class="item-list"></ul>
+
+        <h3 class="sub-heading">每週目標</h3>
+        <ul id="weeklyHabitList" class="item-list"></ul>
+
+        <h3 class="sub-heading">每月目標</h3>
+        <ul id="monthlyHabitList" class="item-list"></ul>
+
+        <h3 class="sub-heading">今日待辦</h3>
         <form id="goalForm" class="inline-form">
-          <input id="goalInput" type="text" placeholder="新增一個目標…" required>
+          <input id="goalInput" type="text" placeholder="新增一個待辦…" required>
           <button type="submit">新增</button>
         </form>
         <ul id="goalList" class="item-list"></ul>
+
+        <h3 class="sub-heading">新增習慣</h3>
+        <form id="habitForm" class="entry-form">
+          <input id="habitName" type="text" placeholder="習慣名稱…" required>
+          <select id="habitFrequency">
+            <option value="daily">每日</option>
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+          </select>
+          <input id="habitTarget" type="number" min="1" value="1" placeholder="目標次數">
+          <label id="habitWorkdaysLabel" class="checkbox-label">
+            <input id="habitWorkdaysOnly" type="checkbox">
+            僅工作日
+          </label>
+          <button id="habitSubmitBtn" type="submit" disabled>新增</button>
+        </form>
       </section>
 
       <section class="card notes-card">
