@@ -8,6 +8,7 @@ const PASSWORD_KEY = "dailyhub_password";
 let state = {
   goals: [],
   events: [],
+  pets: [],
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
@@ -64,6 +65,7 @@ async function tryUnlock(password) {
     const data = await api("getData");
     state.goals = data.goals || [];
     state.events = data.events || [];
+    state.pets = data.pets || [];
     showApp();
     renderAll();
     setStatus("已連上 Google Sheet");
@@ -90,6 +92,7 @@ function renderAll() {
   renderHeader();
   renderGoals();
   renderEvents();
+  renderPets();
   renderCalendar();
 }
 
@@ -165,16 +168,20 @@ function renderEvents() {
     return;
   }
 
+  const ownerLabels = { me: "我", wife: "太太", shared: "共同" };
+
   events.forEach(ev => {
     const li = document.createElement("li");
     li.className = "item-row";
     li.innerHTML = `
       <span class="item-time"></span>
       <span class="item-text"></span>
+      <span class="owner-badge"></span>
       <button class="delete-btn" title="刪除">✕</button>
     `;
     li.querySelector(".item-time").textContent = ev.time || "";
     li.querySelector(".item-text").textContent = ev.title;
+    li.querySelector(".owner-badge").textContent = ownerLabels[ev.owner] || "";
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       try {
         state.events = await api("deleteEvent", { id: ev.id });
@@ -184,6 +191,48 @@ function renderEvents() {
         setStatus("刪除失敗：" + err.message, true);
       }
     });
+    list.appendChild(li);
+  });
+}
+
+function renderPets() {
+  const list = document.getElementById("petsList");
+  list.innerHTML = "";
+  const todayStr = toDateStr(new Date());
+  const upcoming = state.pets
+    .filter(p => p.date && p.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 8);
+
+  if (!upcoming.length) {
+    list.innerHTML = `<li class="empty-hint">近期沒有寵物行程</li>`;
+    return;
+  }
+
+  upcoming.forEach(p => {
+    const li = document.createElement("li");
+    li.className = "item-row";
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "item-time";
+    timeSpan.textContent = formatDateLabel(p.date) + (p.time ? " " + p.time : "");
+
+    const textSpan = document.createElement("span");
+    textSpan.className = "item-text";
+    textSpan.textContent = `${p.petName || ""} · ${p.type || ""}`;
+
+    li.appendChild(timeSpan);
+    li.appendChild(textSpan);
+
+    if (p.location && /^https?:\/\//.test(p.location)) {
+      const link = document.createElement("a");
+      link.href = p.location;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "📍";
+      li.appendChild(link);
+    }
+
     list.appendChild(li);
   });
 }
@@ -210,6 +259,7 @@ function renderCalendar() {
   const datesWithData = new Set([
     ...state.goals.map(g => g.date),
     ...state.events.map(e => e.date),
+    ...state.pets.map(p => p.date),
   ]);
 
   for (let i = 0; i < startOffset; i++) {
@@ -261,6 +311,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const timeInput = document.getElementById("eventTime");
   const titleInput = document.getElementById("eventTitle");
+  const ownerSelect = document.getElementById("eventOwner");
   const title = titleInput.value.trim();
   if (!title) return;
   try {
@@ -269,6 +320,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
       time: timeInput.value || "",
       title,
       notes: "",
+      owner: ownerSelect.value,
     });
     titleInput.value = "";
     timeInput.value = "";

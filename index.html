@@ -50,9 +50,19 @@
         <form id="eventForm" class="inline-form event-form">
           <input id="eventTime" type="time">
           <input id="eventTitle" type="text" placeholder="事件標題…" required>
+          <select id="eventOwner">
+            <option value="shared">共同</option>
+            <option value="me">我</option>
+            <option value="wife">太太</option>
+          </select>
           <button type="submit">新增</button>
         </form>
         <ul id="eventList" class="item-list"></ul>
+      </section>
+
+      <section class="card pets-card">
+        <h2>寵物照護 <span class="muted">(近期)</span></h2>
+        <ul id="petsList" class="item-list"></ul>
       </section>
     </main>
 

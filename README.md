@@ -7,7 +7,7 @@
 
 ### 1. 建立 Google Sheet
 
-新增一個 Google Sheet，建立兩個分頁：
+新增一個 Google Sheet，建立三個分頁：
 
 **Goals**
 
@@ -16,10 +16,29 @@
 
 **Events**
 
-| id | date | time | title | notes | createdAt |
-|----|------|------|-------|-------|-----------|
+| id | date | time | title | notes | createdAt | owner |
+|----|------|------|-------|-------|-----------|-------|
+
+`owner` 是 `me` / `wife` / `shared` 其中一個，用來標記是誰的行程。
+
+**Pets**
+
+| id | date | petName | type | time | location | createdAt |
+|----|------|---------|------|------|----------|-----------|
 
 第一列填欄位名稱（跟上面一樣），下面留空即可。
+
+### 從舊的 pets Google Sheet 搬資料
+
+如果你原本有一份單獨的 pets Google Sheet（寵物照護紀錄 + his/her 個人行程混在一起），
+把 `apps-script/Code.gs` 貼好、Goals/Events/Pets 三個分頁都建立好之後：
+
+1. 在 Apps Script 編輯器上方的函式下拉選單，選 **`migrateFromPetsSheet`**
+2. 按執行（第一次會跳出授權視窗，因為要讀另一份 Sheet，照畫面允許即可）
+3. 執行完到「執行項目」（Executions）看 log，確認搬了幾筆
+4. 這個函式只會「複製」資料過來，**不會動到舊的 pets Sheet**，原本的 LINE 每日通知
+   可以繼續正常運作，等之後把通知功能也搬過來、確認新架構都沒問題後，再自己決定
+   要不要清理舊檔案
 
 ### 2. 設定 Apps Script
 
@@ -41,10 +60,13 @@
 
 把上一步的網址貼到 [app.js](app.js) 最上面的 `WEBAPP_URL`，然後 commit + push。
 
+> 之後每次改 `Code.gs` 存檔，網頁不會自動吃到新版——要到「部署 → 管理部署作業 →
+> 編輯（鉛筆圖示）→ 版本選『新版本』→ 部署」，網址不變但會套用最新程式碼。
+
 ### 5. 啟用 GitHub Pages
 
 Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後會得到一個公開網址
-（例如 `https://<你的帳號>.github.io/daily-hub/`）。
+（例如 `https://<你的帳號>.github.io/<repo 名稱>/`）。
 
 ## 密碼保護的原理
 
@@ -57,3 +79,5 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
 
 - 目標支援「計數/百分比」等不同進度類型，不只是打勾完成
 - Google Sheet 再拆更多分頁（例如習慣追蹤），Apps Script 只要多加 action 對應新分頁
+- 把原本 pets Sheet 裡的 LINE 每日通知 Apps Script 也搬進這個專案，改成讀 Events/Pets
+  分頁，用 Apps Script 的「觸發條件（Triggers）」設定每日定時執行
