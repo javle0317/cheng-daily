@@ -78,7 +78,7 @@ function sheetToObjects(sheet) {
     var obj = {};
     headers.forEach(function (h, i) {
       var v = row[i];
-      if (v instanceof Date) {
+      if (Object.prototype.toString.call(v) === "[object Date]") {
         v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
       }
       obj[h] = v;
@@ -167,11 +167,6 @@ function sendDailyNotifications() {
   var todayStr = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
   var allPets = sheetToObjects(getSheet("Pets"));
   var allEvents = sheetToObjects(getSheet("Events"));
-
-  // 暫時除錯用：確認完問題後可以整段刪掉
-  Logger.log("todayStr = [" + todayStr + "]");
-  Logger.log("Pets 分頁的 date 值: " + JSON.stringify(allPets.map(function (p) { return p.date; })));
-  Logger.log("Events 分頁的 date 值: " + JSON.stringify(allEvents.map(function (e) { return e.date; })));
 
   var pets = allPets.filter(function (p) {
     return p.date === todayStr;
