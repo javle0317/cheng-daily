@@ -43,6 +43,33 @@ function formatDateLabel(dateStr) {
   return `${m}/${d}`;
 }
 
+function splitTextAndLink(text) {
+  const urlMatch = text.match(/https?:\/\/\S+/);
+  const restText = urlMatch ? text.replace(urlMatch[0], "").trim() : text;
+  return { restText, url: urlMatch ? urlMatch[0] : null };
+}
+
+// icon 用來區分連結性質（地點用 📍、其他純連結用 🔗），把網址本身藏起來只留 icon 可點
+function appendTextAndLink(li, text, { textPrefix = "", linkIcon = "🔗" } = {}) {
+  const { restText, url } = splitTextAndLink(text);
+  if (restText) {
+    const span = document.createElement("span");
+    span.className = "item-time";
+    span.textContent = textPrefix ? `${textPrefix} ${restText}` : restText;
+    li.appendChild(span);
+  }
+  if (url) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = linkIcon;
+    link.addEventListener("click", (e) => e.stopPropagation());
+    li.appendChild(link);
+  }
+  return { restText, url };
+}
+
 function setStatus(msg, isError) {
   const el = document.getElementById("statusLine");
   el.textContent = msg || "";
@@ -336,9 +363,18 @@ function renderDailyHabits() {
       <span class="item-time"></span>
       <button class="delete-btn" title="刪除">✕</button>
     `;
-    li.querySelector(".item-text").textContent = habit.name;
+    const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
+    li.querySelector(".item-text").textContent = habitName;
     const streak = computeStreak(habit);
     if (streak > 0) li.querySelector(".item-time").textContent = `🔥 ${streak}`;
+    if (habitUrl) {
+      const link = document.createElement("a");
+      link.href = habitUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "🔗";
+      li.insertBefore(link, li.querySelector(".delete-btn"));
+    }
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       try {
         applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 }));
@@ -388,8 +424,18 @@ function renderPeriodHabits(frequency, listId, sectionId) {
       <span class="item-time"></span>
       <button class="delete-btn" title="刪除">✕</button>
     `;
-    li.querySelector(".item-text").textContent = habit.name;
+    const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
+    li.querySelector(".item-text").textContent = habitName;
     li.querySelector(".item-time").textContent = `${count}/${target}`;
+    if (habitUrl) {
+      const link = document.createElement("a");
+      link.href = habitUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "🔗";
+      link.addEventListener("click", (e) => e.stopPropagation());
+      li.insertBefore(link, li.querySelector(".delete-btn"));
+    }
     li.addEventListener("click", async () => {
       try {
         applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target }));
@@ -473,24 +519,7 @@ function renderEvents() {
     }
 
     if (ev.notes) {
-      const urlMatch = ev.notes.match(/https?:\/\/\S+/);
-      const restText = urlMatch ? ev.notes.replace(urlMatch[0], "").trim() : ev.notes;
-
-      if (restText) {
-        const noteSpan = document.createElement("span");
-        noteSpan.className = "item-time";
-        noteSpan.textContent = `📝 ${restText}`;
-        li.appendChild(noteSpan);
-      }
-
-      if (urlMatch) {
-        const link = document.createElement("a");
-        link.href = urlMatch[0];
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.textContent = "📍";
-        li.appendChild(link);
-      }
+      appendTextAndLink(li, ev.notes, { textPrefix: "📝", linkIcon: "📍" });
     }
 
     if (!ev.recurring) {
@@ -636,6 +665,13 @@ function renderRecurringList() {
     timeSpan.className = "item-time";
     timeSpan.textContent = scheduleText + (rule.time ? ` ${rule.time}` : "");
 
+    li.appendChild(textSpan);
+    li.appendChild(timeSpan);
+
+    if (rule.notes) {
+      appendTextAndLink(li, rule.notes, { textPrefix: "📝", linkIcon: "📍" });
+    }
+
     const delBtn = document.createElement("button");
     delBtn.className = "delete-btn";
     delBtn.title = "刪除";
@@ -652,8 +688,6 @@ function renderRecurringList() {
       }
     });
 
-    li.appendChild(textSpan);
-    li.appendChild(timeSpan);
     li.appendChild(delBtn);
     list.appendChild(li);
   });
