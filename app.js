@@ -488,6 +488,8 @@ function renderEvents() {
   events.forEach(ev => {
     const li = document.createElement("li");
     li.className = "item-row" + (ev.recurring ? " recurring-row" : "");
+    const metaRow = document.createElement("div");
+    metaRow.className = "item-meta-row";
 
     if (ev.title && ev.title.includes("購物")) {
       const shopBtn = document.createElement("button");
@@ -495,7 +497,7 @@ function renderEvents() {
       shopBtn.title = "開啟購物清單";
       shopBtn.textContent = "🛒";
       shopBtn.addEventListener("click", openShoppingModal);
-      li.appendChild(shopBtn);
+      metaRow.appendChild(shopBtn);
     }
 
     const timeSpan = document.createElement("span");
@@ -521,11 +523,11 @@ function renderEvents() {
       const amountSpan = document.createElement("span");
       amountSpan.className = "item-time";
       amountSpan.textContent = `💰 $${Number(ev.amount)}`;
-      li.appendChild(amountSpan);
+      metaRow.appendChild(amountSpan);
     }
 
     if (ev.notes) {
-      appendTextAndLink(li, ev.notes, { textPrefix: "📝", linkIcon: "📍" });
+      appendTextAndLink(metaRow, ev.notes, { textPrefix: "📝", linkIcon: "📍" });
     }
 
     if (!ev.recurring) {
@@ -544,7 +546,7 @@ function renderEvents() {
           setStatus("更新失敗：" + err.message, true);
         }
       });
-      li.appendChild(amountBtn);
+      metaRow.appendChild(amountBtn);
 
       const delBtn = document.createElement("button");
       delBtn.className = "delete-btn";
@@ -560,7 +562,7 @@ function renderEvents() {
           setStatus("刪除失敗：" + err.message, true);
         }
       });
-      li.appendChild(delBtn);
+      metaRow.appendChild(delBtn);
     } else {
       const skipBtn = document.createElement("button");
       skipBtn.className = "event-shopping-btn";
@@ -576,9 +578,10 @@ function renderEvents() {
           setStatus("更新失敗：" + err.message, true);
         }
       });
-      li.appendChild(skipBtn);
+      metaRow.appendChild(skipBtn);
     }
 
+    li.appendChild(metaRow);
     list.appendChild(li);
   });
 }
