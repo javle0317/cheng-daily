@@ -68,6 +68,7 @@
           </div>
           <div class="form-row">
             <input id="eventNote" type="text" placeholder="備註/地點…">
+            <input id="eventAmount" type="number" min="0" placeholder="花費(選填)">
             <button id="eventSubmitBtn" type="submit" disabled>新增</button>
           </div>
         </form>
@@ -81,6 +82,38 @@
           <button id="nextMonth" class="ghost-btn">›</button>
         </div>
         <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+
+      <section id="petExpenseCard" class="card pet-expense-card">
+        <div class="calendar-nav">
+          <button id="petExpensePrev" class="ghost-btn">‹</button>
+          <h2 id="petExpenseMonthLabel"></h2>
+          <button id="petExpenseNext" class="ghost-btn">›</button>
+        </div>
+        <select id="petExpenseFilter">
+          <option value="all">全部寵物</option>
+          <option value="林萌">🐕 林萌</option>
+          <option value="咪嚕">🐈 咪嚕</option>
+        </select>
+        <div id="petExpenseList"></div>
+      </section>
+
+      <section class="card new-pet-expense-card">
+        <h2>新增寵物花費</h2>
+        <form id="petExpenseForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <input id="petExpenseDate" type="date" required>
+            <select id="petExpenseOwner">
+              <option value="林萌">🐕 林萌</option>
+              <option value="咪嚕">🐈 咪嚕</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <input id="petExpenseTitle" type="text" placeholder="項目…" required>
+            <input id="petExpenseAmount" type="number" min="0" placeholder="金額" required>
+            <button id="petExpenseSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
       </section>
 
       <section class="card goals-card">

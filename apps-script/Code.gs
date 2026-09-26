@@ -10,7 +10,7 @@
  *
  * Sheet 需要六個分頁：
  *   Goals           欄位: id | date | text | done | createdAt
- *   Events          欄位: id | date | owner | time | title | notes | createdAt
+ *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
@@ -18,6 +18,9 @@
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
+ * amount 是選填的花費金額（任何 owner 的事件都可以填，跟顯不顯示在行事曆無關）；
+ * hideFromCalendar 是 boolean，true 代表這筆只是記帳用途、不該出現在行事曆/
+ * 每日 LINE 提醒（例如買貓砂），預設 false。
  *
  * Habits 是「習慣定義」（例如每天手沖咖啡），frequency 是 daily/weekly/monthly；
  * HabitLog 是實際完成紀錄，periodKey 依 frequency 是當天日期/該週週一日期/該月，
@@ -65,9 +68,14 @@ function handleRequest(e) {
       case "deleteGoal":
         return respond({ ok: true, data: deleteGoal(p.id) });
       case "addEvent":
-        return respond({ ok: true, data: addEvent(p.date, p.time, p.title, p.notes, p.owner) });
+        return respond({
+          ok: true,
+          data: addEvent(p.date, p.time, p.title, p.notes, p.owner, p.amount, p.hideFromCalendar),
+        });
       case "deleteEvent":
         return respond({ ok: true, data: deleteEvent(p.id) });
+      case "setEventAmount":
+        return respond({ ok: true, data: setEventAmount(p.id, p.amount) });
       case "addHabit":
         return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
       case "toggleHabitLog":
@@ -174,9 +182,19 @@ function deleteGoal(id) {
   return getData();
 }
 
-function addEvent(date, time, title, notes, owner) {
+function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
   var sheet = getSheet("Events");
-  sheet.appendRow([Utilities.getUuid(), date, owner || "", time, title, notes, new Date()]);
+  sheet.appendRow([
+    Utilities.getUuid(),
+    date,
+    owner || "",
+    time,
+    title,
+    notes,
+    new Date(),
+    amount === undefined || amount === "" ? "" : parseFloat(amount),
+    hideFromCalendar === "true" || hideFromCalendar === true,
+  ]);
   return getData();
 }
 
@@ -186,6 +204,20 @@ function deleteEvent(id) {
   for (var i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getData();
+}
+
+function setEventAmount(id, amount) {
+  var sheet = getSheet("Events");
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var amountCol = headers.indexOf("amount") + 1;
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, amountCol).setValue(amount === "" ? "" : parseFloat(amount));
       break;
     }
   }
@@ -319,6 +351,8 @@ function sendDailyNotifications() {
   var events = sheetToObjects(getSheet("Events")).filter(function (e) {
     return e.date === todayStr;
   });
+
+  events = events.filter(function (e) { return !e.hideFromCalendar; });
 
   var todayDate = new Date(todayStr + "T00:00:00");
   var recurringToday = sheetToObjects(getSheet("RecurringEvents"))

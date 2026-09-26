@@ -137,6 +137,7 @@ body {
     grid-template-columns: 1fr 1fr;
   }
   .calendar-card { grid-column: span 2; }
+  .pet-expense-card { grid-column: span 2; }
 }
 
 .card {
@@ -205,7 +206,8 @@ body {
 }
 
 .entry-form input,
-.entry-form select {
+.entry-form select,
+.pet-expense-card select {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid var(--border);

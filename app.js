@@ -12,6 +12,8 @@ const OWNER_META = {
   shared: { label: "一起", icon: "🤝", color: "#3fa373" },
 };
 
+const PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡跟 Code.gs 的 PET_NAMES 都要加
+
 // ====== State ======
 let state = {
   goals: [],
@@ -23,6 +25,9 @@ let state = {
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
+  petExpenseMonth: new Date().getMonth(),
+  petExpenseYear: new Date().getFullYear(),
+  petExpenseFilter: "all",
 };
 
 // ====== Utils ======
@@ -210,6 +215,7 @@ function renderAll() {
   renderCalendar();
   renderRecurringList();
   renderShoppingList();
+  renderPetExpenses();
   const dateInput = document.getElementById("eventDate");
   if (dateInput) dateInput.value = state.selectedDate;
   if (typeof updateEventFormValidity === "function") updateEventFormValidity();
@@ -415,7 +421,7 @@ function renderEvents() {
   const list = document.getElementById("eventList");
   list.innerHTML = "";
   const events = state.events
-    .filter(e => e.date === state.selectedDate)
+    .filter(e => e.date === state.selectedDate && !e.hideFromCalendar)
     .concat(expandRecurringForDate(state.selectedDate))
     .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
 
@@ -456,6 +462,13 @@ function renderEvents() {
     li.appendChild(textSpan);
     li.appendChild(badge);
 
+    if (Number(ev.amount) > 0) {
+      const amountSpan = document.createElement("span");
+      amountSpan.className = "item-time";
+      amountSpan.textContent = `💰 $${Number(ev.amount)}`;
+      li.appendChild(amountSpan);
+    }
+
     if (ev.notes) {
       const urlMatch = ev.notes.match(/https?:\/\/\S+/);
       const restText = urlMatch ? ev.notes.replace(urlMatch[0], "").trim() : ev.notes;
@@ -478,6 +491,23 @@ function renderEvents() {
     }
 
     if (!ev.recurring) {
+      const amountBtn = document.createElement("button");
+      amountBtn.className = "event-shopping-btn";
+      amountBtn.title = "填寫/修改花費金額";
+      amountBtn.textContent = "💰";
+      amountBtn.addEventListener("click", async () => {
+        const input = prompt("花費金額（留空清除）：", ev.amount || "");
+        if (input === null) return;
+        try {
+          state.events = await api("setEventAmount", { id: ev.id, amount: input.trim() });
+          renderEvents();
+          renderPetExpenses();
+        } catch (err) {
+          setStatus("更新失敗：" + err.message, true);
+        }
+      });
+      li.appendChild(amountBtn);
+
       const delBtn = document.createElement("button");
       delBtn.className = "delete-btn";
       delBtn.title = "刪除";
@@ -519,7 +549,7 @@ function renderCalendar() {
   const todayStr = toDateStr(new Date());
 
   const eventColorsByDate = {};
-  state.events.forEach(ev => {
+  state.events.filter(ev => !ev.hideFromCalendar).forEach(ev => {
     const color = (OWNER_META[ev.owner] || {}).color || "var(--accent)";
     if (!eventColorsByDate[ev.date]) eventColorsByDate[ev.date] = new Set();
     eventColorsByDate[ev.date].add(color);
@@ -626,6 +656,163 @@ function renderRecurringList() {
     list.appendChild(li);
   });
 }
+
+function renderPetExpenses() {
+  const monthLabel = document.getElementById("petExpenseMonthLabel");
+  const container = document.getElementById("petExpenseList");
+  container.innerHTML = "";
+
+  const monthStr = `${state.petExpenseYear}-${String(state.petExpenseMonth + 1).padStart(2, "0")}`;
+  monthLabel.textContent = `${state.petExpenseYear} 年 ${state.petExpenseMonth + 1} 月`;
+
+  const entries = state.events
+    .filter(ev => PET_NAMES.includes(ev.owner) && Number(ev.amount) > 0 && ev.date.startsWith(monthStr))
+    .filter(ev => state.petExpenseFilter === "all" || ev.owner === state.petExpenseFilter)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (!entries.length) {
+    container.innerHTML = `<p class="empty-hint">這個月還沒有花費紀錄</p>`;
+    return;
+  }
+
+  const total = entries.reduce((sum, ev) => sum + Number(ev.amount), 0);
+  const totalP = document.createElement("p");
+  totalP.className = "sub-heading";
+  totalP.textContent = `本月合計 $${total}`;
+  container.appendChild(totalP);
+
+  const byDate = {};
+  entries.forEach(ev => {
+    if (!byDate[ev.date]) byDate[ev.date] = [];
+    byDate[ev.date].push(ev);
+  });
+
+  Object.keys(byDate).forEach(date => {
+    const group = document.createElement("div");
+    const dateHeading = document.createElement("h3");
+    dateHeading.className = "sub-heading";
+    dateHeading.textContent = date;
+    group.appendChild(dateHeading);
+
+    const ul = document.createElement("ul");
+    ul.className = "item-list";
+    byDate[date].forEach(ev => {
+      const li = document.createElement("li");
+      li.className = "item-row";
+
+      const meta = OWNER_META[ev.owner] || { label: ev.owner || "", icon: "", color: "var(--accent)" };
+      const badge = document.createElement("span");
+      badge.className = "owner-badge";
+      badge.textContent = `${meta.icon} ${meta.label}`.trim();
+      badge.style.color = meta.color;
+      badge.style.background = meta.color + "22";
+
+      const textSpan = document.createElement("span");
+      textSpan.className = "item-text";
+      textSpan.textContent = ev.title;
+
+      const amountSpan = document.createElement("span");
+      amountSpan.className = "item-time";
+      amountSpan.textContent = `$${Number(ev.amount)}`;
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete-btn";
+      delBtn.title = "刪除";
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm("確定要刪除這筆花費紀錄嗎？")) return;
+        try {
+          state.events = await api("deleteEvent", { id: ev.id });
+          renderPetExpenses();
+          renderEvents();
+          renderCalendar();
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
+
+      li.appendChild(badge);
+      li.appendChild(textSpan);
+      li.appendChild(amountSpan);
+      li.appendChild(delBtn);
+      ul.appendChild(li);
+    });
+    group.appendChild(ul);
+    container.appendChild(group);
+  });
+}
+
+document.getElementById("petExpensePrev").addEventListener("click", () => {
+  state.petExpenseMonth--;
+  if (state.petExpenseMonth < 0) {
+    state.petExpenseMonth = 11;
+    state.petExpenseYear--;
+  }
+  renderPetExpenses();
+});
+
+document.getElementById("petExpenseNext").addEventListener("click", () => {
+  state.petExpenseMonth++;
+  if (state.petExpenseMonth > 11) {
+    state.petExpenseMonth = 0;
+    state.petExpenseYear++;
+  }
+  renderPetExpenses();
+});
+
+document.getElementById("petExpenseFilter").addEventListener("change", (e) => {
+  state.petExpenseFilter = e.target.value;
+  renderPetExpenses();
+});
+
+function updatePetExpenseFormValidity() {
+  const dateInput = document.getElementById("petExpenseDate");
+  const ownerSelect = document.getElementById("petExpenseOwner");
+  const titleInput = document.getElementById("petExpenseTitle");
+  const amountInput = document.getElementById("petExpenseAmount");
+  const submitBtn = document.getElementById("petExpenseSubmitBtn");
+  const valid = !!dateInput.value && !!ownerSelect.value && !!titleInput.value.trim() && Number(amountInput.value) > 0;
+  submitBtn.disabled = !valid;
+}
+
+["petExpenseDate", "petExpenseOwner", "petExpenseTitle", "petExpenseAmount"].forEach(id => {
+  document.getElementById(id).addEventListener("input", updatePetExpenseFormValidity);
+  document.getElementById(id).addEventListener("change", updatePetExpenseFormValidity);
+});
+
+document.getElementById("petExpenseForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const dateInput = document.getElementById("petExpenseDate");
+  const ownerSelect = document.getElementById("petExpenseOwner");
+  const titleInput = document.getElementById("petExpenseTitle");
+  const amountInput = document.getElementById("petExpenseAmount");
+  const date = dateInput.value;
+  const owner = ownerSelect.value;
+  const title = titleInput.value.trim();
+  const amount = amountInput.value;
+  if (!date || !owner || !title || !(Number(amount) > 0)) return;
+  setFormBusy(e.target, true);
+  try {
+    state.events = await api("addEvent", {
+      date,
+      time: "",
+      title,
+      notes: "",
+      owner,
+      amount,
+      hideFromCalendar: "true",
+    });
+    titleInput.value = "";
+    amountInput.value = "";
+    renderPetExpenses();
+    showToast("已新增花費");
+  } catch (err) {
+    setStatus("新增失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
+    updatePetExpenseFormValidity();
+  }
+});
 
 function updateRecurringFormValidity() {
   const titleInput = document.getElementById("recurringTitle");
@@ -803,6 +990,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   const titleInput = document.getElementById("eventTitle");
   const noteInput = document.getElementById("eventNote");
   const ownerSelect = document.getElementById("eventOwner");
+  const amountInput = document.getElementById("eventAmount");
   const title = titleInput.value.trim();
   const date = dateInput.value || state.selectedDate;
   if (!title || !date || !ownerSelect.value) return;
@@ -814,12 +1002,15 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
       title,
       notes: noteInput.value.trim(),
       owner: ownerSelect.value,
+      amount: amountInput.value || "",
     });
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
+    amountInput.value = "";
     renderEvents();
     renderCalendar();
+    renderPetExpenses();
     showToast("已新增記事");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
