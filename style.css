@@ -214,7 +214,8 @@ body {
   font-size: 14px;
 }
 
-.entry-form button {
+.entry-form button,
+.inline-form button {
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
@@ -223,7 +224,8 @@ body {
   cursor: pointer;
 }
 
-.entry-form button:disabled {
+.entry-form button:disabled,
+.inline-form button:disabled {
   background: var(--border);
   color: var(--text-dim);
   cursor: not-allowed;
@@ -266,15 +268,6 @@ body {
   border-radius: 6px;
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-.inline-form button {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
 }
 
 .item-list {

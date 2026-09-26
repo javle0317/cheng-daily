@@ -56,6 +56,19 @@ function showToast(msg) {
   }, 1800);
 }
 
+function setFormBusy(form, busy) {
+  const btn = form.querySelector('button[type="submit"]');
+  if (!btn) return;
+  if (busy) {
+    btn.dataset.originalText = btn.textContent;
+    btn.textContent = "處理中…";
+    btn.disabled = true;
+  } else {
+    if (btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
+    btn.disabled = false;
+  }
+}
+
 function isWorkday(dateStr) {
   const day = new Date(dateStr + "T00:00:00").getDay();
   return day >= 1 && day <= 5;
@@ -645,6 +658,7 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
   const title = titleInput.value.trim();
   if (!title) return;
   if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
+  setFormBusy(e.target, true);
   try {
     const data = await api("addRecurringEvent", {
       owner: ownerSelect.value,
@@ -660,13 +674,15 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
     timeInput.value = "";
     noteInput.value = "";
     dayOfMonthInput.value = "";
-    updateRecurringFormValidity();
     renderRecurringList();
     renderEvents();
     renderCalendar();
     showToast("已新增循環行程");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
+    updateRecurringFormValidity();
   }
 });
 
@@ -732,6 +748,7 @@ document.getElementById("shoppingForm").addEventListener("submit", async (e) => 
   const input = document.getElementById("shoppingInput");
   const item = input.value.trim();
   if (!item) return;
+  setFormBusy(e.target, true);
   try {
     state.shoppingList = await api("addShoppingItem", { item });
     input.value = "";
@@ -739,6 +756,8 @@ document.getElementById("shoppingForm").addEventListener("submit", async (e) => 
     showToast("已新增購物項目");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
   }
 });
 
@@ -748,6 +767,7 @@ document.getElementById("goalForm").addEventListener("submit", async (e) => {
   const input = document.getElementById("goalInput");
   const text = input.value.trim();
   if (!text) return;
+  setFormBusy(e.target, true);
   try {
     state.goals = await api("addGoal", { date: state.selectedDate, text });
     input.value = "";
@@ -757,6 +777,8 @@ document.getElementById("goalForm").addEventListener("submit", async (e) => {
     showToast("已新增待辦");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
   }
 });
 
@@ -784,6 +806,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   const title = titleInput.value.trim();
   const date = dateInput.value || state.selectedDate;
   if (!title || !date || !ownerSelect.value) return;
+  setFormBusy(e.target, true);
   try {
     state.events = await api("addEvent", {
       date,
@@ -795,12 +818,14 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
-    updateEventFormValidity();
     renderEvents();
     renderCalendar();
     showToast("已新增記事");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
+    updateEventFormValidity();
   }
 });
 
@@ -831,6 +856,7 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
   const workdaysCheckbox = document.getElementById("habitWorkdaysOnly");
   const name = nameInput.value.trim();
   if (!name) return;
+  setFormBusy(e.target, true);
   try {
     const data = await api("addHabit", {
       name,
@@ -843,13 +869,15 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
     nameInput.value = "";
     targetInput.value = "1";
     workdaysCheckbox.checked = false;
-    updateHabitFormValidity();
     renderDailyHabits();
     renderWeeklyHabits();
     renderMonthlyHabits();
     showToast("已新增習慣");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
+    updateHabitFormValidity();
   }
 });
 
