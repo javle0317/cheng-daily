@@ -174,7 +174,16 @@ async function api(action, params = {}) {
 function showLockScreen(errorMsg) {
   document.getElementById("app").classList.add("hidden");
   document.getElementById("lockScreen").classList.remove("hidden");
+  document.getElementById("lockLoading").classList.add("hidden");
+  document.getElementById("lockForm").classList.remove("hidden");
   document.getElementById("lockError").textContent = errorMsg || "";
+}
+
+function showLockLoading() {
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("lockScreen").classList.remove("hidden");
+  document.getElementById("lockForm").classList.add("hidden");
+  document.getElementById("lockLoading").classList.remove("hidden");
 }
 
 function showApp() {
@@ -1078,6 +1087,7 @@ document.getElementById("nextMonth").addEventListener("click", () => {
 (function init() {
   const savedPassword = localStorage.getItem(PASSWORD_KEY);
   if (savedPassword) {
+    showLockLoading();
     tryUnlock(savedPassword);
   } else {
     showLockScreen();
