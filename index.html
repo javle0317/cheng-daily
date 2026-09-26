@@ -95,7 +95,8 @@
           <button id="petExpenseNext" class="ghost-btn">›</button>
         </div>
         <select id="petExpenseFilter">
-          <option value="all">全部寵物</option>
+          <option value="all">全部</option>
+          <option value="家庭">🤝 家庭</option>
           <option value="林萌">🐕 林萌</option>
           <option value="咪嚕">🐈 咪嚕</option>
         </select>
@@ -103,11 +104,12 @@
       </section>
 
       <section class="card new-pet-expense-card">
-        <h2>新增寵物花費</h2>
+        <h2>新增花費</h2>
         <form id="petExpenseForm" class="entry-form entry-form-rows">
           <div class="form-row">
             <input id="petExpenseDate" type="date" required>
             <select id="petExpenseOwner">
+              <option value="shared">🤝 家庭</option>
               <option value="林萌">🐕 林萌</option>
               <option value="咪嚕">🐈 咪嚕</option>
             </select>

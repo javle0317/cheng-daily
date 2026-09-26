@@ -537,7 +537,7 @@ function renderCalendar() {
   grid.innerHTML = "";
 
   document.getElementById("monthLabel").textContent =
-    `${state.calendarYear} 年 ${state.calendarMonth + 1} 月`;
+    `📅 ${state.calendarYear} 年 ${state.calendarMonth + 1} 月`;
 
   ["日", "一", "二", "三", "四", "五", "六"].forEach(w => {
     const el = document.createElement("div");
@@ -659,17 +659,21 @@ function renderRecurringList() {
   });
 }
 
+function expenseCategory(owner) {
+  return PET_NAMES.includes(owner) ? owner : "家庭"; // 我/太太/共同都算同一筆家庭花費，不細分是誰花的
+}
+
 function renderPetExpenses() {
   const monthLabel = document.getElementById("petExpenseMonthLabel");
   const container = document.getElementById("petExpenseList");
   container.innerHTML = "";
 
   const monthStr = `${state.petExpenseYear}-${String(state.petExpenseMonth + 1).padStart(2, "0")}`;
-  monthLabel.textContent = `${state.petExpenseYear} 年 ${state.petExpenseMonth + 1} 月`;
+  monthLabel.textContent = `💰 ${state.petExpenseYear} 年 ${state.petExpenseMonth + 1} 月`;
 
   const entries = state.events
-    .filter(ev => PET_NAMES.includes(ev.owner) && Number(ev.amount) > 0 && ev.date.startsWith(monthStr))
-    .filter(ev => state.petExpenseFilter === "all" || ev.owner === state.petExpenseFilter)
+    .filter(ev => Number(ev.amount) > 0 && ev.date.startsWith(monthStr))
+    .filter(ev => state.petExpenseFilter === "all" || expenseCategory(ev.owner) === state.petExpenseFilter)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (!entries.length) {
