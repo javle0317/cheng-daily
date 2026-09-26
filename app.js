@@ -148,6 +148,15 @@ function computeStreak(habit) {
 }
 
 // ====== API ======
+function applyData(data) {
+  state.goals = data.goals || [];
+  state.events = data.events || [];
+  state.habits = data.habits || [];
+  state.habitLogs = data.habitLogs || [];
+  state.recurringEvents = data.recurringEvents || [];
+  state.shoppingList = data.shoppingList || [];
+}
+
 async function api(action, params = {}) {
   const password = localStorage.getItem(PASSWORD_KEY);
   const url = new URL(WEBAPP_URL);
@@ -176,13 +185,7 @@ function showApp() {
 async function tryUnlock(password) {
   localStorage.setItem(PASSWORD_KEY, password);
   try {
-    const data = await api("getData");
-    state.goals = data.goals || [];
-    state.events = data.events || [];
-    state.habits = data.habits || [];
-    state.habitLogs = data.habitLogs || [];
-    state.recurringEvents = data.recurringEvents || [];
-    state.shoppingList = data.shoppingList || [];
+    applyData(await api("getData"));
     showApp();
     renderAll();
     setStatus("已連上 Google Sheet");
@@ -259,7 +262,7 @@ function renderGoals() {
     li.querySelector(".item-text").textContent = goal.text;
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       try {
-        state.goals = await api("toggleGoal", { id: goal.id });
+        applyData(await api("toggleGoal", { id: goal.id }));
         renderGoals();
         renderHeader();
         renderCalendar();
@@ -270,8 +273,7 @@ function renderGoals() {
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!confirm("確定要刪除這個待辦嗎？")) return;
       try {
-        const data = await api("deleteGoal", { id: goal.id });
-        state.goals = data;
+        applyData(await api("deleteGoal", { id: goal.id }));
         renderGoals();
         renderHeader();
         renderCalendar();
@@ -330,9 +332,7 @@ function renderDailyHabits() {
     if (streak > 0) li.querySelector(".item-time").textContent = `🔥 ${streak}`;
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       try {
-        const data = await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 });
-        state.habits = data.habits;
-        state.habitLogs = data.habitLogs;
+        applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 }));
         renderDailyHabits();
       } catch (err) {
         setStatus("更新失敗：" + err.message, true);
@@ -341,9 +341,7 @@ function renderDailyHabits() {
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!confirm("確定要刪除這個習慣嗎？")) return;
       try {
-        const data = await api("deleteHabit", { id: habit.id });
-        state.habits = data.habits;
-        state.habitLogs = data.habitLogs;
+        applyData(await api("deleteHabit", { id: habit.id }));
         renderDailyHabits();
       } catch (err) {
         setStatus("刪除失敗：" + err.message, true);
@@ -385,9 +383,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
     li.querySelector(".item-time").textContent = `${count}/${target}`;
     li.addEventListener("click", async () => {
       try {
-        const data = await api("toggleHabitLog", { habitId: habit.id, periodKey, target });
-        state.habits = data.habits;
-        state.habitLogs = data.habitLogs;
+        applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target }));
         renderPeriodHabits(frequency, listId, sectionId);
       } catch (err) {
         setStatus("更新失敗：" + err.message, true);
@@ -397,9 +393,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
       e.stopPropagation();
       if (!confirm("確定要刪除這個習慣嗎？")) return;
       try {
-        const data = await api("deleteHabit", { id: habit.id });
-        state.habits = data.habits;
-        state.habitLogs = data.habitLogs;
+        applyData(await api("deleteHabit", { id: habit.id }));
         renderPeriodHabits(frequency, listId, sectionId);
       } catch (err) {
         setStatus("刪除失敗：" + err.message, true);
@@ -499,7 +493,7 @@ function renderEvents() {
         const input = prompt("花費金額（留空清除）：", ev.amount || "");
         if (input === null) return;
         try {
-          state.events = await api("setEventAmount", { id: ev.id, amount: input.trim() });
+          applyData(await api("setEventAmount", { id: ev.id, amount: input.trim() }));
           renderEvents();
           renderPetExpenses();
         } catch (err) {
@@ -515,7 +509,7 @@ function renderEvents() {
       delBtn.addEventListener("click", async () => {
         if (!confirm("確定要刪除這筆事件嗎？")) return;
         try {
-          state.events = await api("deleteEvent", { id: ev.id });
+          applyData(await api("deleteEvent", { id: ev.id }));
           renderEvents();
           renderCalendar();
         } catch (err) {
@@ -640,8 +634,7 @@ function renderRecurringList() {
     delBtn.addEventListener("click", async () => {
       if (!confirm("確定要刪除這個循環行程嗎？")) return;
       try {
-        const data = await api("deleteRecurringEvent", { id: rule.id });
-        state.recurringEvents = data.recurringEvents;
+        applyData(await api("deleteRecurringEvent", { id: rule.id }));
         renderRecurringList();
         renderEvents();
         renderCalendar();
@@ -722,7 +715,7 @@ function renderPetExpenses() {
       delBtn.addEventListener("click", async () => {
         if (!confirm("確定要刪除這筆花費紀錄嗎？")) return;
         try {
-          state.events = await api("deleteEvent", { id: ev.id });
+          applyData(await api("deleteEvent", { id: ev.id }));
           renderPetExpenses();
           renderEvents();
           renderCalendar();
@@ -793,7 +786,7 @@ document.getElementById("petExpenseForm").addEventListener("submit", async (e) =
   if (!date || !owner || !title || !(Number(amount) > 0)) return;
   setFormBusy(e.target, true);
   try {
-    state.events = await api("addEvent", {
+    applyData(await api("addEvent", {
       date,
       time: "",
       title,
@@ -801,7 +794,7 @@ document.getElementById("petExpenseForm").addEventListener("submit", async (e) =
       owner,
       amount,
       hideFromCalendar: "true",
-    });
+    }));
     titleInput.value = "";
     amountInput.value = "";
     renderPetExpenses();
@@ -847,7 +840,7 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
   if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
   setFormBusy(e.target, true);
   try {
-    const data = await api("addRecurringEvent", {
+    applyData(await api("addRecurringEvent", {
       owner: ownerSelect.value,
       title,
       time: timeInput.value || "",
@@ -855,8 +848,7 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
       frequency: frequencySelect.value,
       dayOfWeek: dayOfWeekSelect.value,
       dayOfMonth: dayOfMonthInput.value,
-    });
-    state.recurringEvents = data.recurringEvents;
+    }));
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
@@ -897,7 +889,7 @@ function renderShoppingList() {
     li.querySelector(".item-text").textContent = item.item;
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       try {
-        state.shoppingList = await api("toggleShoppingItem", { id: item.id });
+        applyData(await api("toggleShoppingItem", { id: item.id }));
         renderShoppingList();
       } catch (err) {
         setStatus("更新失敗：" + err.message, true);
@@ -906,7 +898,7 @@ function renderShoppingList() {
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!confirm("確定要刪除這個購物項目嗎？")) return;
       try {
-        state.shoppingList = await api("deleteShoppingItem", { id: item.id });
+        applyData(await api("deleteShoppingItem", { id: item.id }));
         renderShoppingList();
       } catch (err) {
         setStatus("刪除失敗：" + err.message, true);
@@ -937,7 +929,7 @@ document.getElementById("shoppingForm").addEventListener("submit", async (e) => 
   if (!item) return;
   setFormBusy(e.target, true);
   try {
-    state.shoppingList = await api("addShoppingItem", { item });
+    applyData(await api("addShoppingItem", { item }));
     input.value = "";
     renderShoppingList();
     showToast("已新增購物項目");
@@ -956,7 +948,7 @@ document.getElementById("goalForm").addEventListener("submit", async (e) => {
   if (!text) return;
   setFormBusy(e.target, true);
   try {
-    state.goals = await api("addGoal", { date: state.selectedDate, text });
+    applyData(await api("addGoal", { date: state.selectedDate, text }));
     input.value = "";
     renderGoals();
     renderHeader();
@@ -996,14 +988,14 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   if (!title || !date || !ownerSelect.value) return;
   setFormBusy(e.target, true);
   try {
-    state.events = await api("addEvent", {
+    applyData(await api("addEvent", {
       date,
       time: timeInput.value || "",
       title,
       notes: noteInput.value.trim(),
       owner: ownerSelect.value,
       amount: amountInput.value || "",
-    });
+    }));
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
@@ -1049,14 +1041,12 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
   if (!name) return;
   setFormBusy(e.target, true);
   try {
-    const data = await api("addHabit", {
+    applyData(await api("addHabit", {
       name,
       frequency: frequencySelect.value,
       workdaysOnly: workdaysCheckbox.checked,
       target: targetInput.value || 1,
-    });
-    state.habits = data.habits;
-    state.habitLogs = data.habitLogs;
+    }));
     nameInput.value = "";
     targetInput.value = "1";
     workdaysCheckbox.checked = false;
