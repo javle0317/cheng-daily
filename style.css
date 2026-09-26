@@ -443,6 +443,27 @@ body {
 
 .modal-header h2 { margin: 0; font-size: 18px; }
 
+.dialog-card { max-width: 320px; }
+
+#dialogMessage { margin: 0 0 12px; }
+
+.dialog-card input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .event-shopping-btn {
   background: none;
   border: none;

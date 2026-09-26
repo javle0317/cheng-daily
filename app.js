@@ -313,7 +313,7 @@ function renderGoals() {
       }
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
-      if (!confirm("確定要刪除這個待辦嗎？")) return;
+      if (!(await showConfirm("確定要刪除這個待辦嗎？"))) return;
       try {
         applyData(await api("deleteGoal", { id: goal.id }));
         renderGoals();
@@ -390,7 +390,7 @@ function renderDailyHabits() {
       }
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
-      if (!confirm("確定要刪除這個習慣嗎？")) return;
+      if (!(await showConfirm("確定要刪除這個習慣嗎？"))) return;
       try {
         applyData(await api("deleteHabit", { id: habit.id }));
         renderDailyHabits();
@@ -452,7 +452,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
     });
     li.querySelector(".delete-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm("確定要刪除這個習慣嗎？")) return;
+      if (!(await showConfirm("確定要刪除這個習慣嗎？"))) return;
       try {
         applyData(await api("deleteHabit", { id: habit.id }));
         renderPeriodHabits(frequency, listId, sectionId);
@@ -534,7 +534,7 @@ function renderEvents() {
       amountBtn.title = "填寫/修改花費金額";
       amountBtn.textContent = "💰";
       amountBtn.addEventListener("click", async () => {
-        const input = prompt("花費金額（留空清除）：", ev.amount || "");
+        const input = await showPrompt("花費金額（留空清除）：", ev.amount || "");
         if (input === null) return;
         try {
           applyData(await api("setEventAmount", { id: ev.id, amount: input.trim() }));
@@ -551,7 +551,7 @@ function renderEvents() {
       delBtn.title = "刪除";
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
-        if (!confirm("確定要刪除這筆事件嗎？")) return;
+        if (!(await showConfirm("確定要刪除這筆事件嗎？"))) return;
         try {
           applyData(await api("deleteEvent", { id: ev.id }));
           renderEvents();
@@ -567,7 +567,7 @@ function renderEvents() {
       skipBtn.title = "跳過這一次";
       skipBtn.textContent = "⏭️";
       skipBtn.addEventListener("click", async () => {
-        if (!confirm("確定要跳過這一次嗎？（規則本身不會刪除）")) return;
+        if (!(await showConfirm("確定要跳過這一次嗎？（規則本身不會刪除）"))) return;
         try {
           applyData(await api("addRecurringException", { recurringId: ev.ruleId, date: ev.date }));
           renderEvents();
@@ -705,7 +705,7 @@ function renderRecurringList() {
     delBtn.title = "刪除";
     delBtn.textContent = "✕";
     delBtn.addEventListener("click", async () => {
-      if (!confirm("確定要刪除這個循環行程嗎？")) return;
+      if (!(await showConfirm("確定要刪除這個循環行程嗎？"))) return;
       try {
         applyData(await api("deleteRecurringEvent", { id: rule.id }));
         renderRecurringList();
@@ -788,7 +788,7 @@ function renderPetExpenses() {
       delBtn.title = "刪除";
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
-        if (!confirm("確定要刪除這筆花費紀錄嗎？")) return;
+        if (!(await showConfirm("確定要刪除這筆花費紀錄嗎？"))) return;
         try {
           applyData(await api("deleteEvent", { id: ev.id }));
           renderPetExpenses();
@@ -971,7 +971,7 @@ function renderShoppingList() {
       }
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
-      if (!confirm("確定要刪除這個購物項目嗎？")) return;
+      if (!(await showConfirm("確定要刪除這個購物項目嗎？"))) return;
       try {
         applyData(await api("deleteShoppingItem", { id: item.id }));
         renderShoppingList();
@@ -982,6 +982,48 @@ function renderShoppingList() {
     list.appendChild(li);
   });
 }
+
+// ====== 確認/輸入 modal（取代原生 confirm()/prompt()，手機瀏覽器對話框關閉後
+// 有時不會立刻重繪畫面，且外觀跟整個 App 風格不一致） ======
+let dialogResolve = null;
+let dialogIsPrompt = false;
+
+function showConfirm(message) {
+  dialogIsPrompt = false;
+  return openDialog(message);
+}
+
+function showPrompt(message, defaultValue = "") {
+  dialogIsPrompt = true;
+  return openDialog(message, defaultValue);
+}
+
+function openDialog(message, defaultValue = "") {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    document.getElementById("dialogMessage").textContent = message;
+    const input = document.getElementById("dialogInput");
+    input.classList.toggle("hidden", !dialogIsPrompt);
+    input.value = defaultValue;
+    document.getElementById("dialogModal").classList.remove("hidden");
+    if (dialogIsPrompt) setTimeout(() => input.focus(), 0);
+  });
+}
+
+function resolveDialog(ok) {
+  document.getElementById("dialogModal").classList.add("hidden");
+  if (!dialogResolve) return;
+  const input = document.getElementById("dialogInput");
+  const result = !ok ? (dialogIsPrompt ? null : false) : (dialogIsPrompt ? input.value : true);
+  dialogResolve(result);
+  dialogResolve = null;
+}
+
+document.getElementById("dialogOkBtn").addEventListener("click", () => resolveDialog(true));
+document.getElementById("dialogCancelBtn").addEventListener("click", () => resolveDialog(false));
+document.getElementById("dialogModal").addEventListener("click", (e) => {
+  if (e.target.id === "dialogModal") resolveDialog(false);
+});
 
 function openShoppingModal() {
   document.getElementById("shoppingModal").classList.remove("hidden");
