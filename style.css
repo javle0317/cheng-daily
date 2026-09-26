@@ -370,6 +370,11 @@ body {
   margin-top: 3px;
 }
 
+.calendar-cell .dot.dot-recurring {
+  border: 1.2px solid;
+  box-sizing: border-box;
+}
+
 .calendar-weekday {
   text-align: center;
   font-size: 11px;

@@ -133,7 +133,7 @@ function matchesRecurringRule(rule, dateStr) {
 
 function expandRecurringForDate(dateStr) {
   return state.recurringEvents
-    .filter(r => isTruthy(r.active) && matchesRecurringRule(r, dateStr))
+    .filter(r => matchesRecurringRule(r, dateStr))
     .map(r => ({
       id: `rec_${r.id}_${dateStr}`,
       date: dateStr,
@@ -605,18 +605,24 @@ function renderCalendar() {
     dayLabel.textContent = day;
     cell.appendChild(dayLabel);
 
-    const colors = new Set(eventColorsByDate[dateStr] || []);
+    const solidColors = new Set(eventColorsByDate[dateStr] || []);
+    if (goalDates.has(dateStr)) solidColors.add("var(--accent)");
+
+    const recurringColors = new Set();
     expandRecurringForDate(dateStr).forEach(ev => {
-      colors.add((OWNER_META[ev.owner] || {}).color || "var(--accent)");
+      recurringColors.add((OWNER_META[ev.owner] || {}).color || "var(--accent)");
     });
-    if (goalDates.has(dateStr)) colors.add("var(--accent)");
-    if (colors.size) {
+
+    const allColors = new Set([...solidColors, ...recurringColors]);
+    if (allColors.size) {
       const dotsWrap = document.createElement("div");
       dotsWrap.className = "dot-row";
-      [...colors].slice(0, 4).forEach(color => {
+      [...allColors].slice(0, 4).forEach(color => {
         const dot = document.createElement("span");
-        dot.className = "dot";
-        dot.style.background = color;
+        const isSolid = solidColors.has(color);
+        dot.className = "dot" + (isSolid ? "" : " dot-recurring");
+        dot.style.background = isSolid ? color : "transparent";
+        dot.style.borderColor = color;
         dotsWrap.appendChild(dot);
       });
       cell.appendChild(dotsWrap);
