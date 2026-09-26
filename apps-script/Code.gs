@@ -14,6 +14,7 @@
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
+ *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
@@ -91,6 +92,10 @@ function handleRequest(e) {
         });
       case "deleteRecurringEvent":
         return respond({ ok: true, data: deleteRecurringEvent(p.id) });
+      case "addRecurringException":
+        return respond({ ok: true, data: addRecurringException(p.recurringId, p.date) });
+      case "deleteRecurringException":
+        return respond({ ok: true, data: deleteRecurringException(p.id) });
       case "addShoppingItem":
         return respond({ ok: true, data: addShoppingItem(p.item) });
       case "toggleShoppingItem":
@@ -148,6 +153,7 @@ function getData() {
     habits: sheetToObjects(getSheet("Habits")),
     habitLogs: sheetToObjects(getSheet("HabitLog")),
     recurringEvents: sheetToObjects(getSheet("RecurringEvents")),
+    recurringExceptions: sheetToObjects(getSheet("RecurringExceptions")),
     shoppingList: sheetToObjects(getSheet("ShoppingList")),
   };
 }
@@ -242,6 +248,24 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
 
 function deleteRecurringEvent(id) {
   var sheet = getSheet("RecurringEvents");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getData();
+}
+
+function addRecurringException(recurringId, date) {
+  var sheet = getSheet("RecurringExceptions");
+  sheet.appendRow([Utilities.getUuid(), recurringId, date, new Date()]);
+  return getData();
+}
+
+function deleteRecurringException(id) {
+  var sheet = getSheet("RecurringExceptions");
   var values = sheet.getDataRange().getValues();
   for (var i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
@@ -355,8 +379,12 @@ function sendDailyNotifications() {
   events = events.filter(function (e) { return !e.hideFromCalendar; });
 
   var todayDate = new Date(todayStr + "T00:00:00");
+  var skippedToday = {};
+  sheetToObjects(getSheet("RecurringExceptions")).forEach(function (ex) {
+    if (ex.date === todayStr) skippedToday[ex.recurringId] = true;
+  });
   var recurringToday = sheetToObjects(getSheet("RecurringEvents"))
-    .filter(function (r) { return matchesRecurringRule_(r, todayDate); })
+    .filter(function (r) { return matchesRecurringRule_(r, todayDate) && !skippedToday[r.id]; })
     .map(function (r) {
       return { date: todayStr, owner: r.owner, time: r.time, title: r.title, notes: r.notes };
     });

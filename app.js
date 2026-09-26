@@ -21,6 +21,7 @@ let state = {
   habits: [],
   habitLogs: [],
   recurringEvents: [],
+  recurringExceptions: [],
   shoppingList: [],
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
@@ -132,10 +133,14 @@ function matchesRecurringRule(rule, dateStr) {
 }
 
 function expandRecurringForDate(dateStr) {
+  const skipped = new Set(
+    state.recurringExceptions.filter(ex => ex.date === dateStr).map(ex => ex.recurringId)
+  );
   return state.recurringEvents
-    .filter(r => matchesRecurringRule(r, dateStr))
+    .filter(r => matchesRecurringRule(r, dateStr) && !skipped.has(r.id))
     .map(r => ({
       id: `rec_${r.id}_${dateStr}`,
+      ruleId: r.id,
       date: dateStr,
       owner: r.owner,
       time: r.time,
@@ -181,6 +186,7 @@ function applyData(data) {
   state.habits = data.habits || [];
   state.habitLogs = data.habitLogs || [];
   state.recurringEvents = data.recurringEvents || [];
+  state.recurringExceptions = data.recurringExceptions || [];
   state.shoppingList = data.shoppingList || [];
 }
 
@@ -555,6 +561,22 @@ function renderEvents() {
         }
       });
       li.appendChild(delBtn);
+    } else {
+      const skipBtn = document.createElement("button");
+      skipBtn.className = "event-shopping-btn";
+      skipBtn.title = "跳過這一次";
+      skipBtn.textContent = "⏭️";
+      skipBtn.addEventListener("click", async () => {
+        if (!confirm("確定要跳過這一次嗎？（規則本身不會刪除）")) return;
+        try {
+          applyData(await api("addRecurringException", { recurringId: ev.ruleId, date: ev.date }));
+          renderEvents();
+          renderCalendar();
+        } catch (err) {
+          setStatus("更新失敗：" + err.message, true);
+        }
+      });
+      li.appendChild(skipBtn);
     }
 
     list.appendChild(li);
