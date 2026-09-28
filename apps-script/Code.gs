@@ -184,8 +184,19 @@ function getData() {
     recurringEvents: sheetToObjects(getSheet("RecurringEvents")),
     recurringExceptions: sheetToObjects(getSheet("RecurringExceptions")),
     shoppingList: sheetToObjects(getSheet("ShoppingList")),
-    holidays: getHolidays_(),
+    holidays: getHolidaysSafe_(),
   };
+}
+
+// 假日抓取失敗（例如 Calendar 權限還沒授權、或 Google 那邊暫時出狀況）不該讓
+// 整個 App（包含登入）掛掉，失敗就當作沒有假日資料，其餘功能照常運作。
+function getHolidaysSafe_() {
+  try {
+    return getHolidays_();
+  } catch (err) {
+    Logger.log("getHolidays_ 失敗，假日功能暫時停用：" + err);
+    return [];
+  }
 }
 
 function addGoal(date, text) {
