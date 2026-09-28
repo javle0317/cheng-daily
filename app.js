@@ -228,6 +228,8 @@ function showApp() {
 
 async function tryUnlock(password) {
   localStorage.setItem(PASSWORD_KEY, password);
+  const form = document.getElementById("lockForm");
+  setFormBusy(form, true);
   try {
     applyData(await api("getData"));
     showApp();
@@ -236,6 +238,8 @@ async function tryUnlock(password) {
   } catch (err) {
     localStorage.removeItem(PASSWORD_KEY);
     showLockScreen("密碼錯誤，或無法連線，請再試一次");
+  } finally {
+    setFormBusy(form, false);
   }
 }
 
