@@ -82,6 +82,12 @@ body {
   cursor: pointer;
 }
 
+.lock-card button:disabled {
+  background: var(--border);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
 .error-text {
   color: var(--danger);
   font-size: 13px;
