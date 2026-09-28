@@ -23,6 +23,7 @@ let state = {
   recurringEvents: [],
   recurringExceptions: [],
   shoppingList: [],
+  holidayDates: new Set(),
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
@@ -104,7 +105,7 @@ function setFormBusy(form, busy) {
 
 function isWorkday(dateStr) {
   const day = new Date(dateStr + "T00:00:00").getDay();
-  return day >= 1 && day <= 5;
+  return day >= 1 && day <= 5 && !state.holidayDates.has(dateStr);
 }
 
 function getWeekStart(dateStr) {
@@ -188,6 +189,7 @@ function applyData(data) {
   state.recurringEvents = data.recurringEvents || [];
   state.recurringExceptions = data.recurringExceptions || [];
   state.shoppingList = data.shoppingList || [];
+  state.holidayDates = new Set((data.holidays || []).map(h => h.date));
 }
 
 async function api(action, params = {}) {

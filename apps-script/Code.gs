@@ -36,6 +36,10 @@
  * 每日 LINE 通知：sendDailyNotifications()，需要另外設定時間驅動的觸發條件
  * （見 README.md），不會透過網頁前端呼叫。
  *
+ * 台灣國定假日：getHolidays_() 讀 Google 內建的公開行事曆（不用自己維護清單），
+ * 供前端 isWorkday() 判斷 workdaysOnly 的習慣要不要排除假日。第一次存檔或部署
+ * 時會跳出要求授權 Calendar 讀取權限的視窗，允許即可。
+ *
  * （曾經用過的幾支一次性搬移/整理函式都已經跑完並移除，需要參考的話到 git
  * 歷史紀錄找 migrateFromPetsSheet / fillBlankEventOwners / migratePetsIntoEvents /
  * normalizeEventDates。）
@@ -118,6 +122,31 @@ function respond(obj) {
 
 var TIME_ZONE = "Asia/Taipei"; // 寫死，不依賴這個 Apps Script 專案本身的時區設定
 
+// Google 內建的台灣國定假日公開行事曆，不用自己維護清單。只抓國定假日本身，
+// 不處理補班日（目前 workdaysOnly 的需求只要排除假日就好）。
+var HOLIDAY_CALENDAR_ID = "zh-tw.taiwan#holiday@group.v.calendar.google.com";
+
+function getHolidays_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get("holidays");
+  if (cached) return JSON.parse(cached);
+
+  var cal = CalendarApp.getCalendarById(HOLIDAY_CALENDAR_ID);
+  var start = new Date();
+  start.setDate(start.getDate() - 400); // 涵蓋 computeStreak 往回算 365 天需要的範圍
+  var end = new Date();
+  end.setDate(end.getDate() + 60);
+  var holidays = cal.getEvents(start, end).map(function (ev) {
+    return {
+      date: Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "yyyy-MM-dd"),
+      name: ev.getTitle(),
+    };
+  });
+
+  cache.put("holidays", JSON.stringify(holidays), 21600); // 快取 6 小時，行事曆很少變動
+  return holidays;
+}
+
 function getSheet(name) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sheet) throw new Error("找不到分頁: " + name);
@@ -155,6 +184,7 @@ function getData() {
     recurringEvents: sheetToObjects(getSheet("RecurringEvents")),
     recurringExceptions: sheetToObjects(getSheet("RecurringExceptions")),
     shoppingList: sheetToObjects(getSheet("ShoppingList")),
+    holidays: getHolidays_(),
   };
 }
 
