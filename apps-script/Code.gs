@@ -373,22 +373,32 @@ function deleteHabit(id) {
   return getData();
 }
 
+// 讀取現有列、決定要遞增還是新增一列、再寫回去——這整段「讀了再寫」如果同時有
+// 兩次呼叫重疊（連續點太快、網路延遲重試），兩邊都會在對方寫入前讀到「還沒有
+// 這一列」，結果各自新增一列造成重複資料，而不是原本預期的同一列遞增/歸零。
+// 用 LockService 把整段包起來序列化，確保同一時間只有一個執行緒在動這個習慣。
 function toggleHabitLog(habitId, periodKey, target) {
-  var sheet = getSheet("HabitLog");
-  var values = sheet.getDataRange().getValues();
-  var maxTarget = parseInt(target, 10) || 1;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getSheet("HabitLog");
+    var values = sheet.getDataRange().getValues();
+    var maxTarget = parseInt(target, 10) || 1;
 
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][1] === habitId && String(values[i][2]) === String(periodKey)) {
-      var next = (Number(values[i][3]) || 0) + 1;
-      if (next > maxTarget) next = 0;
-      sheet.getRange(i + 1, 4).setValue(next);
-      return getData();
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][1] === habitId && String(values[i][2]) === String(periodKey)) {
+        var next = (Number(values[i][3]) || 0) + 1;
+        if (next > maxTarget) next = 0;
+        sheet.getRange(i + 1, 4).setValue(next);
+        return getData();
+      }
     }
-  }
 
-  sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
-  return getData();
+    sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
+    return getData();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
