@@ -1200,6 +1200,20 @@ document.getElementById("nextMonth").addEventListener("click", () => {
   renderCalendar();
 });
 
+document.getElementById("todayBtn").addEventListener("click", () => {
+  const today = new Date();
+  state.calendarMonth = today.getMonth();
+  state.calendarYear = today.getFullYear();
+  state.selectedDate = toDateStr(today);
+  renderHeader();
+  renderGoals();
+  renderEvents();
+  renderCalendar();
+  const dateInput = document.getElementById("eventDate");
+  if (dateInput) dateInput.value = state.selectedDate;
+  updateEventFormValidity();
+});
+
 // ====== Boot ======
 (function init() {
   const savedPassword = localStorage.getItem(PASSWORD_KEY);
