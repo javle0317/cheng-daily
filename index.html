@@ -53,8 +53,54 @@
         </div>
       </section>
 
-      <section class="card notes-card">
-        <h2>新增記事 <span id="selectedDateLabel2"></span></h2>
+      <!-- ====== 檢視優先區 ====== -->
+
+      <section class="card calendar-card">
+        <div class="calendar-nav">
+          <button id="todayBtn" class="ghost-btn" title="回到今天">今天</button>
+          <div class="calendar-nav-center">
+            <button id="prevMonth" class="ghost-btn">‹</button>
+            <h2 id="monthLabel"></h2>
+            <button id="nextMonth" class="ghost-btn">›</button>
+          </div>
+          <button class="ghost-btn calendar-nav-spacer" aria-hidden="true" tabindex="-1">今天</button>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+
+      <section class="card today-events-card">
+        <h2>今日事件 <span id="selectedDateLabel2"></span></h2>
+        <ul id="eventList" class="item-list"></ul>
+      </section>
+
+      <section id="petExpenseCard" class="card pet-expense-card">
+        <div class="calendar-nav">
+          <button id="petExpensePrev" class="ghost-btn">‹</button>
+          <h2 id="petExpenseMonthLabel"></h2>
+          <button id="petExpenseNext" class="ghost-btn">›</button>
+        </div>
+        <select id="petExpenseFilter">
+          <option value="all">全部</option>
+          <option value="家庭">🤝 家庭</option>
+          <option value="林萌">🐕 林萌</option>
+          <option value="咪嚕">🐈 咪嚕</option>
+        </select>
+        <div id="petExpenseList"></div>
+      </section>
+
+      <section class="card goals-card">
+        <h2>今日待辦 <span id="selectedDateLabel3"></span></h2>
+        <form id="goalForm" class="inline-form">
+          <input id="goalInput" type="text" placeholder="新增一個待辦…" required>
+          <button type="submit">新增</button>
+        </form>
+        <ul id="goalList" class="item-list"></ul>
+      </section>
+
+      <!-- ====== 新增/管理區（依使用頻率排：記事、花費常用；循環行程、習慣不常用） ====== -->
+
+      <section class="card notes-card new-event-card">
+        <h2>新增記事</h2>
         <form id="eventForm" class="entry-form entry-form-rows">
           <div class="form-row">
             <input id="eventDate" type="date" required>
@@ -76,32 +122,6 @@
             <button id="eventSubmitBtn" type="submit" disabled>新增</button>
           </div>
         </form>
-        <ul id="eventList" class="item-list"></ul>
-      </section>
-
-      <section class="card calendar-card">
-        <div class="calendar-nav">
-          <button id="prevMonth" class="ghost-btn">‹</button>
-          <h2 id="monthLabel"></h2>
-          <button id="nextMonth" class="ghost-btn">›</button>
-          <button id="todayBtn" class="ghost-btn" title="回到今天">今天</button>
-        </div>
-        <div id="calendarGrid" class="calendar-grid"></div>
-      </section>
-
-      <section id="petExpenseCard" class="card pet-expense-card">
-        <div class="calendar-nav">
-          <button id="petExpensePrev" class="ghost-btn">‹</button>
-          <h2 id="petExpenseMonthLabel"></h2>
-          <button id="petExpenseNext" class="ghost-btn">›</button>
-        </div>
-        <select id="petExpenseFilter">
-          <option value="all">全部</option>
-          <option value="家庭">🤝 家庭</option>
-          <option value="林萌">🐕 林萌</option>
-          <option value="咪嚕">🐈 咪嚕</option>
-        </select>
-        <div id="petExpenseList"></div>
       </section>
 
       <section class="card new-pet-expense-card">
@@ -123,34 +143,7 @@
         </form>
       </section>
 
-      <section class="card goals-card">
-        <h2>今日待辦 <span id="selectedDateLabel3"></span></h2>
-        <form id="goalForm" class="inline-form">
-          <input id="goalInput" type="text" placeholder="新增一個待辦…" required>
-          <button type="submit">新增</button>
-        </form>
-        <ul id="goalList" class="item-list"></ul>
-      </section>
-
-      <section class="card new-habit-card">
-        <h2>新增習慣</h2>
-        <form id="habitForm" class="entry-form">
-          <input id="habitName" type="text" placeholder="習慣名稱…" required>
-          <select id="habitFrequency">
-            <option value="daily">每日</option>
-            <option value="weekly">每週</option>
-            <option value="monthly">每月</option>
-          </select>
-          <input id="habitTarget" type="number" min="1" value="1" placeholder="目標次數">
-          <label id="habitWorkdaysLabel" class="checkbox-label">
-            <input id="habitWorkdaysOnly" type="checkbox">
-            僅工作日
-          </label>
-          <button id="habitSubmitBtn" type="submit" disabled>新增</button>
-        </form>
-      </section>
-
-      <section class="card recurring-card">
+      <section class="card new-recurring-card">
         <h2>循環行程</h2>
         <form id="recurringForm" class="entry-form entry-form-rows">
           <div class="form-row">
@@ -186,6 +179,24 @@
           </div>
         </form>
         <ul id="recurringList" class="item-list"></ul>
+      </section>
+
+      <section class="card new-habit-card">
+        <h2>新增習慣</h2>
+        <form id="habitForm" class="entry-form">
+          <input id="habitName" type="text" placeholder="習慣名稱…" required>
+          <select id="habitFrequency">
+            <option value="daily">每日</option>
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+          </select>
+          <input id="habitTarget" type="number" min="1" value="1" placeholder="目標次數">
+          <label id="habitWorkdaysLabel" class="checkbox-label">
+            <input id="habitWorkdaysOnly" type="checkbox">
+            僅工作日
+          </label>
+          <button id="habitSubmitBtn" type="submit" disabled>新增</button>
+        </form>
       </section>
     </main>
 
