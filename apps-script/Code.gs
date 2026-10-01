@@ -478,13 +478,20 @@ function migrateCreditCardBillsFromBankSheet() {
     var tab = sourceSs.getSheetByName(tabName);
     if (!tab) { Logger.log("找不到分頁: " + tabName); return; }
     var values = tab.getDataRange().getValues();
+    var blocksFound = 0;
 
     for (var i = 0; i < values.length; i++) {
       var cellA = values[i][0];
-      var monthMatch = typeof cellA === "string" && cellA.match(/^(\d{4})\/(\d{1,2})$/);
-      if (!monthMatch) continue;
-
-      var billingMonth = monthMatch[1] + "-" + pad2Bill_(parseInt(monthMatch[2], 10));
+      var billingMonth = null;
+      if (Object.prototype.toString.call(cellA) === "[object Date]") {
+        // 月份標題文字（例如 "2025/06"）常被 Sheets 自動判斷成日期型態存
+        billingMonth = Utilities.formatDate(cellA, TIME_ZONE, "yyyy-MM");
+      } else if (typeof cellA === "string") {
+        var monthMatch = cellA.match(/^(\d{4})\/(\d{1,2})$/);
+        if (monthMatch) billingMonth = monthMatch[1] + "-" + pad2Bill_(parseInt(monthMatch[2], 10));
+      }
+      if (!billingMonth) continue;
+      blocksFound++;
 
       // 月份標題下一列是欄位標題列（跳過），再下面固定依序 6 家銀行
       for (var b = 0; b < SOURCE_BANK_NAMES.length; b++) {
@@ -514,6 +521,7 @@ function migrateCreditCardBillsFromBankSheet() {
         ]);
       }
     }
+    Logger.log(tabName + " 分頁找到 " + blocksFound + " 個月份區塊");
   });
 
   if (rowsToAppend.length > 0) {
