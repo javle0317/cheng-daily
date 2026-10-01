@@ -454,103 +454,10 @@ function deleteCreditCardBill(id) {
   return getCreditCardBills();
 }
 
-// ====== 一次性搬移：把舊的「Bank」試算表（年度分頁，每個月固定 9 列：月份
-// 標題、欄位標題、6 家銀行各一列、小計列）搬進 CreditCardBills 分頁。整段
-// （含下面的常數跟輔助函式）只要執行過一次，執行完就可以整段刪除——跟
-// migrateBloodPressureFromPressure2026（已刪除）是同一個模式，GitHub Pages
-// 網頁不會呼叫它，要在 Apps Script 編輯器手動選
-// migrateCreditCardBillsFromBankSheet 執行（故意不加結尾底線，理由同上：底線
-// 結尾會被「選取要執行的函式」下拉選單隱藏）。搬全部 5 個年度分頁
-// （2022~2026）。第一次執行會跳出要求存取「其他試算表」的授權視窗，允許即可。
-// 結果（搬了幾筆、跳過幾個看不懂的月份區塊）看執行紀錄。
-// ======
-var SOURCE_BANK_SHEET_ID = "1l2aYebEu1d4OeKeO_e3nQUAduPlubFN0sZOPowBYzLg";
-var SOURCE_BANK_YEAR_TABS = ["2022", "2023", "2024", "2025", "2026"];
-var SOURCE_BANK_NAMES = ["聯邦", "國泰", "中信", "富邦", "兆豐", "玉山", "星展", "富邦貸", "中信貸"];
-
-function migrateCreditCardBillsFromBankSheet() {
-  var sourceSs = SpreadsheetApp.openById(SOURCE_BANK_SHEET_ID);
-  var targetSheet = getSheet("CreditCardBills");
-  var rowsToAppend = [];
-  var skipped = [];
-
-  SOURCE_BANK_YEAR_TABS.forEach(function (tabName) {
-    var tab = sourceSs.getSheetByName(tabName);
-    if (!tab) { Logger.log("找不到分頁: " + tabName); return; }
-    var values = tab.getDataRange().getValues();
-    var blocksFound = 0;
-
-    for (var i = 0; i < values.length; i++) {
-      var cellA = values[i][0];
-      var billingMonth = null;
-      if (Object.prototype.toString.call(cellA) === "[object Date]") {
-        // 月份標題文字（例如 "2025/06"）常被 Sheets 自動判斷成日期型態存
-        billingMonth = Utilities.formatDate(cellA, TIME_ZONE, "yyyy-MM");
-      } else if (typeof cellA === "string") {
-        var monthMatch = cellA.match(/^(\d{4})\/(\d{1,2})$/);
-        if (monthMatch) billingMonth = monthMatch[1] + "-" + pad2Bill_(parseInt(monthMatch[2], 10));
-      }
-      if (!billingMonth) continue;
-      blocksFound++;
-
-      // 月份標題下一列是欄位標題列（跳過），再下面是銀行列——不假設固定幾家、
-      // 固定順序（早期年份銀行數量比較少，後來才陸續開新卡），遇到清單裡的
-      // 銀行名稱就收，遇到清單外的名稱單獨記錄但繼續讀下一列，遇到空白（通常
-      // 是小計列）才算這個月份區塊結束。
-      var rowIndex = i + 2;
-      while (rowIndex < values.length) {
-        var row = values[rowIndex];
-        var bankName = row[0];
-        if (bankName === "" || bankName === null || bankName === undefined) break;
-
-        if (SOURCE_BANK_NAMES.indexOf(bankName) === -1) {
-          skipped.push(tabName + " " + billingMonth + "：出現不認得的銀行名稱 \"" + bankName + "\"，這一列跳過");
-          rowIndex++;
-          continue;
-        }
-
-        var full = row[2];
-        if (full !== "" && full !== null && Number(full) > 0) {
-          var paid = row[4];
-          rowsToAppend.push([
-            Utilities.getUuid(),
-            bankName,
-            billingMonth,
-            formatBankDate_(row[1]),
-            Number(full) || 0,
-            Number(row[3]) || 0,
-            (paid === "" || paid === null) ? "" : (Number(paid) || 0),
-            new Date(),
-          ]);
-        }
-        rowIndex++;
-      }
-    }
-    Logger.log(tabName + " 分頁找到 " + blocksFound + " 個月份區塊");
-  });
-
-  if (rowsToAppend.length > 0) {
-    var startRow = targetSheet.getLastRow() + 1;
-    targetSheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-  }
-
-  Logger.log("搬了 " + rowsToAppend.length + " 筆，跳過 " + skipped.length + " 個格式看不懂的月份區塊：");
-  Logger.log(skipped.join("\n"));
-}
-
-function pad2Bill_(n) {
-  return n < 10 ? "0" + n : String(n);
-}
-
-function formatBankDate_(v) {
-  if (Object.prototype.toString.call(v) === "[object Date]") {
-    return Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
-  }
-  if (typeof v === "string") {
-    return v.trim().replace(/\//g, "-");
-  }
-  return "";
-}
+// 一次性搬移函式 migrateCreditCardBillsFromBankSheet()（含常數跟
+// pad2Bill_/formatBankDate_ 輔助函式）已經執行完、資料確認搬移成功，整段刪除
+// 了。要參考寫法到 git 歷史紀錄找，跟 migrateBloodPressureFromPressure2026
+// 一樣的模式。
 
 // 一次性搬移函式 migrateBloodPressureFromPressure2026()（含 pad2_/parseBpCell_
 // 輔助函式）已經執行完、資料確認搬移成功（888 筆），整段刪除了。要參考寫法
