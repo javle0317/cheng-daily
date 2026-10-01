@@ -84,9 +84,11 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 - 這張表**不會**出現在主頁面用的 `getData()` 回傳裡，有自己專屬的
   `getBloodPressureData`/`addBloodPressureReading`/`deleteBloodPressureReading`
   三個 action，確保主頁面的操作速度不受血壓資料量增長影響
-- `apps-script/Code.gs` 裡的 `migrateBloodPressureFromPressure2026_()` 是一次性
+- `apps-script/Code.gs` 裡的 `migrateBloodPressureFromPressure2026()` 是一次性
   搬移函式（把舊的 `pressure2026` 試算表資料搬過來），只需要在 Apps Script
-  編輯器手動執行一次，確認資料搬完後可以整段刪除
+  編輯器手動執行一次，確認資料搬完後可以整段刪除——故意沒加結尾底線，因為
+  Apps Script 的「選取要執行的函式」下拉選單會隱藏底線結尾的函式，這支是要
+  手動選來執行的，不能被藏起來
 
 **ShoppingList**（購物清單，不綁日期、買了就勾掉）
 

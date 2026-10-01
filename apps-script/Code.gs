@@ -393,7 +393,9 @@ function deleteBloodPressureReading(id) {
 // "收縮壓/舒張壓/脈搏" 文字字串）搬進 BloodPressure 分頁。整段（含下面的常數跟
 // 輔助函式）只要執行過一次，執行完就可以整段刪除——跟過去用過的
 // migrateFromPetsSheet 等一次性函式是同一個模式，GitHub Pages 網頁不會呼叫它，
-// 要在 Apps Script 編輯器手動選 migrateBloodPressureFromPressure2026_ 執行。
+// 要在 Apps Script 編輯器手動選 migrateBloodPressureFromPressure2026 執行
+// （故意不加結尾底線——底線結尾在 Apps Script 的「選取要執行的函式」下拉選單
+// 裡會被當成私有函式隱藏起來，這支就是要手動選來執行的，不能藏）。
 // 第一次執行會跳出要求存取「其他試算表」的授權視窗，允許即可。結果（搬了幾筆、
 // 跳過幾格看不懂的格式）看執行紀錄（左側「執行項目」或選單「查看 > 執行紀錄」）。
 // ======
@@ -405,7 +407,7 @@ var SOURCE_PRESSURE_MONTHS = [
   { tab: "Oct", month: 10 },
 ];
 
-function migrateBloodPressureFromPressure2026_() {
+function migrateBloodPressureFromPressure2026() {
   var sourceSs = SpreadsheetApp.openById(SOURCE_PRESSURE_SHEET_ID);
   var targetSheet = getSheet("BloodPressure");
   var rowsToAppend = [];
