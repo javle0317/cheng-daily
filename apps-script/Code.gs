@@ -506,10 +506,18 @@ function deleteHabit(id) {
   return getData();
 }
 
-// 讀取現有列、決定要遞增還是新增一列、再寫回去——這整段「讀了再寫」如果同時有
-// 兩次呼叫重疊（連續點太快、網路延遲重試），兩邊都會在對方寫入前讀到「還沒有
-// 這一列」，結果各自新增一列造成重複資料，而不是原本預期的同一列遞增/歸零。
-// 用 LockService 把整段包起來序列化，確保同一時間只有一個執行緒在動這個習慣。
+// 讀取現有列、決定要遞增/刪除還是新增一列、再寫回去——這整段「讀了再寫」如果
+// 同時有兩次呼叫重疊（連續點太快、網路延遲重試），兩邊都會在對方寫入前讀到
+// 「還沒有這一列」，結果各自新增一列造成重複資料。用 LockService 把整段包起來
+// 序列化，確保同一時間只有一個執行緒在動這個習慣。
+//
+// target=1（目前固定是所有 daily 習慣）是「存在就算打勾」的二元狀態，不是
+// 累計次數：沒有列就新增一列（count 固定存 1），有列就直接刪掉——而且是刪掉
+// 「所有」符合 habitId+periodKey 的列，不只刪第一筆，這樣就算之前因為某個
+// bug（例如 periodKey 被 Sheets 誤判成日期型態比對失敗）意外產生過重複列，
+// 下一次取消打勾也會順便全部清乾淨，不用手動去 Sheet 處理。
+// target>1（weekly/monthly）維持原本的遞增/超過歸零邏輯，因為要追蹤的是
+// 「目前做到第幾次」，不是單純有沒有。
 function toggleHabitLog(habitId, periodKey, target) {
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -518,13 +526,30 @@ function toggleHabitLog(habitId, periodKey, target) {
     var values = sheet.getDataRange().getValues();
     var maxTarget = parseInt(target, 10) || 1;
 
+    var matchingRows = [];
     for (var i = 1; i < values.length; i++) {
       if (values[i][1] === habitId && String(values[i][2]) === String(periodKey)) {
-        var next = (Number(values[i][3]) || 0) + 1;
-        if (next > maxTarget) next = 0;
-        sheet.getRange(i + 1, 4).setValue(next);
-        return getData();
+        matchingRows.push(i);
       }
+    }
+
+    if (maxTarget === 1) {
+      if (matchingRows.length > 0) {
+        for (var j = matchingRows.length - 1; j >= 0; j--) {
+          sheet.deleteRow(matchingRows[j] + 1);
+        }
+      } else {
+        sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
+      }
+      return getData();
+    }
+
+    if (matchingRows.length > 0) {
+      var rowIndex = matchingRows[0];
+      var next = (Number(values[rowIndex][3]) || 0) + 1;
+      if (next > maxTarget) next = 0;
+      sheet.getRange(rowIndex + 1, 4).setValue(next);
+      return getData();
     }
 
     sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
