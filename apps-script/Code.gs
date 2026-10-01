@@ -16,6 +16,7 @@
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt
+ *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -106,6 +107,15 @@ function handleRequest(e) {
         return respond({ ok: true, data: toggleShoppingItem(p.id) });
       case "deleteShoppingItem":
         return respond({ ok: true, data: deleteShoppingItem(p.id) });
+      case "getBloodPressureData":
+        return respond({ ok: true, data: getBloodPressureData() });
+      case "addBloodPressureReading":
+        return respond({
+          ok: true,
+          data: addBloodPressureReading(p.date, p.period, p.systolic, p.diastolic, p.pulse),
+        });
+      case "deleteBloodPressureReading":
+        return respond({ ok: true, data: deleteBloodPressureReading(p.id) });
       default:
         return respond({ ok: false, error: "unknown action" });
     }
@@ -345,6 +355,122 @@ function deleteShoppingItem(id) {
     }
   }
   return getData();
+}
+
+// 血壓頁面是獨立頁面、有自己專屬的 action，故意不回傳 getData()（不想讓主頁面
+// 每個操作都順便撈一份完全用不到的血壓資料）。
+function getBloodPressureData() {
+  return sheetToObjects(getSheet("BloodPressure"));
+}
+
+function addBloodPressureReading(date, period, systolic, diastolic, pulse) {
+  var sheet = getSheet("BloodPressure");
+  sheet.appendRow([
+    Utilities.getUuid(),
+    date,
+    period,
+    parseInt(systolic, 10),
+    parseInt(diastolic, 10),
+    parseInt(pulse, 10),
+    new Date(),
+  ]);
+  return getBloodPressureData();
+}
+
+function deleteBloodPressureReading(id) {
+  var sheet = getSheet("BloodPressure");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getBloodPressureData();
+}
+
+// ====== 一次性搬移：把舊的 pressure2026 試算表（月分頁、一天一列、早晚各兩格
+// "收縮壓/舒張壓/脈搏" 文字字串）搬進 BloodPressure 分頁。整段（含下面的常數跟
+// 輔助函式）只要執行過一次，執行完就可以整段刪除——跟過去用過的
+// migrateFromPetsSheet 等一次性函式是同一個模式，GitHub Pages 網頁不會呼叫它，
+// 要在 Apps Script 編輯器手動選 migrateBloodPressureFromPressure2026_ 執行。
+// 第一次執行會跳出要求存取「其他試算表」的授權視窗，允許即可。結果（搬了幾筆、
+// 跳過幾格看不懂的格式）看執行紀錄（左側「執行項目」或選單「查看 > 執行紀錄」）。
+// ======
+var SOURCE_PRESSURE_SHEET_ID = "1mOMpsPMWg94RufMY8-tsMqHp6zs6JzYIdxAlRruXdEg";
+var SOURCE_PRESSURE_MONTHS = [
+  { tab: "Jan", month: 1 }, { tab: "Feb", month: 2 }, { tab: "Mar", month: 3 },
+  { tab: "Apr", month: 4 }, { tab: "May", month: 5 }, { tab: "Jun", month: 6 },
+  { tab: "Jul", month: 7 }, { tab: "Aug", month: 8 }, { tab: "Sep", month: 9 },
+  { tab: "Oct", month: 10 },
+];
+
+function migrateBloodPressureFromPressure2026_() {
+  var sourceSs = SpreadsheetApp.openById(SOURCE_PRESSURE_SHEET_ID);
+  var targetSheet = getSheet("BloodPressure");
+  var rowsToAppend = [];
+  var skipped = [];
+  var slots = [
+    { col: 1, period: "morning" },
+    { col: 2, period: "morning" },
+    { col: 3, period: "evening" },
+    { col: 4, period: "evening" },
+  ];
+
+  SOURCE_PRESSURE_MONTHS.forEach(function (m) {
+    var tab = sourceSs.getSheetByName(m.tab);
+    if (!tab) { Logger.log("找不到分頁: " + m.tab); return; }
+    var values = tab.getDataRange().getValues();
+
+    for (var i = 1; i < values.length; i++) {
+      var day = values[i][0];
+      if (day === "" || day === null) continue;
+      var dateStr = "2026-" + pad2_(m.month) + "-" + pad2_(day);
+
+      slots.forEach(function (slot) {
+        var parsed = parseBpCell_(values[i][slot.col]);
+        if (parsed.empty) return;
+        if (!parsed.ok) {
+          skipped.push(m.tab + " 第" + day + "天 (col " + slot.col + "): " + values[i][slot.col]);
+          return;
+        }
+        rowsToAppend.push([
+          Utilities.getUuid(), dateStr, slot.period,
+          parsed.systolic, parsed.diastolic, parsed.pulse, new Date(),
+        ]);
+      });
+    }
+  });
+
+  if (rowsToAppend.length > 0) {
+    var startRow = targetSheet.getLastRow() + 1;
+    targetSheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
+  }
+
+  Logger.log("搬了 " + rowsToAppend.length + " 筆，跳過 " + skipped.length + " 格（格式看不懂，自己檢查原始資料）：");
+  Logger.log(skipped.join("\n"));
+}
+
+function pad2_(n) {
+  return n < 10 ? "0" + n : String(n);
+}
+
+// 原始格式是 "122/ 85/55" 這種帶空白的字串（刻意用空白避免 Sheets 把它當成
+// 日期），"//" 代表那一格沒量。回傳 {empty:true} 代表本來就沒資料（正常現象，
+// 不用記錄），{ok:false} 代表格式看不懂、需要人工檢查，{ok:true, ...} 是正常
+// 解析出來的數字。
+function parseBpCell_(raw) {
+  if (raw === "" || raw === null || raw === undefined) return { empty: true };
+  if (typeof raw !== "string") return { empty: false, ok: false };
+  var trimmed = raw.trim();
+  if (trimmed === "" || trimmed === "//") return { empty: true };
+  var parts = trimmed.split("/").map(function (p) { return parseInt(p.trim(), 10); });
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return { empty: false, ok: false };
+  return {
+    empty: false, ok: true,
+    systolic: parts[0], diastolic: parts[1],
+    pulse: isNaN(parts[2]) ? "" : parts[2],
+  };
 }
 
 function addHabit(name, frequency, workdaysOnly, target) {

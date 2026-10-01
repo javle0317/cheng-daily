@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>健康記錄 · Daily Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>Daily Hub</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>Daily Hub</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1>健康記錄</h1>
+        <p class="progress-line"><a href="index.html" class="back-link">← 返回</a></p>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card bp-chart-card">
+        <div class="calendar-nav">
+          <button id="bpPeriodPrev" class="ghost-btn">‹</button>
+          <h2 id="bpPeriodLabel"></h2>
+          <button id="bpPeriodNext" class="ghost-btn">›</button>
+        </div>
+        <div class="bp-chart-controls">
+          <select id="bpGranularity">
+            <option value="month">本月（日趨勢）</option>
+            <option value="year">本年（月平均）</option>
+          </select>
+          <label class="checkbox-label">
+            <input id="bpCompareToggle" type="checkbox">
+            分早晚比較（只看收縮壓）
+          </label>
+        </div>
+
+        <p id="bpAlertBanner" class="bp-alert hidden"></p>
+
+        <div id="bpStatsRow" class="bp-stats-row"></div>
+
+        <div id="bpChart"></div>
+        <div id="bpPulseChart"></div>
+
+        <div class="bp-list-header">
+          <h3 class="sub-heading">量測紀錄</h3>
+          <select id="bpListFilter">
+            <option value="all">全部</option>
+            <option value="morning">早上</option>
+            <option value="evening">晚上</option>
+          </select>
+        </div>
+        <div id="bpList"></div>
+      </section>
+
+      <section class="card new-bp-card">
+        <h2>新增血壓紀錄</h2>
+        <form id="bpForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <input id="bpDate" type="date" required>
+            <select id="bpPeriod">
+              <option value="morning">早上</option>
+              <option value="evening">晚上</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <input id="bpSystolic" type="number" min="0" placeholder="收縮壓" required>
+            <input id="bpDiastolic" type="number" min="0" placeholder="舒張壓" required>
+            <input id="bpPulse" type="number" min="0" placeholder="脈搏" required>
+          </div>
+          <div class="form-row">
+            <button id="bpSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="health.js"></script>
+</body>
+</html>

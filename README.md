@@ -73,6 +73,21 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   組合——目前網頁上只能新增跳過紀錄（當日事件清單上的 ⏭️ 按鈕），沒有「復原」
   的介面，想復原要自己去 Sheet 刪那一列
 
+**BloodPressure**（血壓量測紀錄，獨立頁面 `health.html`）
+
+| id | date | period | systolic | diastolic | pulse | createdAt |
+|----|------|--------|----------|-----------|-------|-----------|
+
+- `period`：`morning` / `evening`
+- **一列代表一次量測**，不是一天一列——早上量兩次就是兩列，想刪掉某一次直接
+  刪那一列，跟 Events 的新增/刪除邏輯一樣
+- 這張表**不會**出現在主頁面用的 `getData()` 回傳裡，有自己專屬的
+  `getBloodPressureData`/`addBloodPressureReading`/`deleteBloodPressureReading`
+  三個 action，確保主頁面的操作速度不受血壓資料量增長影響
+- `apps-script/Code.gs` 裡的 `migrateBloodPressureFromPressure2026_()` 是一次性
+  搬移函式（把舊的 `pressure2026` 試算表資料搬過來），只需要在 Apps Script
+  編輯器手動執行一次，確認資料搬完後可以整段刪除
+
 **ShoppingList**（購物清單，不綁日期、買了就勾掉）
 
 | id | item | done | createdAt |
@@ -124,7 +139,9 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 ### 6. 啟用 GitHub Pages
 
 Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後會得到一個公開網址
-（例如 `https://<你的帳號>.github.io/<repo 名稱>/`）。
+（例如 `https://<你的帳號>.github.io/<repo 名稱>/`）。血壓記錄是獨立的
+`health.html`（跟 `index.html` 共用 `shared.js`/`style.css`），GitHub Pages 會
+自動一起部署，不用額外設定，從主頁面右上角的 ❤️ 連過去即可。
 
 ## 密碼保護的原理
 
