@@ -465,7 +465,8 @@ function parseBpCell_(raw) {
   if (raw === "" || raw === null || raw === undefined) return { empty: true };
   if (typeof raw !== "string") return { empty: false, ok: false };
   var trimmed = raw.trim();
-  if (trimmed === "" || trimmed === "//") return { empty: true };
+  var compact = trimmed.replace(/\s+/g, ""); // 有些格子是 "//"，有些是 "/ /"，統一拿掉內部空白再判斷
+  if (compact === "" || compact === "//") return { empty: true };
   var parts = trimmed.split("/").map(function (p) { return parseInt(p.trim(), 10); });
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return { empty: false, ok: false };
   return {
