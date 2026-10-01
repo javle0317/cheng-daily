@@ -1,7 +1,6 @@
 // ====== 信用卡帳單頁 ======
 // WEBAPP_URL / api() / 登入流程 / showConfirm 等共用邏輯在 shared.js。
-
-const BANKS = ["聯邦", "國泰", "中信", "富邦", "兆豐", "玉山"]; // 之後開新卡就加這裡
+// 銀行清單寫在 bills.html 的 #billBank 下拉選項裡，之後開新卡就加那裡。
 
 let state = {
   bills: [],

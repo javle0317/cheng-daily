@@ -466,7 +466,7 @@ function deleteCreditCardBill(id) {
 // ======
 var SOURCE_BANK_SHEET_ID = "1l2aYebEu1d4OeKeO_e3nQUAduPlubFN0sZOPowBYzLg";
 var SOURCE_BANK_YEAR_TABS = ["2022", "2023", "2024", "2025", "2026"];
-var SOURCE_BANK_NAMES = ["聯邦", "國泰", "中信", "富邦", "兆豐", "玉山"];
+var SOURCE_BANK_NAMES = ["聯邦", "國泰", "中信", "富邦", "兆豐", "玉山", "星展", "富邦貸", "中信貸"];
 
 function migrateCreditCardBillsFromBankSheet() {
   var sourceSs = SpreadsheetApp.openById(SOURCE_BANK_SHEET_ID);
