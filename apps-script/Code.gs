@@ -393,92 +393,9 @@ function deleteBloodPressureReading(id) {
   return getBloodPressureData();
 }
 
-// ====== 一次性搬移：把舊的 pressure2026 試算表（月分頁、一天一列、早晚各兩格
-// "收縮壓/舒張壓/脈搏" 文字字串）搬進 BloodPressure 分頁。整段（含下面的常數跟
-// 輔助函式）只要執行過一次，執行完就可以整段刪除——跟過去用過的
-// migrateFromPetsSheet 等一次性函式是同一個模式，GitHub Pages 網頁不會呼叫它，
-// 要在 Apps Script 編輯器手動選 migrateBloodPressureFromPressure2026 執行
-// （故意不加結尾底線——底線結尾在 Apps Script 的「選取要執行的函式」下拉選單
-// 裡會被當成私有函式隱藏起來，這支就是要手動選來執行的，不能藏）。
-// 第一次執行會跳出要求存取「其他試算表」的授權視窗，允許即可。結果（搬了幾筆、
-// 跳過幾格看不懂的格式）看執行紀錄（左側「執行項目」或選單「查看 > 執行紀錄」）。
-// ======
-var SOURCE_PRESSURE_SHEET_ID = "1mOMpsPMWg94RufMY8-tsMqHp6zs6JzYIdxAlRruXdEg";
-var SOURCE_PRESSURE_MONTHS = [
-  { tab: "Jan", month: 1 }, { tab: "Feb", month: 2 }, { tab: "Mar", month: 3 },
-  { tab: "Apr", month: 4 }, { tab: "May", month: 5 }, { tab: "Jun", month: 6 },
-  { tab: "Jul", month: 7 }, { tab: "Aug", month: 8 }, { tab: "Sep", month: 9 },
-  { tab: "Oct", month: 10 },
-];
-
-function migrateBloodPressureFromPressure2026() {
-  var sourceSs = SpreadsheetApp.openById(SOURCE_PRESSURE_SHEET_ID);
-  var targetSheet = getSheet("BloodPressure");
-  var rowsToAppend = [];
-  var skipped = [];
-  var slots = [
-    { col: 1, period: "morning" },
-    { col: 2, period: "morning" },
-    { col: 3, period: "evening" },
-    { col: 4, period: "evening" },
-  ];
-
-  SOURCE_PRESSURE_MONTHS.forEach(function (m) {
-    var tab = sourceSs.getSheetByName(m.tab);
-    if (!tab) { Logger.log("找不到分頁: " + m.tab); return; }
-    var values = tab.getDataRange().getValues();
-
-    for (var i = 1; i < values.length; i++) {
-      var day = values[i][0];
-      if (day === "" || day === null) continue;
-      var dateStr = "2026-" + pad2_(m.month) + "-" + pad2_(day);
-
-      slots.forEach(function (slot) {
-        var parsed = parseBpCell_(values[i][slot.col]);
-        if (parsed.empty) return;
-        if (!parsed.ok) {
-          skipped.push(m.tab + " 第" + day + "天 (col " + slot.col + "): " + values[i][slot.col]);
-          return;
-        }
-        rowsToAppend.push([
-          Utilities.getUuid(), dateStr, slot.period,
-          parsed.systolic, parsed.diastolic, parsed.pulse, new Date(),
-        ]);
-      });
-    }
-  });
-
-  if (rowsToAppend.length > 0) {
-    var startRow = targetSheet.getLastRow() + 1;
-    targetSheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-  }
-
-  Logger.log("搬了 " + rowsToAppend.length + " 筆，跳過 " + skipped.length + " 格（格式看不懂，自己檢查原始資料）：");
-  Logger.log(skipped.join("\n"));
-}
-
-function pad2_(n) {
-  return n < 10 ? "0" + n : String(n);
-}
-
-// 原始格式是 "122/ 85/55" 這種帶空白的字串（刻意用空白避免 Sheets 把它當成
-// 日期），"//" 代表那一格沒量。回傳 {empty:true} 代表本來就沒資料（正常現象，
-// 不用記錄），{ok:false} 代表格式看不懂、需要人工檢查，{ok:true, ...} 是正常
-// 解析出來的數字。
-function parseBpCell_(raw) {
-  if (raw === "" || raw === null || raw === undefined) return { empty: true };
-  if (typeof raw !== "string") return { empty: false, ok: false };
-  var trimmed = raw.trim();
-  var compact = trimmed.replace(/\s+/g, ""); // 有些格子是 "//"，有些是 "/ /"，統一拿掉內部空白再判斷
-  if (compact === "" || compact === "//") return { empty: true };
-  var parts = trimmed.split("/").map(function (p) { return parseInt(p.trim(), 10); });
-  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return { empty: false, ok: false };
-  return {
-    empty: false, ok: true,
-    systolic: parts[0], diastolic: parts[1],
-    pulse: isNaN(parts[2]) ? "" : parts[2],
-  };
-}
+// 一次性搬移函式 migrateBloodPressureFromPressure2026()（含 pad2_/parseBpCell_
+// 輔助函式）已經執行完、資料確認搬移成功（888 筆），整段刪除了。要參考寫法
+// 到 git 歷史紀錄找，跟 migrateFromPetsSheet 等舊的一次性函式一樣的模式。
 
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
