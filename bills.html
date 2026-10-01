@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>信用卡帳單 · Daily Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>Daily Hub</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>Daily Hub</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1>信用卡帳單</h1>
+        <p class="progress-line"><a href="index.html" class="back-link">← 返回</a></p>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card bp-chart-card">
+        <div class="calendar-nav">
+          <button id="billYearPrev" class="ghost-btn">‹</button>
+          <h2 id="billYearLabel"></h2>
+          <button id="billYearNext" class="ghost-btn">›</button>
+        </div>
+        <div class="bp-chart-controls">
+          <label class="checkbox-label">
+            <input id="billCompareLastYear" type="checkbox">
+            跟去年比較
+          </label>
+          <select id="billCompareExtraYear">
+            <option value="">+ 再加一個年份</option>
+          </select>
+        </div>
+
+        <div id="billStatsRow" class="bp-stats-row"></div>
+        <div id="billYearChart"></div>
+
+        <div class="bp-list-header">
+          <h3 class="sub-heading">各銀行比較</h3>
+          <select id="billBankChartMonth"></select>
+        </div>
+        <div id="billBankChart"></div>
+
+        <div class="bp-list-header">
+          <h3 class="sub-heading">帳單紀錄</h3>
+          <select id="billListFilter">
+            <option value="all">全部銀行</option>
+            <option value="聯邦">聯邦</option>
+            <option value="國泰">國泰</option>
+            <option value="中信">中信</option>
+            <option value="富邦">富邦</option>
+            <option value="兆豐">兆豐</option>
+            <option value="玉山">玉山</option>
+          </select>
+        </div>
+        <div id="billList"></div>
+      </section>
+
+      <section class="card new-bp-card">
+        <h2>新增帳單</h2>
+        <form id="billForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <select id="billBank">
+              <option value="聯邦">聯邦</option>
+              <option value="國泰">國泰</option>
+              <option value="中信">中信</option>
+              <option value="富邦">富邦</option>
+              <option value="兆豐">兆豐</option>
+              <option value="玉山">玉山</option>
+            </select>
+            <input id="billBillingMonth" type="month" required>
+          </div>
+          <div class="form-row">
+            <input id="billDate" type="date" placeholder="繳費截止日" required>
+          </div>
+          <div class="form-row">
+            <input id="billFullAmount" type="number" min="0" placeholder="帳單全額" required>
+            <input id="billLowestAmount" type="number" min="0" placeholder="最低應繳" required>
+          </div>
+          <div class="form-row">
+            <button id="billSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="bills.js"></script>
+</body>
+</html>

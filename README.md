@@ -84,6 +84,18 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 - 這張表**不會**出現在主頁面用的 `getData()` 回傳裡，有自己專屬的
   `getBloodPressureData`/`addBloodPressureReading`/`deleteBloodPressureReading`
   三個 action，確保主頁面的操作速度不受血壓資料量增長影響
+
+**CreditCardBills**（信用卡帳單，獨立頁面 `bills.html`）
+
+| id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt |
+|----|------|--------------|------|------------|--------------|------------|-----------|
+
+- `bank`：固定幾家銀行（聯邦/國泰/中信/富邦/兆豐/玉山），之後開新卡再加
+- `billingMonth`：帳單年月（yyyy-MM），`date` 是繳費截止日
+- **先新增（帳單全額/最低應繳/截止日），收到繳費後再回來補 `paidAmount`**——
+  帳單紀錄旁邊的 💰 按鈕只改這一個欄位，跟 Events 補登花費金額的按鈕是同一套
+  寫法。剩餘未繳（`remain`）不存，前端用 `fullAmount - paidAmount` 即時算
+- 這張表也不會出現在主頁面的 `getData()` 回傳裡，理由跟 BloodPressure 一樣
 - `apps-script/Code.gs` 裡的 `migrateBloodPressureFromPressure2026()` 是一次性
   搬移函式（把舊的 `pressure2026` 試算表資料搬過來），只需要在 Apps Script
   編輯器手動執行一次，確認資料搬完後可以整段刪除——故意沒加結尾底線，因為

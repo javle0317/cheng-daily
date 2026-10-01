@@ -17,6 +17,7 @@
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
+ *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -116,6 +117,17 @@ function handleRequest(e) {
         });
       case "deleteBloodPressureReading":
         return respond({ ok: true, data: deleteBloodPressureReading(p.id) });
+      case "getCreditCardBills":
+        return respond({ ok: true, data: getCreditCardBills() });
+      case "addCreditCardBill":
+        return respond({
+          ok: true,
+          data: addCreditCardBill(p.bank, p.billingMonth, p.date, p.fullAmount, p.lowestAmount),
+        });
+      case "setCreditCardBillPaid":
+        return respond({ ok: true, data: setCreditCardBillPaid(p.id, p.paidAmount) });
+      case "deleteCreditCardBill":
+        return respond({ ok: true, data: deleteCreditCardBill(p.id) });
       default:
         return respond({ ok: false, error: "unknown action" });
     }
@@ -179,6 +191,8 @@ function sheetToObjects(sheet) {
           // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
           // 而新增重複列，不是遞增既有的）
           v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
+        } else if (h === "billingMonth") {
+          v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM");
         } else {
           v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd HH:mm:ss");
         }
@@ -391,6 +405,138 @@ function deleteBloodPressureReading(id) {
     }
   }
   return getBloodPressureData();
+}
+
+// 信用卡帳單是獨立頁面，有自己專屬的 action，故意不回傳 getData()，理由跟
+// BloodPressure 一樣：不要讓主頁面每個操作都順便撈一份用不到的資料。
+function getCreditCardBills() {
+  return sheetToObjects(getSheet("CreditCardBills"));
+}
+
+function addCreditCardBill(bank, billingMonth, date, fullAmount, lowestAmount) {
+  var sheet = getSheet("CreditCardBills");
+  sheet.appendRow([
+    Utilities.getUuid(),
+    bank,
+    billingMonth,
+    date,
+    parseFloat(fullAmount) || 0,
+    parseFloat(lowestAmount) || 0,
+    "", // paidAmount 先留空，收到帳單當下通常還沒繳
+    new Date(),
+  ]);
+  return getCreditCardBills();
+}
+
+function setCreditCardBillPaid(id, paidAmount) {
+  var sheet = getSheet("CreditCardBills");
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var paidCol = headers.indexOf("paidAmount") + 1;
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, paidCol).setValue(paidAmount === "" ? "" : parseFloat(paidAmount) || 0);
+      break;
+    }
+  }
+  return getCreditCardBills();
+}
+
+function deleteCreditCardBill(id) {
+  var sheet = getSheet("CreditCardBills");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getCreditCardBills();
+}
+
+// ====== 一次性搬移：把舊的「Bank」試算表（年度分頁，每個月固定 9 列：月份
+// 標題、欄位標題、6 家銀行各一列、小計列）搬進 CreditCardBills 分頁。整段
+// （含下面的常數跟輔助函式）只要執行過一次，執行完就可以整段刪除——跟
+// migrateBloodPressureFromPressure2026（已刪除）是同一個模式，GitHub Pages
+// 網頁不會呼叫它，要在 Apps Script 編輯器手動選
+// migrateCreditCardBillsFromBankSheet 執行（故意不加結尾底線，理由同上：底線
+// 結尾會被「選取要執行的函式」下拉選單隱藏）。搬全部 5 個年度分頁
+// （2022~2026）。第一次執行會跳出要求存取「其他試算表」的授權視窗，允許即可。
+// 結果（搬了幾筆、跳過幾個看不懂的月份區塊）看執行紀錄。
+// ======
+var SOURCE_BANK_SHEET_ID = "1l2aYebEu1d4OeKeO_e3nQUAduPlubFN0sZOPowBYzLg";
+var SOURCE_BANK_YEAR_TABS = ["2022", "2023", "2024", "2025", "2026"];
+var SOURCE_BANK_NAMES = ["聯邦", "國泰", "中信", "富邦", "兆豐", "玉山"];
+
+function migrateCreditCardBillsFromBankSheet() {
+  var sourceSs = SpreadsheetApp.openById(SOURCE_BANK_SHEET_ID);
+  var targetSheet = getSheet("CreditCardBills");
+  var rowsToAppend = [];
+  var skipped = [];
+
+  SOURCE_BANK_YEAR_TABS.forEach(function (tabName) {
+    var tab = sourceSs.getSheetByName(tabName);
+    if (!tab) { Logger.log("找不到分頁: " + tabName); return; }
+    var values = tab.getDataRange().getValues();
+
+    for (var i = 0; i < values.length; i++) {
+      var cellA = values[i][0];
+      var monthMatch = typeof cellA === "string" && cellA.match(/^(\d{4})\/(\d{1,2})$/);
+      if (!monthMatch) continue;
+
+      var billingMonth = monthMatch[1] + "-" + pad2Bill_(parseInt(monthMatch[2], 10));
+
+      // 月份標題下一列是欄位標題列（跳過），再下面固定依序 6 家銀行
+      for (var b = 0; b < SOURCE_BANK_NAMES.length; b++) {
+        var rowIndex = i + 2 + b;
+        if (rowIndex >= values.length) break;
+        var row = values[rowIndex];
+        var bankName = row[0];
+        if (bankName !== SOURCE_BANK_NAMES[b]) {
+          skipped.push(tabName + " " + billingMonth + "：第" + (b + 1) + "家銀行應該是 " +
+            SOURCE_BANK_NAMES[b] + " 但讀到 \"" + bankName + "\"，這個月份區塊整段跳過");
+          break;
+        }
+
+        var full = row[2];
+        if (full === "" || full === null || !(Number(full) > 0)) continue; // 這家銀行這個月沒有帳單
+
+        var paid = row[4];
+        rowsToAppend.push([
+          Utilities.getUuid(),
+          bankName,
+          billingMonth,
+          formatBankDate_(row[1]),
+          Number(full) || 0,
+          Number(row[3]) || 0,
+          (paid === "" || paid === null) ? "" : (Number(paid) || 0),
+          new Date(),
+        ]);
+      }
+    }
+  });
+
+  if (rowsToAppend.length > 0) {
+    var startRow = targetSheet.getLastRow() + 1;
+    targetSheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
+  }
+
+  Logger.log("搬了 " + rowsToAppend.length + " 筆，跳過 " + skipped.length + " 個格式看不懂的月份區塊：");
+  Logger.log(skipped.join("\n"));
+}
+
+function pad2Bill_(n) {
+  return n < 10 ? "0" + n : String(n);
+}
+
+function formatBankDate_(v) {
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
+  }
+  if (typeof v === "string") {
+    return v.trim().replace(/\//g, "-");
+  }
+  return "";
 }
 
 // 一次性搬移函式 migrateBloodPressureFromPressure2026()（含 pad2_/parseBpCell_
