@@ -214,25 +214,33 @@ function renderGoals() {
     `;
     li.querySelector(".item-text").textContent = goal.text;
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
-      try {
-        applyData(await api("toggleGoal", { id: goal.id }));
-        renderGoals();
-        renderHeader();
-        renderCalendar();
-      } catch (err) {
-        setStatus("更新失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        const box = li.querySelector('input[type="checkbox"]');
+        li.classList.toggle("done", box.checked);
+        try {
+          applyData(await api("toggleGoal", { id: goal.id }));
+          renderGoals();
+          renderHeader();
+          renderCalendar();
+        } catch (err) {
+          box.checked = !box.checked;
+          li.classList.toggle("done", box.checked);
+          setStatus("更新失敗：" + err.message, true);
+        }
+      });
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!(await showConfirm("確定要刪除這個待辦嗎？"))) return;
-      try {
-        applyData(await api("deleteGoal", { id: goal.id }));
-        renderGoals();
-        renderHeader();
-        renderCalendar();
-      } catch (err) {
-        setStatus("刪除失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        try {
+          applyData(await api("deleteGoal", { id: goal.id }));
+          renderGoals();
+          renderHeader();
+          renderCalendar();
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
     });
     list.appendChild(li);
   });
@@ -293,21 +301,29 @@ function renderDailyHabits() {
       li.insertBefore(link, li.querySelector(".delete-btn"));
     }
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
-      try {
-        applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 }));
-        renderDailyHabits();
-      } catch (err) {
-        setStatus("更新失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        const box = li.querySelector('input[type="checkbox"]');
+        li.classList.toggle("done", box.checked);
+        try {
+          applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 }));
+          renderDailyHabits();
+        } catch (err) {
+          box.checked = !box.checked;
+          li.classList.toggle("done", box.checked);
+          setStatus("更新失敗：" + err.message, true);
+        }
+      });
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!(await showConfirm("確定要刪除這個習慣嗎？"))) return;
-      try {
-        applyData(await api("deleteHabit", { id: habit.id }));
-        renderDailyHabits();
-      } catch (err) {
-        setStatus("刪除失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        try {
+          applyData(await api("deleteHabit", { id: habit.id }));
+          renderDailyHabits();
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
     });
     list.appendChild(li);
   });
@@ -354,22 +370,26 @@ function renderPeriodHabits(frequency, listId, sectionId) {
       li.insertBefore(link, li.querySelector(".delete-btn"));
     }
     li.addEventListener("click", async () => {
-      try {
-        applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target }));
-        renderPeriodHabits(frequency, listId, sectionId);
-      } catch (err) {
-        setStatus("更新失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        try {
+          applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target }));
+          renderPeriodHabits(frequency, listId, sectionId);
+        } catch (err) {
+          setStatus("更新失敗：" + err.message, true);
+        }
+      });
     });
     li.querySelector(".delete-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
       if (!(await showConfirm("確定要刪除這個習慣嗎？"))) return;
-      try {
-        applyData(await api("deleteHabit", { id: habit.id }));
-        renderPeriodHabits(frequency, listId, sectionId);
-      } catch (err) {
-        setStatus("刪除失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        try {
+          applyData(await api("deleteHabit", { id: habit.id }));
+          renderPeriodHabits(frequency, listId, sectionId);
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
     });
     list.appendChild(li);
   });
@@ -449,13 +469,15 @@ function renderEvents() {
       amountBtn.addEventListener("click", async () => {
         const input = await showPrompt("花費金額（留空清除）：", ev.amount || "");
         if (input === null) return;
-        try {
-          applyData(await api("setEventAmount", { id: ev.id, amount: input.trim() }));
-          renderEvents();
-          renderPetExpenses();
-        } catch (err) {
-          setStatus("更新失敗：" + err.message, true);
-        }
+        await withRowLock(amountBtn, async () => {
+          try {
+            applyData(await api("setEventAmount", { id: ev.id, amount: input.trim() }));
+            renderEvents();
+            renderPetExpenses();
+          } catch (err) {
+            setStatus("更新失敗：" + err.message, true);
+          }
+        });
       });
       metaRow.appendChild(amountBtn);
 
@@ -465,13 +487,15 @@ function renderEvents() {
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
         if (!(await showConfirm("確定要刪除這筆事件嗎？"))) return;
-        try {
-          applyData(await api("deleteEvent", { id: ev.id }));
-          renderEvents();
-          renderCalendar();
-        } catch (err) {
-          setStatus("刪除失敗：" + err.message, true);
-        }
+        await withRowLock(delBtn, async () => {
+          try {
+            applyData(await api("deleteEvent", { id: ev.id }));
+            renderEvents();
+            renderCalendar();
+          } catch (err) {
+            setStatus("刪除失敗：" + err.message, true);
+          }
+        });
       });
       metaRow.appendChild(delBtn);
     } else {
@@ -481,13 +505,15 @@ function renderEvents() {
       skipBtn.textContent = "⏭️";
       skipBtn.addEventListener("click", async () => {
         if (!(await showConfirm("確定要跳過這一次嗎？（規則本身不會刪除）"))) return;
-        try {
-          applyData(await api("addRecurringException", { recurringId: ev.ruleId, date: ev.date }));
-          renderEvents();
-          renderCalendar();
-        } catch (err) {
-          setStatus("更新失敗：" + err.message, true);
-        }
+        await withRowLock(skipBtn, async () => {
+          try {
+            applyData(await api("addRecurringException", { recurringId: ev.ruleId, date: ev.date }));
+            renderEvents();
+            renderCalendar();
+          } catch (err) {
+            setStatus("更新失敗：" + err.message, true);
+          }
+        });
       });
       metaRow.appendChild(skipBtn);
     }
@@ -620,14 +646,16 @@ function renderRecurringList() {
     delBtn.textContent = "✕";
     delBtn.addEventListener("click", async () => {
       if (!(await showConfirm("確定要刪除這個循環行程嗎？"))) return;
-      try {
-        applyData(await api("deleteRecurringEvent", { id: rule.id }));
-        renderRecurringList();
-        renderEvents();
-        renderCalendar();
-      } catch (err) {
-        setStatus("刪除失敗：" + err.message, true);
-      }
+      await withRowLock(delBtn, async () => {
+        try {
+          applyData(await api("deleteRecurringEvent", { id: rule.id }));
+          renderRecurringList();
+          renderEvents();
+          renderCalendar();
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
     });
 
     li.appendChild(delBtn);
@@ -703,14 +731,16 @@ function renderPetExpenses() {
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
         if (!(await showConfirm("確定要刪除這筆花費紀錄嗎？"))) return;
-        try {
-          applyData(await api("deleteEvent", { id: ev.id }));
-          renderPetExpenses();
-          renderEvents();
-          renderCalendar();
-        } catch (err) {
-          setStatus("刪除失敗：" + err.message, true);
-        }
+        await withRowLock(delBtn, async () => {
+          try {
+            applyData(await api("deleteEvent", { id: ev.id }));
+            renderPetExpenses();
+            renderEvents();
+            renderCalendar();
+          } catch (err) {
+            setStatus("刪除失敗：" + err.message, true);
+          }
+        });
       });
 
       li.appendChild(badge);
@@ -877,21 +907,29 @@ function renderShoppingList() {
     `;
     li.querySelector(".item-text").textContent = item.item;
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
-      try {
-        applyData(await api("toggleShoppingItem", { id: item.id }));
-        renderShoppingList();
-      } catch (err) {
-        setStatus("更新失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        const box = li.querySelector('input[type="checkbox"]');
+        li.classList.toggle("done", box.checked);
+        try {
+          applyData(await api("toggleShoppingItem", { id: item.id }));
+          renderShoppingList();
+        } catch (err) {
+          box.checked = !box.checked;
+          li.classList.toggle("done", box.checked);
+          setStatus("更新失敗：" + err.message, true);
+        }
+      });
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!(await showConfirm("確定要刪除這個購物項目嗎？"))) return;
-      try {
-        applyData(await api("deleteShoppingItem", { id: item.id }));
-        renderShoppingList();
-      } catch (err) {
-        setStatus("刪除失敗：" + err.message, true);
-      }
+      await withRowLock(li, async () => {
+        try {
+          applyData(await api("deleteShoppingItem", { id: item.id }));
+          renderShoppingList();
+        } catch (err) {
+          setStatus("刪除失敗：" + err.message, true);
+        }
+      });
     });
     list.appendChild(li);
   });

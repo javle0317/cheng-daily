@@ -308,12 +308,14 @@ function renderList() {
       payBtn.addEventListener("click", async () => {
         const input = await showPrompt("已繳金額（留空清除）：", paidVal === null ? "" : String(paidVal));
         if (input === null) return;
-        try {
-          applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: input.trim() }));
-          renderBillsAll();
-        } catch (err) {
-          setStatus("更新失敗：" + err.message, true);
-        }
+        await withRowLock(payBtn, async () => {
+          try {
+            applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: input.trim() }));
+            renderBillsAll();
+          } catch (err) {
+            setStatus("更新失敗：" + err.message, true);
+          }
+        });
       });
 
       const delBtn = document.createElement("button");
@@ -322,12 +324,14 @@ function renderList() {
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
         if (!(await showConfirm("確定要刪除這筆帳單嗎？"))) return;
-        try {
-          applyBillData(await api("deleteCreditCardBill", { id: b.id }));
-          renderBillsAll();
-        } catch (err) {
-          setStatus("刪除失敗：" + err.message, true);
-        }
+        await withRowLock(delBtn, async () => {
+          try {
+            applyBillData(await api("deleteCreditCardBill", { id: b.id }));
+            renderBillsAll();
+          } catch (err) {
+            setStatus("刪除失敗：" + err.message, true);
+          }
+        });
       });
 
       li2.appendChild(payBtn);

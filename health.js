@@ -365,12 +365,14 @@ function renderList() {
       delBtn.textContent = "✕";
       delBtn.addEventListener("click", async () => {
         if (!(await showConfirm("確定要刪除這筆血壓紀錄嗎？"))) return;
-        try {
-          applyBpData(await api("deleteBloodPressureReading", { id: r.id }));
-          renderBpAll();
-        } catch (err) {
-          setStatus("刪除失敗：" + err.message, true);
-        }
+        await withRowLock(delBtn, async () => {
+          try {
+            applyBpData(await api("deleteBloodPressureReading", { id: r.id }));
+            renderBpAll();
+          } catch (err) {
+            setStatus("刪除失敗：" + err.message, true);
+          }
+        });
       });
 
       li.appendChild(periodBadge);

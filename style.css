@@ -651,3 +651,5 @@ a.ghost-btn {
   background: var(--input-bg);
   color: var(--text);
 }
+
+.item-row.pending { opacity: 0.6; }

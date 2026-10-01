@@ -32,17 +32,42 @@ function showToast(msg) {
 }
 
 function setFormBusy(form, busy) {
+  // 送出期間整張表單（輸入框、下拉、勾選、按鈕）全部鎖住，等後端回應完才能再操作
+  form.querySelectorAll("input, select, textarea, button").forEach(el => {
+    if (busy) {
+      el.dataset.wasDisabled = el.disabled ? "1" : "";
+      el.disabled = true;
+    } else {
+      el.disabled = el.dataset.wasDisabled === "1";
+      delete el.dataset.wasDisabled;
+    }
+  });
   const btn = form.querySelector('button[type="submit"]');
   if (!btn) return;
   if (busy) {
     btn.dataset.originalText = btn.textContent;
     btn.textContent = "處理中…";
-    btn.disabled = true;
-  } else {
-    if (btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
-    btn.disabled = false;
+  } else if (btn.dataset.originalText) {
+    btn.textContent = btn.dataset.originalText;
   }
 }
+
+// 列表裡單一項目（勾選、刪除、改金額等）的操作：呼叫後端期間把那一列的
+// 所有控制項鎖住，回來前不能再點，避免連點送出重複請求
+async function withRowLock(el, fn) {
+  const row = el.closest("li") || el;
+  if (row.classList.contains("pending")) return;
+  row.classList.add("pending");
+  const controls = row.querySelectorAll("input, button, select, textarea");
+  controls.forEach(c => { c.dataset.wasDisabled = c.disabled ? "1" : ""; c.disabled = true; });
+  try {
+    return await fn();
+  } finally {
+    row.classList.remove("pending");
+    controls.forEach(c => { c.disabled = c.dataset.wasDisabled === "1"; delete c.dataset.wasDisabled; });
+  }
+}
+
 
 // ====== API ======
 async function api(action, params = {}) {
