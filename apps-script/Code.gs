@@ -493,32 +493,37 @@ function migrateCreditCardBillsFromBankSheet() {
       if (!billingMonth) continue;
       blocksFound++;
 
-      // 月份標題下一列是欄位標題列（跳過），再下面固定依序 6 家銀行
-      for (var b = 0; b < SOURCE_BANK_NAMES.length; b++) {
-        var rowIndex = i + 2 + b;
-        if (rowIndex >= values.length) break;
+      // 月份標題下一列是欄位標題列（跳過），再下面是銀行列——不假設固定幾家、
+      // 固定順序（早期年份銀行數量比較少，後來才陸續開新卡），遇到清單裡的
+      // 銀行名稱就收，遇到清單外的名稱單獨記錄但繼續讀下一列，遇到空白（通常
+      // 是小計列）才算這個月份區塊結束。
+      var rowIndex = i + 2;
+      while (rowIndex < values.length) {
         var row = values[rowIndex];
         var bankName = row[0];
-        if (bankName !== SOURCE_BANK_NAMES[b]) {
-          skipped.push(tabName + " " + billingMonth + "：第" + (b + 1) + "家銀行應該是 " +
-            SOURCE_BANK_NAMES[b] + " 但讀到 \"" + bankName + "\"，這個月份區塊整段跳過");
-          break;
+        if (bankName === "" || bankName === null || bankName === undefined) break;
+
+        if (SOURCE_BANK_NAMES.indexOf(bankName) === -1) {
+          skipped.push(tabName + " " + billingMonth + "：出現不認得的銀行名稱 \"" + bankName + "\"，這一列跳過");
+          rowIndex++;
+          continue;
         }
 
         var full = row[2];
-        if (full === "" || full === null || !(Number(full) > 0)) continue; // 這家銀行這個月沒有帳單
-
-        var paid = row[4];
-        rowsToAppend.push([
-          Utilities.getUuid(),
-          bankName,
-          billingMonth,
-          formatBankDate_(row[1]),
-          Number(full) || 0,
-          Number(row[3]) || 0,
-          (paid === "" || paid === null) ? "" : (Number(paid) || 0),
-          new Date(),
-        ]);
+        if (full !== "" && full !== null && Number(full) > 0) {
+          var paid = row[4];
+          rowsToAppend.push([
+            Utilities.getUuid(),
+            bankName,
+            billingMonth,
+            formatBankDate_(row[1]),
+            Number(full) || 0,
+            Number(row[3]) || 0,
+            (paid === "" || paid === null) ? "" : (Number(paid) || 0),
+            new Date(),
+          ]);
+        }
+        rowIndex++;
       }
     }
     Logger.log(tabName + " 分頁找到 " + blocksFound + " 個月份區塊");
