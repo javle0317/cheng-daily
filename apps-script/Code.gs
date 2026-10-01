@@ -173,7 +173,11 @@ function sheetToObjects(sheet) {
       if (Object.prototype.toString.call(v) === "[object Date]") {
         if (h === "time") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
-        } else if (h === "date") {
+        } else if (h === "date" || h === "periodKey") {
+          // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
+          // Google Sheets 常會把這種格子自動判斷成日期型態存，讀回來要轉回純
+          // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
+          // 而新增重複列，不是遞增既有的）
           v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
         } else {
           v = Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd HH:mm:ss");
