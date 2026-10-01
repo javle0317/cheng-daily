@@ -511,7 +511,13 @@ function toggleHabitLog(habitId, periodKey, target) {
 
     var matchingRows = [];
     for (var i = 1; i < values.length; i++) {
-      if (values[i][1] === habitId && String(values[i][2]) === String(periodKey)) {
+      var rowKey = values[i][2];
+      // 這裡是原始 getValues()，periodKey 若被 Sheets 轉成 Date 型態，要先轉回
+      // 跟前端一致的字串再比對，否則找不到既有列，取消打勾會變成又新增一列
+      if (Object.prototype.toString.call(rowKey) === "[object Date]") {
+        rowKey = Utilities.formatDate(rowKey, TIME_ZONE, "yyyy-MM-dd");
+      }
+      if (values[i][1] === habitId && String(rowKey) === String(periodKey)) {
         matchingRows.push(i);
       }
     }
