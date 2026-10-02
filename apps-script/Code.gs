@@ -615,38 +615,12 @@ function toggleHabitLog(habitId, periodKey, target) {
 //     失敗就還原成 count=0 讓使用者可重送。
 // 連線設定放「專案設定 → 指令碼屬性」（不能寫進程式，repo 是公開的）：
 //   CHALLENGE_URL（朋友的 web app 網址）、CHALLENGE_PLAYER（玩家名稱）、CHALLENGE_PIN（密碼）。
-// CHALLENGE_URL 沒設定時是開發模式：抽卡從內建清單隨機挑、完成不呼叫朋友。
-// 另可設 CHALLENGE_DEBUG=true：真的送出，並把送出內容跟對方原始回應顯示在網頁彈窗。
-// 另可設 CHALLENGE_DRY_RUN=true：同樣不送出，但會把要送的內容隨回應帶回網頁，顯示在彈窗裡。
 var CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
-var CHALLENGE_STUB_EXERCISES = ["開合跳 50 下", "深蹲 30 下", "棒式 1 分鐘", "伏地挺身 15 下", "原地高抬腿 2 分鐘"];
-
-// 預覽模式下收集「會送出的內容」，隨回應帶回前端顯示（Cloud 記錄不一定看得到）
-var challengePreviews_ = [];
-
-function withChallengePreview_(data) {
-  if (challengePreviews_.length) data.dryRunPreview = challengePreviews_.slice();
-  return data;
-}
 
 function callChallengeApi_(payload) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty("CHALLENGE_URL");
-  // CHALLENGE_DRY_RUN=true：不真的送出，只把「會送出的內容」（密碼遮掉）寫進執行記錄，
-  // 用來先確認內容再正式開啟
-  if (props.getProperty("CHALLENGE_DRY_RUN") === "true") {
-    var preview = { url: url, player: props.getProperty("CHALLENGE_PLAYER"), pin: "****" };
-    Object.keys(payload).forEach(function (k) { preview[k] = payload[k]; });
-    Logger.log("[挑戰站 DRY RUN] " + JSON.stringify(preview));
-    challengePreviews_.push("[預覽，沒有送出] " + JSON.stringify(preview));
-    url = "";
-  }
-  if (!url) {
-    if (payload.action === "draw") {
-      return { exercise: CHALLENGE_STUB_EXERCISES[Math.floor(Math.random() * CHALLENGE_STUB_EXERCISES.length)] };
-    }
-    return {};
-  }
+  if (!url) throw new Error("尚未設定 CHALLENGE_URL（指令碼屬性）");
   var body = {
     player: props.getProperty("CHALLENGE_PLAYER"),
     pin: props.getProperty("CHALLENGE_PIN"),
@@ -659,21 +633,11 @@ function callChallengeApi_(payload) {
     muteHttpExceptions: true,
     followRedirects: true,
   });
-  var code = res.getResponseCode();
-  var text = res.getContentText();
-  // CHALLENGE_DEBUG=true：把「實際送出的內容（密碼遮掉）」跟「對方原始回應」隨回應帶回網頁顯示
-  if (props.getProperty("CHALLENGE_DEBUG") === "true") {
-    var sent = {};
-    Object.keys(body).forEach(function (k) { sent[k] = body[k]; });
-    sent.pin = "****";
-    challengePreviews_.push("[已送出] " + JSON.stringify(sent));
-    challengePreviews_.push("[對方回應 HTTP " + code + "] " + text.slice(0, 500));
-  }
   var json;
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(res.getContentText());
   } catch (e) {
-    throw new Error("運動挑戰站回應格式錯誤（HTTP " + code + "）：" + text.slice(0, 200));
+    throw new Error("運動挑戰站回應格式錯誤（HTTP " + res.getResponseCode() + "）：" + res.getContentText().slice(0, 200));
   }
   if (json.error) throw new Error(String(json.error));
   return json;
@@ -710,7 +674,7 @@ function drawChallenge() {
     var cols = challengeCols_(sheet);
     var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
     // 今天已經有列（例如另一個裝置先抽了）就直接回傳現況，不重抽
-    if (findChallengeRow_(sheet, today)) return withChallengePreview_(getData());
+    if (findChallengeRow_(sheet, today)) return getData();
 
     var width = sheet.getLastColumn();
     var row = [];
@@ -739,7 +703,7 @@ function drawChallenge() {
       // 朋友那邊已經抽成功、但我們寫入失敗：draw 不能重複呼叫，把結果放進錯誤訊息讓人可以手動補
       throw new Error("抽到「" + exercise + "」，但記錄失敗，請手動填到 HabitLog 的 exercise 欄");
     }
-    return withChallengePreview_(getData());
+    return getData();
   } finally {
     lock.releaseLock();
   }
@@ -758,7 +722,7 @@ function completeChallenge() {
     if (!exercise) throw new Error("今天的運動還沒抽到");
     var wasDone = Number(sheet.getRange(rowIndex, cols.count).getValue()) >= 1;
     var synced = sheet.getRange(rowIndex, cols.synced).getValue();
-    if (wasDone && (synced === true || synced === "TRUE")) return withChallengePreview_(getData()); // 已同步，鎖死
+    if (wasDone && (synced === true || synced === "TRUE")) return getData(); // 已同步，鎖死
 
     sheet.getRange(rowIndex, cols.count).setValue(1);
     sheet.getRange(rowIndex, cols.synced).setValue("");
@@ -770,7 +734,7 @@ function completeChallenge() {
       throw err;
     }
     sheet.getRange(rowIndex, cols.synced).setValue(true);
-    return withChallengePreview_(getData());
+    return getData();
   } finally {
     lock.releaseLock();
   }

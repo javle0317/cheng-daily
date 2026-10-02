@@ -1278,11 +1278,6 @@ async function runChallengeAction(action, failText) {
     const data = await api(action);
     applyData(data);
     renderDailyHabits();
-    // 後端開了 CHALLENGE_DRY_RUN（預覽、不送出）或 CHALLENGE_DEBUG（送出並附對方回應）時，
-    // 把細節顯示出來確認
-    if (data.dryRunPreview) {
-      await showConfirm("【挑戰站除錯資訊】\n" + data.dryRunPreview.join("\n"));
-    }
   } catch (err) {
     // 失敗時後端已還原，重畫一次讓畫面回到真實狀態、可以重按
     setStatus(failText + "：" + err.message, true);
