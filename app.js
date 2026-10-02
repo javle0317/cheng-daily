@@ -141,6 +141,40 @@ function computeStreak(habit) {
   return streak;
 }
 
+// 歷史統計：最長連續天數、本月完成次數。連續天數的規則跟 computeStreak 一致
+// （僅工作日的習慣跳過非工作日；今天還沒做不算斷）。紀錄全部保留在 HabitLog，
+// 所以從該習慣最早一筆往今天掃一遍就好。
+function computeHabitStats(habit) {
+  const workdaysOnly = habit.workdaysOnly === true || habit.workdaysOnly === "TRUE";
+  const target = Number(habit.target || 1);
+  const logs = state.habitLogs.filter(l => l.habitId === habit.id && Number(l.count) >= target);
+  const monthKey = getMonthKey(toDateStr(new Date()));
+  const monthCount = logs.filter(l => String(l.periodKey).startsWith(monthKey)).length;
+  if (!logs.length) return { longest: 0, monthCount };
+
+  const first = logs.map(l => String(l.periodKey)).sort()[0];
+  const doneDates = new Set(logs.map(l => String(l.periodKey)));
+  const todayStr = toDateStr(new Date());
+  const cursor = new Date(first + "T00:00:00");
+  let run = 0, longest = 0;
+  for (let guard = 0; guard < 3700; guard++) {
+    const dateStr = toDateStr(cursor);
+    if (dateStr > todayStr) break;
+    if (!(workdaysOnly && !isWorkday(dateStr))) {
+      if (doneDates.has(dateStr)) {
+        run++;
+        if (run > longest) longest = run;
+      } else if (dateStr !== todayStr) {
+        run = 0;
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { longest, monthCount };
+}
+
+const openStreakHabitIds = new Set();
+
 // ====== API ======
 function applyData(data) {
   state.goals = data.goals || [];
@@ -293,7 +327,24 @@ function renderDailyHabits() {
     li.querySelector(".item-text").textContent = habitName;
     li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
     const streak = computeStreak(habit);
-    if (streak > 0) li.querySelector(".item-time").textContent = `🔥 ${streak}`;
+    const stats = computeHabitStats(habit);
+    const streakEl = li.querySelector(".item-time");
+    if (streak > 0 || stats.longest > 0) {
+      streakEl.textContent = `🔥 ${streak}`;
+      streakEl.classList.add("streak-badge");
+      const detail = `目前連續 ${streak} 天 · 歷史最長 ${stats.longest} 天 · 本月完成 ${stats.monthCount} 次`;
+      streakEl.title = detail; // 電腦版 hover 看得到
+      const pop = document.createElement("div");
+      pop.className = "streak-detail" + (openStreakHabitIds.has(habit.id) ? "" : " hidden");
+      pop.textContent = detail;
+      streakEl.addEventListener("click", () => {
+        // 手機沒有 hover，點一下展開/收合
+        if (openStreakHabitIds.has(habit.id)) openStreakHabitIds.delete(habit.id);
+        else openStreakHabitIds.add(habit.id);
+        pop.classList.toggle("hidden");
+      });
+      li.appendChild(pop);
+    }
     if (habitUrl) {
       const link = document.createElement("a");
       link.href = habitUrl;
