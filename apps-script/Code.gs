@@ -617,6 +617,15 @@ function toggleHabitLog(habitId, periodKey, target) {
 //   CHALLENGE_URL（朋友的 web app 網址）、CHALLENGE_PLAYER（玩家名稱）、CHALLENGE_PIN（密碼）。
 var CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 
+// 朋友 draw 的回應格式：{"mine":{"date","player","ex","name":"伏地挺身（可跪姿）","amount":"3 組 × 5 下","done":false}}
+// 顯示用字串 = name・amount（沒有 amount 就只有 name）。
+function formatChallengeExercise_(res) {
+  var m = (res && res.mine) || res || {};
+  var name = String(m.name || "").trim();
+  var amount = String(m.amount || "").trim();
+  return amount ? name + "・" + amount : name;
+}
+
 function callChallengeApi_(payload) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty("CHALLENGE_URL");
@@ -691,7 +700,7 @@ function drawChallenge() {
     var exercise;
     try {
       var res = callChallengeApi_({ action: "draw", date: today });
-      exercise = String(res.exercise || "").trim();
+      exercise = formatChallengeExercise_(res);
       if (!exercise) throw new Error("運動挑戰站沒有回傳運動內容");
     } catch (err) {
       sheet.deleteRow(rowIndex); // 抽卡失敗，拿掉佔位列，使用者可以重抽

@@ -39,9 +39,13 @@
 - 連線設定放 Apps Script「專案設定 → 指令碼屬性」：`CHALLENGE_URL`（朋友的 web app
   網址）、`CHALLENGE_PLAYER`（玩家名稱）、`CHALLENGE_PIN`（密碼）。不要寫進程式，
   repo 是公開的。沒設 `CHALLENGE_URL` 時抽卡/完成會直接報錯。
-- 朋友的 API 約定：`draw`（`{action:"draw", player, pin, date}` → 回傳
-  `{exercise:"運動名稱"}`，同一天不可重複呼叫）、`done`（`{action:"done", player,
-  pin, date, done:true}`，要能重複送同樣內容不出錯）；失敗回 `{error:"訊息"}`。
+- 朋友的 API 約定（POST，body 是 JSON 字串）：
+  - `draw`：`{action:"draw", player, pin, date}` → 回傳
+    `{"mine":{"date","player","ex","name","amount","done"}}`，我們顯示 `name・amount`
+    （例如「伏地挺身（可跪姿）・3 組 × 5 下」）存進 HabitLog 的 `exercise` 欄；同一天
+    不可重複呼叫。
+  - `done`：`{action:"done", player, pin, date, done:true}`，要能重複送同樣內容不出錯。
+  - 失敗一律回 `{error:"訊息"}`（訊息會直接顯示給使用者）。
 
 - `periodKey`：`daily` 是當天日期；`weekly` 是那一週週一的日期；`monthly` 是
   `yyyy-MM`
@@ -198,7 +202,3 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
 - 每週/每月習慣的連續統計（連續幾週/幾個月達標、歷史最長），目前只有每日習慣有 🔥
 - 循環行程支援截止日期（曾經做過又拿掉了，目前一律無限期直到手動刪除）
 - 靜態檔案快取問題：shared.js / app.js 等改版後瀏覽器可能還在用舊版，可以在 HTML 的 script/css 網址加版本參數（例如 `?v=日期`）
-
-等別人配合的：
-
-- 「每日運動挑戰」習慣名稱裡的連結（chelsea0211.github.io/exercise/），等對方的頁面支援「網址帶參數就自動觸發按鈕」，拿到參數名稱後只要改習慣名稱裡的網址，我們這邊程式不用動
