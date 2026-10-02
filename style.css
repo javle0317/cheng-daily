@@ -688,3 +688,16 @@ a.ghost-btn {
   color: var(--text-dim);
   padding-left: 28px;
 }
+
+/* 確認/輸入彈窗的「確定」按鈕：跟站內其他主要按鈕同一個樣式（原本是瀏覽器預設灰色） */
+.dialog-actions button:not(.ghost-btn) {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dialog-card input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
