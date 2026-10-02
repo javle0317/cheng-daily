@@ -672,3 +672,7 @@ a.ghost-btn {
   .bill-unpaid-card { grid-column: span 2; }
   .bill-list-card { grid-column: span 2; }
 }
+
+/* 帳單列：金額文字不要被擠成多行，空間不夠時整個項目換到下一行 */
+.bill-row .item-text { flex: 0 0 auto; white-space: nowrap; }
+.bill-row .item-time { white-space: nowrap; }

@@ -95,7 +95,7 @@ function renderUnpaid() {
   unpaid.forEach(b => {
     const overdue = String(b.date) <= today;
     const li = document.createElement("li");
-    li.className = "item-row" + (overdue ? " bill-overdue" : "");
+    li.className = "item-row bill-row" + (overdue ? " bill-overdue" : "");
 
     const bankBadge = document.createElement("span");
     bankBadge.className = "owner-badge";
@@ -341,7 +341,7 @@ function renderList() {
     ul.className = "item-list";
     byMonth[month].forEach(b => {
       const li = document.createElement("li");
-      li.className = "item-row";
+      li.className = "item-row bill-row";
 
       const bankBadge = document.createElement("span");
       bankBadge.className = "owner-badge";
