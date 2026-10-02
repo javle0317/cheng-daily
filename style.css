@@ -737,3 +737,6 @@ a.ghost-btn {
   cursor: pointer;
 }
 .clear-done-btn { margin-top: 12px; width: 100%; }
+
+/* 清單裡已勾選的項目靠「清除已完成」統一清掉，不需要單獨的 ✕ */
+#shoppingList .item-row.done .delete-btn { display: none; }
