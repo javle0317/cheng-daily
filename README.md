@@ -38,7 +38,7 @@
   （`drawChallenge` / `completeChallenge`）。
 - 連線設定放 Apps Script「專案設定 → 指令碼屬性」：`CHALLENGE_URL`（朋友的 web app
   網址）、`CHALLENGE_PLAYER`（玩家名稱）、`CHALLENGE_PIN`（密碼）。不要寫進程式，
-  repo 是公開的。`CHALLENGE_DRY_RUN` 設成 `true` 時不會真的送出，只把要送的內容（密碼遮成 `****`）寫進 Apps Script 的執行記錄，用來先確認再正式開啟。沒設 `CHALLENGE_URL` 時是開發模式（抽卡從內建清單隨機挑、完成不
+  repo 是公開的。`CHALLENGE_DRY_RUN` 設成 `true` 時不會真的送出，只把要送的內容（密碼遮成 `****`）隨回應帶回網頁、顯示在彈窗裡（也會寫進執行記錄，但 Cloud 記錄不一定看得到），用來先確認再正式開啟。沒設 `CHALLENGE_URL` 時是開發模式（抽卡從內建清單隨機挑、完成不
   呼叫朋友）。
 - 朋友的 API 約定：`draw`（`{action:"draw", player, pin, date}` → 回傳
   `{exercise:"運動名稱"}`，同一天不可重複呼叫）、`done`（`{action:"done", player,

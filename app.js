@@ -1285,8 +1285,13 @@ function renderChallenge() {
 
 async function runChallengeAction(action, failText) {
   try {
-    applyData(await api(action));
+    const data = await api(action);
+    applyData(data);
     renderChallenge();
+    // 後端開了預覽模式（CHALLENGE_DRY_RUN）時，不會真的送出，把「會送出的內容」顯示出來確認
+    if (data.dryRunPreview) {
+      await showConfirm("【預覽模式，沒有真的送出】\n會送出的內容：\n" + data.dryRunPreview.join("\n"));
+    }
   } catch (err) {
     // 失敗時後端已還原，畫面維持原狀可以重按
     setStatus(failText + "：" + err.message, true);

@@ -755,3 +755,5 @@ a.ghost-btn {
 }
 .challenge-actions button:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
 .challenge-card .streak-detail { padding-left: 0; margin: 10px 0 0; }
+
+#dialogMessage { white-space: pre-wrap; word-break: break-all; }
