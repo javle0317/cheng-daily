@@ -29,8 +29,20 @@
 
 **HabitLog**（習慣的完成紀錄）
 
-| id | habitId | periodKey | count | createdAt |
-|----|---------|-----------|-------|-----------|
+| id | habitId | periodKey | count | createdAt | exercise | synced |
+|----|---------|-----------|-------|-----------|----------|--------|
+
+- `exercise`、`synced` 只有「每日運動挑戰」那個習慣（`CHALLENGE_HABIT_ID`）會用到，
+  其他習慣留空：`exercise` 是抽到的運動，`synced` 表示完成是否已成功回傳給朋友的
+  挑戰站。這個習慣不走一般勾選，改由首頁「每日運動挑戰」卡片的抽卡/完成打卡處理
+  （`drawChallenge` / `completeChallenge`）。
+- 連線設定放 Apps Script「專案設定 → 指令碼屬性」：`CHALLENGE_URL`（朋友的 web app
+  網址）、`CHALLENGE_PLAYER`（玩家名稱）、`CHALLENGE_PIN`（密碼）。不要寫進程式，
+  repo 是公開的。沒設 `CHALLENGE_URL` 時是開發模式（抽卡從內建清單隨機挑、完成不
+  呼叫朋友）。
+- 朋友的 API 約定：`draw`（`{action:"draw", player, pin, date}` → 回傳
+  `{exercise:"運動名稱"}`，同一天不可重複呼叫）、`done`（`{action:"done", player,
+  pin, date, done:true}`，要能重複送同樣內容不出錯）；失敗回 `{error:"訊息"}`。
 
 - `periodKey`：`daily` 是當天日期；`weekly` 是那一週週一的日期；`monthly` 是
   `yyyy-MM`

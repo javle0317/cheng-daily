@@ -740,3 +740,18 @@ a.ghost-btn {
 
 /* 清單裡已勾選的項目靠「清除已完成」統一清掉，不需要單獨的 ✕ */
 #shoppingList .item-row.done .delete-btn { display: none; }
+
+/* 每日運動挑戰卡片 */
+.challenge-card h2 { margin-top: 0; }
+.challenge-text { margin: 0 0 10px; font-size: 15px; }
+.challenge-actions button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+.challenge-actions button:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+.challenge-card .streak-detail { padding-left: 0; margin: 10px 0 0; }

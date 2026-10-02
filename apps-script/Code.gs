@@ -12,7 +12,8 @@
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
- *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
+ *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
+ *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
@@ -85,6 +86,10 @@ function handleRequest(e) {
         return respond({ ok: true, data: setEventAmount(p.id, p.amount) });
       case "addHabit":
         return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
+      case "drawChallenge":
+        return respond({ ok: true, data: drawChallenge() });
+      case "completeChallenge":
+        return respond({ ok: true, data: completeChallenge() });
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
       case "updateHabit":
@@ -552,6 +557,7 @@ function deleteHabit(id) {
 // target>1（weekly/monthly）維持原本的遞增/超過歸零邏輯，因為要追蹤的是
 // 「目前做到第幾次」，不是單純有沒有。
 function toggleHabitLog(habitId, periodKey, target) {
+  if (habitId === CHALLENGE_HABIT_ID) throw new Error("每日運動挑戰請用抽卡/完成打卡，不能直接勾選");
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -592,6 +598,149 @@ function toggleHabitLog(habitId, periodKey, target) {
     }
 
     sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
+    return getData();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ====== 每日運動挑戰 ======
+// 朋友維護的運動挑戰站有自己的打卡 API（Google Apps Script web app，POST JSON）。
+// 這個挑戰在我們這邊用 HabitLog 存：同一個 habit（CHALLENGE_HABIT_ID）、一天一列，
+// 多用兩個欄位：exercise（抽到的運動）、synced（完成是否已成功回傳給朋友）。
+//   - 抽卡：先寫一列 count=0（佔位），再呼叫朋友的 draw，成功就把運動寫進 exercise，
+//     失敗就把佔位列刪掉讓使用者可重抽。朋友的 draw 同一天不能重複呼叫，所以結果
+//     一定要立刻存下來。
+//   - 完成：先記 count=1，再送 done 給朋友；成功才標 synced=TRUE（之後鎖死不能再按），
+//     失敗就還原成 count=0 讓使用者可重送。
+// 連線設定放「專案設定 → 指令碼屬性」（不能寫進程式，repo 是公開的）：
+//   CHALLENGE_URL（朋友的 web app 網址）、CHALLENGE_PLAYER（玩家名稱）、CHALLENGE_PIN（密碼）。
+// CHALLENGE_URL 沒設定時是開發模式：抽卡從內建清單隨機挑、完成不呼叫朋友。
+var CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
+var CHALLENGE_STUB_EXERCISES = ["開合跳 50 下", "深蹲 30 下", "棒式 1 分鐘", "伏地挺身 15 下", "原地高抬腿 2 分鐘"];
+
+function callChallengeApi_(payload) {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty("CHALLENGE_URL");
+  if (!url) {
+    if (payload.action === "draw") {
+      return { exercise: CHALLENGE_STUB_EXERCISES[Math.floor(Math.random() * CHALLENGE_STUB_EXERCISES.length)] };
+    }
+    return {};
+  }
+  var body = {
+    player: props.getProperty("CHALLENGE_PLAYER"),
+    pin: props.getProperty("CHALLENGE_PIN"),
+  };
+  Object.keys(payload).forEach(function (k) { body[k] = payload[k]; });
+  var res = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "text/plain",
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true,
+    followRedirects: true,
+  });
+  var json;
+  try {
+    json = JSON.parse(res.getContentText());
+  } catch (e) {
+    throw new Error("運動挑戰站回應格式錯誤");
+  }
+  if (json.error) throw new Error(String(json.error));
+  return json;
+}
+
+// 回傳今天（台北時間）那一列在 HabitLog 的位置（1-based row），沒有就回 0
+function findChallengeRow_(sheet, today) {
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    var key = values[i][2];
+    if (Object.prototype.toString.call(key) === "[object Date]") {
+      key = Utilities.formatDate(key, TIME_ZONE, "yyyy-MM-dd");
+    }
+    if (values[i][1] === CHALLENGE_HABIT_ID && String(key) === today) return i + 1;
+  }
+  return 0;
+}
+
+function challengeCols_(sheet) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var cols = {};
+  ["habitId", "periodKey", "count", "exercise", "synced"].forEach(function (h) {
+    cols[h] = headers.indexOf(h) + 1;
+  });
+  if (!cols.exercise || !cols.synced) throw new Error("HabitLog 缺少 exercise / synced 欄位，請先在表頭補上");
+  return cols;
+}
+
+function drawChallenge() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getSheet("HabitLog");
+    var cols = challengeCols_(sheet);
+    var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
+    // 今天已經有列（例如另一個裝置先抽了）就直接回傳現況，不重抽
+    if (findChallengeRow_(sheet, today)) return getData();
+
+    var width = sheet.getLastColumn();
+    var row = [];
+    for (var c = 0; c < width; c++) row.push("");
+    row[0] = Utilities.getUuid();
+    row[cols.habitId - 1] = CHALLENGE_HABIT_ID;
+    row[cols.periodKey - 1] = today;
+    row[cols.count - 1] = 0;
+    var createdAtCol = sheet.getRange(1, 1, 1, width).getValues()[0].indexOf("createdAt");
+    if (createdAtCol >= 0) row[createdAtCol] = new Date();
+    sheet.appendRow(row);
+    var rowIndex = sheet.getLastRow();
+
+    var exercise;
+    try {
+      var res = callChallengeApi_({ action: "draw", date: today });
+      exercise = String(res.exercise || "").trim();
+      if (!exercise) throw new Error("運動挑戰站沒有回傳運動內容");
+    } catch (err) {
+      sheet.deleteRow(rowIndex); // 抽卡失敗，拿掉佔位列，使用者可以重抽
+      throw err;
+    }
+    try {
+      sheet.getRange(rowIndex, cols.exercise).setValue(exercise);
+    } catch (err) {
+      // 朋友那邊已經抽成功、但我們寫入失敗：draw 不能重複呼叫，把結果放進錯誤訊息讓人可以手動補
+      throw new Error("抽到「" + exercise + "」，但記錄失敗，請手動填到 HabitLog 的 exercise 欄");
+    }
+    return getData();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function completeChallenge() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = getSheet("HabitLog");
+    var cols = challengeCols_(sheet);
+    var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
+    var rowIndex = findChallengeRow_(sheet, today);
+    if (!rowIndex) throw new Error("今天還沒抽卡");
+    var exercise = sheet.getRange(rowIndex, cols.exercise).getValue();
+    if (!exercise) throw new Error("今天的運動還沒抽到");
+    var wasDone = Number(sheet.getRange(rowIndex, cols.count).getValue()) >= 1;
+    var synced = sheet.getRange(rowIndex, cols.synced).getValue();
+    if (wasDone && (synced === true || synced === "TRUE")) return getData(); // 已同步，鎖死
+
+    sheet.getRange(rowIndex, cols.count).setValue(1);
+    sheet.getRange(rowIndex, cols.synced).setValue("");
+    try {
+      callChallengeApi_({ action: "done", date: today, done: true });
+    } catch (err) {
+      // 第一次送失敗就還原成未完成讓使用者重送；已經是「完成但未同步」的重新同步失敗則維持原狀
+      if (!wasDone) sheet.getRange(rowIndex, cols.count).setValue(0);
+      throw err;
+    }
+    sheet.getRange(rowIndex, cols.synced).setValue(true);
     return getData();
   } finally {
     lock.releaseLock();

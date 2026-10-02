@@ -202,6 +202,7 @@ function renderAll() {
   renderDailyHabits();
   renderWeeklyHabits();
   renderMonthlyHabits();
+  renderChallenge();
   renderCalendar();
   renderRecurringList();
   renderShoppingList();
@@ -284,6 +285,10 @@ function isTruthy(v) {
   return v === true || v === "TRUE";
 }
 
+// 「每日運動挑戰」是特殊習慣：不在一般每日習慣清單裡，改由 challengeCard 處理
+// （抽卡、完成後回傳給朋友的挑戰站）。id 要跟 apps-script/Code.gs 的 CHALLENGE_HABIT_ID 一致。
+const CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
+
 function updateHabitsCardVisibility() {
   const card = document.getElementById("habitsCard");
   const anyVisible = ["dailyHabitSection", "weeklyHabitSection", "monthlyHabitSection"]
@@ -297,6 +302,7 @@ function renderDailyHabits() {
   list.innerHTML = "";
 
   const habits = state.habits.filter(h =>
+    h.id !== CHALLENGE_HABIT_ID &&
     h.frequency === "daily" &&
     (!isTruthy(h.workdaysOnly) || isWorkday(state.selectedDate))
   );
@@ -1217,6 +1223,76 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
     updateHabitFormValidity();
   }
 });
+
+// ====== 每日運動挑戰 ======
+function getTodayChallengeLog() {
+  const today = toDateStr(new Date());
+  return state.habitLogs.find(l => l.habitId === CHALLENGE_HABIT_ID && String(l.periodKey) === today) || null;
+}
+
+function renderChallenge() {
+  const card = document.getElementById("challengeCard");
+  const body = document.getElementById("challengeBody");
+  const habit = state.habits.find(h => h.id === CHALLENGE_HABIT_ID);
+  card.classList.toggle("hidden", !habit);
+  if (!habit) return;
+  body.innerHTML = "";
+
+  const log = getTodayChallengeLog();
+  const exercise = log ? String(log.exercise || "") : "";
+  const isDone = log && Number(log.count) >= 1;
+  const isSynced = log && isTruthy(log.synced);
+
+  const text = document.createElement("p");
+  text.className = "challenge-text";
+  const actions = document.createElement("div");
+  actions.className = "challenge-actions";
+
+  const addBtn = (label, handler) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.addEventListener("click", () => withRowLock(card, () => handler()));
+    actions.appendChild(btn);
+  };
+
+  if (!log) {
+    text.textContent = "今天還沒抽運動";
+    addBtn("🎲 抽今天的運動", () => runChallengeAction("drawChallenge", "抽卡失敗"));
+  } else if (!exercise) {
+    text.textContent = "抽卡狀態異常：今天有紀錄但沒有運動內容，請到 HabitLog 檢查";
+  } else if (isDone && isSynced) {
+    text.textContent = `✅ 今天已完成：${exercise}`;
+  } else if (isDone) {
+    text.textContent = `${exercise}（已完成，但還沒成功回傳）`;
+    addBtn("重新同步", () => runChallengeAction("completeChallenge", "同步失敗"));
+  } else {
+    text.textContent = `今天的運動：${exercise}`;
+    addBtn("✅ 完成打卡", () => runChallengeAction("completeChallenge", "打卡失敗"));
+  }
+  body.appendChild(text);
+  if (actions.children.length) body.appendChild(actions);
+
+  const streak = computeStreak(habit);
+  const stats = computeHabitStats(habit);
+  if (streak > 0 || stats.longest > 0) {
+    const info = document.createElement("p");
+    info.className = "streak-detail";
+    info.textContent = `🔥 連續 ${streak} 天 · 歷史最長 ${stats.longest} 天 · 本月完成 ${stats.monthCount} 次`;
+    body.appendChild(info);
+  }
+}
+
+async function runChallengeAction(action, failText) {
+  try {
+    applyData(await api(action));
+    renderChallenge();
+  } catch (err) {
+    // 失敗時後端已還原，畫面維持原狀可以重按
+    setStatus(failText + "：" + err.message, true);
+    renderChallenge();
+  }
+}
 
 // ====== 編輯習慣 ======
 let editingHabit = null;
