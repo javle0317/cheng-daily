@@ -653,3 +653,10 @@ a.ghost-btn {
 }
 
 .item-row.pending { opacity: 0.6; }
+
+/* 血壓頁：新增卡片在最上面（窄版優先看到），量測紀錄獨立一張卡片放最下面 */
+@media (min-width: 760px) {
+  .new-bp-card { grid-column: 2; grid-row: 1; }
+  .bp-chart-card { grid-column: 1; grid-row: 1; }
+  .bp-list-card { grid-column: span 2; }
+}

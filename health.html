@@ -33,6 +33,27 @@
     </header>
 
     <main class="grid">
+      <section class="card new-bp-card">
+        <h2>新增血壓紀錄</h2>
+        <form id="bpForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <select id="bpDate" required></select>
+            <select id="bpPeriod">
+              <option value="morning">起床</option>
+              <option value="evening">睡前</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <input id="bpSystolic" type="number" min="0" placeholder="收縮壓" required>
+            <input id="bpDiastolic" type="number" min="0" placeholder="舒張壓" required>
+            <input id="bpPulse" type="number" min="0" placeholder="脈搏" required>
+          </div>
+          <div class="form-row">
+            <button id="bpSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+      </section>
+
       <section class="card bp-chart-card">
         <div class="calendar-nav">
           <button id="bpPeriodPrev" class="ghost-btn">‹</button>
@@ -46,7 +67,7 @@
           </select>
           <label class="checkbox-label">
             <input id="bpCompareToggle" type="checkbox">
-            分早晚比較（只看收縮壓）
+            分起床/睡前比較（只看收縮壓）
           </label>
         </div>
 
@@ -57,37 +78,20 @@
         <div id="bpChart"></div>
         <div id="bpPulseChart"></div>
 
+      </section>
+
+      <section class="card bp-list-card">
         <div class="bp-list-header">
-          <h3 class="sub-heading">量測紀錄</h3>
+          <h2 id="bpListTitle">每日量測紀錄</h2>
           <select id="bpListFilter">
             <option value="all">全部</option>
-            <option value="morning">早上</option>
-            <option value="evening">晚上</option>
+            <option value="morning">起床</option>
+            <option value="evening">睡前</option>
           </select>
         </div>
         <div id="bpList"></div>
       </section>
 
-      <section class="card new-bp-card">
-        <h2>新增血壓紀錄</h2>
-        <form id="bpForm" class="entry-form entry-form-rows">
-          <div class="form-row">
-            <input id="bpDate" type="date" required>
-            <select id="bpPeriod">
-              <option value="morning">早上</option>
-              <option value="evening">晚上</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <input id="bpSystolic" type="number" min="0" placeholder="收縮壓" required>
-            <input id="bpDiastolic" type="number" min="0" placeholder="舒張壓" required>
-            <input id="bpPulse" type="number" min="0" placeholder="脈搏" required>
-          </div>
-          <div class="form-row">
-            <button id="bpSubmitBtn" type="submit" disabled>新增</button>
-          </div>
-        </form>
-      </section>
     </main>
 
     <p id="statusLine" class="status-line"></p>

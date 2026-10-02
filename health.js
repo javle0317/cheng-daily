@@ -4,7 +4,7 @@
 let state = {
   readings: [],
   granularity: "month", // "month" | "year"
-  compareMode: false, // 分早晚比較（只看收縮壓）
+  compareMode: false, // 分起床/睡前比較（只看收縮壓）
   month: new Date().getMonth(),
   year: new Date().getFullYear(),
   listFilter: "all", // all / morning / evening
@@ -49,13 +49,48 @@ function renderBpAll() {
   renderChart();
   renderPulseChart();
   renderList();
-  const dateInput = document.getElementById("bpDate");
-  if (dateInput && !dateInput.value) dateInput.value = toDateStr(new Date());
+  renderDateOptions();
+  syncPeriodLock();
   updateBpFormValidity();
+}
+
+// 新增表單的日期只開放今天/昨天（選昨天是給睡前量血壓跨日的情境）
+const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+
+function formatDateOption(label, d) {
+  return `${label}(${d.getMonth() + 1}/${d.getDate()} ${WEEKDAY_LABELS[d.getDay()]})`;
+}
+
+function renderDateOptions() {
+  const select = document.getElementById("bpDate");
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const todayStr = toDateStr(today);
+  const previous = select.value;
+  select.innerHTML = "";
+  [["今天", today], ["昨天", yesterday]].forEach(([label, d]) => {
+    const opt = document.createElement("option");
+    opt.value = toDateStr(d);
+    opt.textContent = formatDateOption(label, d);
+    select.appendChild(opt);
+  });
+  select.value = [...select.options].some(o => o.value === previous) ? previous : todayStr;
+}
+
+// 選昨天時，時段鎖死為睡前
+function syncPeriodLock() {
+  const isYesterday = document.getElementById("bpDate").value !== toDateStr(new Date());
+  const period = document.getElementById("bpPeriod");
+  if (isYesterday) period.value = "evening";
+  period.disabled = isYesterday;
 }
 
 function renderPeriodNav() {
   const label = document.getElementById("bpPeriodLabel");
+  document.getElementById("bpListTitle").textContent = state.granularity === "month"
+    ? `每日量測紀錄 · ${state.year}/${state.month + 1}`
+    : `每日量測紀錄 · ${state.year} 年`;
   label.textContent = state.granularity === "month"
     ? `${state.year} 年 ${state.month + 1} 月`
     : `${state.year} 年`;
@@ -207,8 +242,8 @@ function buildSeries() {
   return {
     bucketCount,
     series: [
-      { label: "早上收縮壓", color: "var(--series-systolic)", points: morningPoints },
-      { label: "晚上收縮壓", color: "var(--series-diastolic)", points: eveningPoints },
+      { label: "起床收縮壓", color: "var(--series-systolic)", points: morningPoints },
+      { label: "睡前收縮壓", color: "var(--series-diastolic)", points: eveningPoints },
     ],
   };
 }
@@ -349,7 +384,7 @@ function renderList() {
 
       const periodBadge = document.createElement("span");
       periodBadge.className = "owner-badge";
-      periodBadge.textContent = r.period === "morning" ? "🌅 早上" : "🌙 晚上";
+      periodBadge.textContent = r.period === "morning" ? "🌅 起床" : "🌙 睡前";
 
       const valueSpan = document.createElement("span");
       valueSpan.className = "item-text";
@@ -400,6 +435,8 @@ function updateBpFormValidity() {
   document.getElementById("bpSubmitBtn").disabled = !(date && systolic && diastolic && pulse);
 }
 
+document.getElementById("bpDate").addEventListener("change", syncPeriodLock);
+
 ["bpDate", "bpPeriod", "bpSystolic", "bpDiastolic", "bpPulse"].forEach(id => {
   document.getElementById(id).addEventListener("input", updateBpFormValidity);
   document.getElementById(id).addEventListener("change", updateBpFormValidity);
@@ -425,6 +462,7 @@ document.getElementById("bpForm").addEventListener("submit", async (e) => {
     setStatus("新增失敗：" + err.message, true);
   } finally {
     setFormBusy(e.target, false);
+    syncPeriodLock();
     updateBpFormValidity();
   }
 });

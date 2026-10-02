@@ -286,10 +286,12 @@ function renderDailyHabits() {
       <input type="checkbox" ${done ? "checked" : ""}>
       <span class="item-text"></span>
       <span class="item-time"></span>
+      <button class="event-shopping-btn habit-edit-btn" title="編輯" type="button">✏️</button>
       <button class="delete-btn" title="刪除">✕</button>
     `;
     const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
     li.querySelector(".item-text").textContent = habitName;
+    li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
     const streak = computeStreak(habit);
     if (streak > 0) li.querySelector(".item-time").textContent = `🔥 ${streak}`;
     if (habitUrl) {
@@ -355,10 +357,15 @@ function renderPeriodHabits(frequency, listId, sectionId) {
     li.innerHTML = `
       <span class="item-text"></span>
       <span class="item-time"></span>
+      <button class="event-shopping-btn habit-edit-btn" title="編輯" type="button">✏️</button>
       <button class="delete-btn" title="刪除">✕</button>
     `;
     const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
     li.querySelector(".item-text").textContent = habitName;
+    li.querySelector(".habit-edit-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openHabitEdit(habit);
+    });
     li.querySelector(".item-time").textContent = `${count}/${target}`;
     if (habitUrl) {
       const link = document.createElement("a");
@@ -1088,6 +1095,52 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
   } finally {
     setFormBusy(e.target, false);
     updateHabitFormValidity();
+  }
+});
+
+// ====== 編輯習慣 ======
+let editingHabit = null;
+
+function openHabitEdit(habit) {
+  editingHabit = habit;
+  const isDaily = habit.frequency === "daily";
+  document.getElementById("habitEditName").value = habit.name;
+  document.getElementById("habitEditTarget").value = habit.target || 1;
+  document.getElementById("habitEditWorkdaysOnly").checked = habit.workdaysOnly === true || habit.workdaysOnly === "TRUE";
+  document.getElementById("habitEditTargetLabel").style.display = isDaily ? "none" : "";
+  document.getElementById("habitEditWorkdaysLabel").style.display = isDaily ? "" : "none";
+  document.getElementById("habitEditModal").classList.remove("hidden");
+}
+
+function closeHabitEdit() {
+  document.getElementById("habitEditModal").classList.add("hidden");
+  editingHabit = null;
+}
+
+document.getElementById("habitEditCloseBtn").addEventListener("click", closeHabitEdit);
+document.getElementById("habitEditModal").addEventListener("click", (e) => {
+  if (e.target.id === "habitEditModal") closeHabitEdit();
+});
+
+document.getElementById("habitEditForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!editingHabit) return;
+  const name = document.getElementById("habitEditName").value.trim();
+  if (!name) return;
+  const target = document.getElementById("habitEditTarget").value || 1;
+  const workdaysOnly = document.getElementById("habitEditWorkdaysOnly").checked;
+  setFormBusy(e.target, true);
+  try {
+    applyData(await api("updateHabit", { id: editingHabit.id, name, workdaysOnly, target }));
+    closeHabitEdit();
+    renderDailyHabits();
+    renderWeeklyHabits();
+    renderMonthlyHabits();
+    showToast("已更新習慣");
+  } catch (err) {
+    setStatus("更新失敗：" + err.message, true);
+  } finally {
+    setFormBusy(e.target, false);
   }
 });
 

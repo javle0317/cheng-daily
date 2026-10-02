@@ -207,6 +207,28 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <div id="habitEditModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>編輯習慣</h2>
+        <button id="habitEditCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="habitEditForm" class="entry-form">
+        <input id="habitEditName" type="text" placeholder="習慣名稱…" required>
+        <label id="habitEditTargetLabel" class="checkbox-label">
+          目標次數
+          <input id="habitEditTarget" type="number" min="1" value="1">
+        </label>
+        <label id="habitEditWorkdaysLabel" class="checkbox-label">
+          <input id="habitEditWorkdaysOnly" type="checkbox">
+          只算工作日
+        </label>
+        <p class="progress-line">頻率不能修改（紀錄會對不起來），要換請刪掉重加</p>
+        <button id="habitEditSubmitBtn" type="submit">儲存</button>
+      </form>
+    </div>
+  </div>
+
   <div id="shoppingModal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">

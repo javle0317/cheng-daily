@@ -87,6 +87,8 @@ function handleRequest(e) {
         return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
+      case "updateHabit":
+        return respond({ ok: true, data: updateHabit(p.id, p.name, p.workdaysOnly, p.target) });
       case "deleteHabit":
         return respond({ ok: true, data: deleteHabit(p.id) });
       case "addRecurringEvent":
@@ -474,6 +476,25 @@ function addHabit(name, frequency, workdaysOnly, target) {
     finalTarget,
     new Date(),
   ]);
+  return getData();
+}
+
+// 編輯習慣：可改名稱、daily 的「只算工作日」、weekly/monthly 的目標次數。
+// 故意不開放改 frequency——HabitLog 的 periodKey 格式依頻率而定（日期/週一/月份），
+// 改了之前的紀錄就對不起來，要換頻率請刪掉重加。daily 的 target 固定 1。
+function updateHabit(id, name, workdaysOnly, target) {
+  var sheet = getSheet("Habits");
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      var frequency = values[i][2];
+      var finalTarget = frequency === "daily" ? 1 : (parseInt(target, 10) || 1);
+      sheet.getRange(i + 1, 2).setValue(name);
+      sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? (workdaysOnly === "true" || workdaysOnly === true) : values[i][3]);
+      sheet.getRange(i + 1, 5).setValue(finalTarget);
+      break;
+    }
+  }
   return getData();
 }
 
