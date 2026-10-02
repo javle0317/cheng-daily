@@ -174,6 +174,16 @@ Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後�
 `health.html`（跟 `index.html` 共用 `shared.js`/`style.css`），GitHub Pages 會
 自動一起部署，不用額外設定，從主頁面右上角的 ❤️ 連過去即可。
 
+## 快取版本參數
+
+HTML 裡 `style.css` 和各個 `.js` 的網址都帶 `?v=時間戳`，避免改版後瀏覽器/GitHub Pages
+還在用舊檔。更新方式：
+
+- 第一次在新電腦上 clone 之後，跑一次 `sh scripts/install-hooks.sh` 安裝 pre-commit
+  hook，之後只要 commit 有改到根目錄的 `.js` / `.css`，就會自動更新版本參數並一起 commit。
+- 也可以手動跑 `sh scripts/bump-version.sh`。
+- 注意：`apps-script/Code.gs` 不在這個機制內，那個要手動貼進 Apps Script 並重新部署。
+
 ## 前端開發守則
 
 **所有會呼叫後端（`api(...)`）的操作，等待回應期間一律要鎖住對應的控制項，回來前不能再操作。** 後端（Apps Script）有延遲，沒鎖的話使用者會連點，造成重複請求、畫面與資料不一致（例如勾選框已翻轉但刪除線還沒更新、取消勾選又被當成新增）。
