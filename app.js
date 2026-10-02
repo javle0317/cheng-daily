@@ -354,7 +354,8 @@ function renderDailyHabits() {
     }
     if (isChallenge) {
       li.querySelector(".delete-btn").remove(); // 刪掉這個習慣整個挑戰就沒了，不給刪
-      setupChallengeRow(li, periodKey, challengeLog);
+      setupChallengeRow(li, periodKey, challengeLog); // 裡面用編輯鈕當插入位置，所以編輯鈕等它跑完再移除
+      li.querySelector(".habit-edit-btn").remove(); // 名稱/設定不開放從網頁修改
     } else if (habitUrl) {
       const link = document.createElement("a");
       link.href = habitUrl;
