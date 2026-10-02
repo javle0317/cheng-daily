@@ -742,3 +742,7 @@ a.ghost-btn {
 #shoppingList .item-row.done .delete-btn { display: none; }
 
 #dialogMessage { white-space: pre-wrap; word-break: break-all; }
+
+/* 循環行程截止日 */
+.recurring-end-label { gap: 8px; }
+.item-row.recurring-ended { opacity: 0.55; }

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261003011359">
+<link rel="stylesheet" href="style.css?v=20261003011702">
 </head>
 <body>
 
@@ -176,6 +176,12 @@
             <input id="recurringTime" type="time">
           </div>
           <div class="form-row">
+            <label class="checkbox-label recurring-end-label">
+              截止日（選填）
+              <input id="recurringEndDate" type="date">
+            </label>
+          </div>
+          <div class="form-row">
             <input id="recurringNote" type="text" placeholder="備註/地點…">
             <button id="recurringSubmitBtn" type="submit" disabled>新增</button>
           </div>
@@ -229,6 +235,24 @@
     </div>
   </div>
 
+  <div id="recurringEndModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <div class="modal-header">
+        <h2>截止日</h2>
+        <button id="recurringEndCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <p id="recurringEndTitle" class="progress-line"></p>
+      <form id="recurringEndForm" class="entry-form">
+        <input id="recurringEndInput" type="date">
+        <p class="progress-line">截止日當天仍會出現，之後就不再出現。留空 = 無限期。</p>
+        <div class="dialog-actions">
+          <button id="recurringEndClearBtn" class="ghost-btn" type="button">清除（無限期）</button>
+          <button id="recurringEndSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="shoppingModal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -259,7 +283,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261003011359"></script>
-  <script src="app.js?v=20261003011359"></script>
+  <script src="shared.js?v=20261003011702"></script>
+  <script src="app.js?v=20261003011702"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
  *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空）
- *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
+ *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
@@ -100,9 +100,11 @@ function handleRequest(e) {
         return respond({
           ok: true,
           data: addRecurringEvent(
-            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth
+            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth, p.endDate
           ),
         });
+      case "setRecurringEndDate":
+        return respond({ ok: true, data: setRecurringEndDate(p.id, p.endDate) });
       case "deleteRecurringEvent":
         return respond({ ok: true, data: deleteRecurringEvent(p.id) });
       case "addRecurringException":
@@ -194,7 +196,7 @@ function sheetToObjects(sheet) {
       if (Object.prototype.toString.call(v) === "[object Date]") {
         if (h === "time") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
-        } else if (h === "date" || h === "periodKey") {
+        } else if (h === "date" || h === "periodKey" || h === "endDate") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
           // Google Sheets 常會把這種格子自動判斷成日期型態存，讀回來要轉回純
           // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
@@ -308,7 +310,7 @@ function setEventAmount(id, amount) {
   return getData();
 }
 
-function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth) {
+function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate) {
   var sheet = getSheet("RecurringEvents");
   sheet.appendRow([
     Utilities.getUuid(),
@@ -320,7 +322,24 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     dayOfWeek === undefined || dayOfWeek === "" ? "" : parseInt(dayOfWeek, 10),
     dayOfMonth === undefined || dayOfMonth === "" ? "" : parseInt(dayOfMonth, 10),
     new Date(),
+    endDate || "",
   ]);
+  return getData();
+}
+
+// 事後補登/修改/清除（傳空字串）循環行程的截止日。截止日當天仍會出現，之後就不展開。
+function setRecurringEndDate(id, endDate) {
+  var sheet = getSheet("RecurringEvents");
+  var values = sheet.getDataRange().getValues();
+  var col = values[0].indexOf("endDate") + 1;
+  if (!col) throw new Error("RecurringEvents 缺少 endDate 欄位，請先在表頭補上");
+  if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error("截止日格式錯誤");
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      sheet.getRange(i + 1, col).setValue(endDate || "");
+      break;
+    }
+  }
   return getData();
 }
 
@@ -783,7 +802,7 @@ function sendDailyNotifications() {
     if (ex.date === todayStr) skippedToday[ex.recurringId] = true;
   });
   var recurringToday = sheetToObjects(getSheet("RecurringEvents"))
-    .filter(function (r) { return matchesRecurringRule_(r, todayDate) && !skippedToday[r.id]; })
+    .filter(function (r) { return matchesRecurringRule_(r, todayDate, todayStr) && !skippedToday[r.id]; })
     .map(function (r) {
       return { date: todayStr, owner: r.owner, time: r.time, title: r.title, notes: r.notes };
     });
@@ -821,7 +840,9 @@ function sendDailyNotifications() {
   }
 }
 
-function matchesRecurringRule_(rule, dateObj) {
+function matchesRecurringRule_(rule, dateObj, dateStr) {
+  // 有設截止日的話，截止日當天（含）之後就不再出現
+  if (rule.endDate && dateStr > String(rule.endDate)) return false;
   if (rule.frequency === "weekly") {
     return dateObj.getDay() === Number(rule.dayOfWeek);
   }

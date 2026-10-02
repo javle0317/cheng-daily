@@ -88,6 +88,8 @@ function getPeriodKey(habit, dateStr) {
 }
 
 function matchesRecurringRule(rule, dateStr) {
+  // 有設截止日：截止日當天（含）之後就不再出現
+  if (rule.endDate && dateStr > String(rule.endDate)) return false;
   const d = new Date(dateStr + "T00:00:00");
   if (rule.frequency === "weekly") return d.getDay() === Number(rule.dayOfWeek);
   if (rule.frequency === "monthly") return d.getDate() === Number(rule.dayOfMonth);
@@ -706,9 +708,28 @@ function renderRecurringList() {
     li.appendChild(textSpan);
     li.appendChild(timeSpan);
 
+    // 截止日：已過期的規則整列變淡並標「已結束」，仍保留在清單裡，可以改截止日恢復
+    const endDate = rule.endDate ? String(rule.endDate) : "";
+    if (endDate) {
+      const ended = endDate < toDateStr(new Date());
+      const endSpan = document.createElement("span");
+      endSpan.className = "item-time";
+      endSpan.textContent = ended ? `已結束（${endDate}）` : `至 ${endDate}`;
+      li.appendChild(endSpan);
+      li.classList.toggle("recurring-ended", ended);
+    }
+
     if (rule.notes) {
       appendTextAndLink(li, rule.notes, { textPrefix: "📝", linkIcon: "📍" });
     }
+
+    const endBtn = document.createElement("button");
+    endBtn.className = "event-shopping-btn";
+    endBtn.type = "button";
+    endBtn.title = "設定/修改截止日";
+    endBtn.textContent = "📅";
+    endBtn.addEventListener("click", () => openRecurringEnd(rule));
+    li.appendChild(endBtn);
 
     const delBtn = document.createElement("button");
     delBtn.className = "delete-btn";
@@ -937,7 +958,9 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
       frequency: frequencySelect.value,
       dayOfWeek: dayOfWeekSelect.value,
       dayOfMonth: dayOfMonthInput.value,
+      endDate: document.getElementById("recurringEndDate").value || "",
     }));
+    document.getElementById("recurringEndDate").value = "";
     titleInput.value = "";
     timeInput.value = "";
     noteInput.value = "";
@@ -953,6 +976,49 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
     updateRecurringFormValidity();
   }
 });
+
+// ====== 循環行程截止日（事後補登/修改/清除）======
+let editingRecurring = null;
+
+function openRecurringEnd(rule) {
+  editingRecurring = rule;
+  document.getElementById("recurringEndTitle").textContent = rule.title;
+  document.getElementById("recurringEndInput").value = rule.endDate ? String(rule.endDate) : "";
+  document.getElementById("recurringEndModal").classList.remove("hidden");
+}
+
+function closeRecurringEnd() {
+  document.getElementById("recurringEndModal").classList.add("hidden");
+  editingRecurring = null;
+}
+
+async function saveRecurringEnd(endDate) {
+  if (!editingRecurring) return;
+  const form = document.getElementById("recurringEndForm");
+  setFormBusy(form, true);
+  try {
+    applyData(await api("setRecurringEndDate", { id: editingRecurring.id, endDate }));
+    closeRecurringEnd();
+    renderRecurringList();
+    renderEvents();
+    renderCalendar();
+    showToast(endDate ? "已更新截止日" : "已清除截止日");
+  } catch (err) {
+    setStatus("更新失敗：" + err.message, true);
+  } finally {
+    setFormBusy(form, false);
+  }
+}
+
+document.getElementById("recurringEndCloseBtn").addEventListener("click", closeRecurringEnd);
+document.getElementById("recurringEndModal").addEventListener("click", (e) => {
+  if (e.target.id === "recurringEndModal") closeRecurringEnd();
+});
+document.getElementById("recurringEndForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  saveRecurringEnd(document.getElementById("recurringEndInput").value);
+});
+document.getElementById("recurringEndClearBtn").addEventListener("click", () => saveRecurringEnd(""));
 
 // ====== 購物清單 ======
 // 「清單」彈窗分兩個分類：shopping（購物）、idea（想法），同一張 ShoppingList 表用
