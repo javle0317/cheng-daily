@@ -202,7 +202,6 @@ function renderAll() {
   renderDailyHabits();
   renderWeeklyHabits();
   renderMonthlyHabits();
-  renderChallenge();
   renderCalendar();
   renderRecurringList();
   renderShoppingList();
@@ -285,8 +284,8 @@ function isTruthy(v) {
   return v === true || v === "TRUE";
 }
 
-// 「每日運動挑戰」是特殊習慣：不在一般每日習慣清單裡，改由 challengeCard 處理
-// （抽卡、完成後回傳給朋友的挑戰站）。id 要跟 apps-script/Code.gs 的 CHALLENGE_HABIT_ID 一致。
+// 「每日運動挑戰」是特殊習慣：每日習慣清單裡那一列有專屬的抽卡/完成流程
+// （完成後回傳給朋友的挑戰站，見 setupChallengeRow）。id 要跟 apps-script/Code.gs 的 CHALLENGE_HABIT_ID 一致。
 const CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 
 function updateHabitsCardVisibility() {
@@ -302,7 +301,6 @@ function renderDailyHabits() {
   list.innerHTML = "";
 
   const habits = state.habits.filter(h =>
-    h.id !== CHALLENGE_HABIT_ID &&
     h.frequency === "daily" &&
     (!isTruthy(h.workdaysOnly) || isWorkday(state.selectedDate))
   );
@@ -330,7 +328,10 @@ function renderDailyHabits() {
       <button class="delete-btn" title="刪除">✕</button>
     `;
     const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
-    li.querySelector(".item-text").textContent = habitName;
+    const isChallenge = habit.id === CHALLENGE_HABIT_ID;
+    const challengeLog = isChallenge ? getChallengeLog(periodKey) : null;
+    // 運動挑戰：抽卡前標題是習慣名稱，抽卡後換成抽到的運動
+    li.querySelector(".item-text").textContent = (challengeLog && challengeLog.exercise) ? challengeLog.exercise : habitName;
     li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
     const streak = computeStreak(habit);
     const stats = computeHabitStats(habit);
@@ -351,7 +352,9 @@ function renderDailyHabits() {
       });
       li.appendChild(pop);
     }
-    if (habitUrl) {
+    if (isChallenge) {
+      setupChallengeRow(li, periodKey, challengeLog);
+    } else if (habitUrl) {
       const link = document.createElement("a");
       link.href = habitUrl;
       link.target = "_blank";
@@ -359,7 +362,7 @@ function renderDailyHabits() {
       link.textContent = "🔗";
       li.insertBefore(link, li.querySelector(".delete-btn"));
     }
-    li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
+    if (!isChallenge) li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       await withRowLock(li, async () => {
         const box = li.querySelector('input[type="checkbox"]');
         li.classList.toggle("done", box.checked);
@@ -1225,61 +1228,45 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
 });
 
 // ====== 每日運動挑戰 ======
-function getTodayChallengeLog() {
-  const today = toDateStr(new Date());
-  return state.habitLogs.find(l => l.habitId === CHALLENGE_HABIT_ID && String(l.periodKey) === today) || null;
+// 挑戰是特殊習慣，直接顯示在每日習慣清單裡：抽卡前標題是習慣名稱、右邊是 🎲 抽卡鈕；
+// 抽卡後標題換成抽到的運動（HabitLog 的 exercise），勾選 = 完成打卡並回傳給朋友的
+// 挑戰站；回傳成功後鎖死不能取消。抽卡/完成只能在「今天」做。
+function getChallengeLog(dateStr) {
+  return state.habitLogs.find(l => l.habitId === CHALLENGE_HABIT_ID && String(l.periodKey) === dateStr) || null;
 }
 
-function renderChallenge() {
-  const card = document.getElementById("challengeCard");
-  const body = document.getElementById("challengeBody");
-  const habit = state.habits.find(h => h.id === CHALLENGE_HABIT_ID);
-  card.classList.toggle("hidden", !habit);
-  if (!habit) return;
-  body.innerHTML = "";
-
-  const log = getTodayChallengeLog();
+function setupChallengeRow(li, periodKey, log) {
+  const box = li.querySelector('input[type="checkbox"]');
+  const isToday = periodKey === toDateStr(new Date());
   const exercise = log ? String(log.exercise || "") : "";
-  const isDone = log && Number(log.count) >= 1;
-  const isSynced = log && isTruthy(log.synced);
+  const isDone = !!log && Number(log.count) >= 1;
+  const isSynced = !!log && isTruthy(log.synced);
 
-  const text = document.createElement("p");
-  text.className = "challenge-text";
-  const actions = document.createElement("div");
-  actions.className = "challenge-actions";
-
-  const addBtn = (label, handler) => {
+  const addBtn = (label, title, handler) => {
     const btn = document.createElement("button");
     btn.type = "button";
+    btn.className = "event-shopping-btn";
+    btn.title = title;
     btn.textContent = label;
-    btn.addEventListener("click", () => withRowLock(card, () => handler()));
-    actions.appendChild(btn);
+    btn.addEventListener("click", () => withRowLock(li, handler));
+    li.insertBefore(btn, li.querySelector(".habit-edit-btn"));
   };
 
+  // 預設不能勾：沒抽卡、已完成並同步、或不是今天
+  box.disabled = true;
+  if (!isToday) return;
   if (!log) {
-    text.textContent = "今天還沒抽運動";
-    addBtn("🎲 抽今天的運動", () => runChallengeAction("drawChallenge", "抽卡失敗"));
+    addBtn("🎲", "抽今天的運動", () => runChallengeAction("drawChallenge", "抽卡失敗"));
   } else if (!exercise) {
-    text.textContent = "抽卡狀態異常：今天有紀錄但沒有運動內容，請到 HabitLog 檢查";
-  } else if (isDone && isSynced) {
-    text.textContent = `✅ 今天已完成：${exercise}`;
-  } else if (isDone) {
-    text.textContent = `${exercise}（已完成，但還沒成功回傳）`;
-    addBtn("重新同步", () => runChallengeAction("completeChallenge", "同步失敗"));
-  } else {
-    text.textContent = `今天的運動：${exercise}`;
-    addBtn("✅ 完成打卡", () => runChallengeAction("completeChallenge", "打卡失敗"));
-  }
-  body.appendChild(text);
-  if (actions.children.length) body.appendChild(actions);
-
-  const streak = computeStreak(habit);
-  const stats = computeHabitStats(habit);
-  if (streak > 0 || stats.longest > 0) {
-    const info = document.createElement("p");
-    info.className = "streak-detail";
-    info.textContent = `🔥 連續 ${streak} 天 · 歷史最長 ${stats.longest} 天 · 本月完成 ${stats.monthCount} 次`;
-    body.appendChild(info);
+    li.querySelector(".item-text").textContent += "（抽卡狀態異常，請檢查 HabitLog）";
+  } else if (isDone && !isSynced) {
+    addBtn("🔄", "已完成但還沒成功回傳，點一下重新同步", () => runChallengeAction("completeChallenge", "同步失敗"));
+  } else if (!isDone) {
+    box.disabled = false;
+    box.addEventListener("change", () => withRowLock(li, async () => {
+      li.classList.toggle("done", box.checked);
+      await runChallengeAction("completeChallenge", "打卡失敗");
+    }));
   }
 }
 
@@ -1287,15 +1274,15 @@ async function runChallengeAction(action, failText) {
   try {
     const data = await api(action);
     applyData(data);
-    renderChallenge();
+    renderDailyHabits();
     // 後端開了預覽模式（CHALLENGE_DRY_RUN）時，不會真的送出，把「會送出的內容」顯示出來確認
     if (data.dryRunPreview) {
       await showConfirm("【預覽模式，沒有真的送出】\n會送出的內容：\n" + data.dryRunPreview.join("\n"));
     }
   } catch (err) {
-    // 失敗時後端已還原，畫面維持原狀可以重按
+    // 失敗時後端已還原，重畫一次讓畫面回到真實狀態、可以重按
     setStatus(failText + "：" + err.message, true);
-    renderChallenge();
+    renderDailyHabits();
   }
 }
 
