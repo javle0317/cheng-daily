@@ -15,7 +15,7 @@
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
- *   ShoppingList    欄位: id | item | done | createdAt
+ *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *
@@ -105,9 +105,11 @@ function handleRequest(e) {
       case "deleteRecurringException":
         return respond({ ok: true, data: deleteRecurringException(p.id) });
       case "addShoppingItem":
-        return respond({ ok: true, data: addShoppingItem(p.item) });
+        return respond({ ok: true, data: addShoppingItem(p.item, p.category) });
       case "toggleShoppingItem":
         return respond({ ok: true, data: toggleShoppingItem(p.id) });
+      case "clearDoneShoppingItems":
+        return respond({ ok: true, data: clearDoneShoppingItems(p.category) });
       case "deleteShoppingItem":
         return respond({ ok: true, data: deleteShoppingItem(p.id) });
       case "getBloodPressureData":
@@ -347,9 +349,30 @@ function deleteRecurringException(id) {
   return getData();
 }
 
-function addShoppingItem(item) {
+// 「清單」有兩個分類：shopping（購物）跟 idea（想法），同一張表用 category 欄位區分。
+// 舊資料沒有 category 值，一律當 shopping。
+function normalizeListCategory_(c) {
+  return c === "idea" ? "idea" : "shopping";
+}
+
+function addShoppingItem(item, category) {
   var sheet = getSheet("ShoppingList");
-  sheet.appendRow([Utilities.getUuid(), item, false, new Date()]);
+  sheet.appendRow([Utilities.getUuid(), item, false, new Date(), normalizeListCategory_(category)]);
+  return getData();
+}
+
+// 清除某個分類底下所有已勾選的項目
+function clearDoneShoppingItems(category) {
+  var sheet = getSheet("ShoppingList");
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var catIdx = headers.indexOf("category");
+  var target = normalizeListCategory_(category);
+  for (var i = values.length - 1; i >= 1; i--) {
+    var rowCat = normalizeListCategory_(catIdx >= 0 ? values[i][catIdx] : "");
+    var done = values[i][2] === true || values[i][2] === "TRUE";
+    if (done && rowCat === target) sheet.deleteRow(i + 1);
+  }
   return getData();
 }
 

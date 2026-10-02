@@ -483,8 +483,8 @@ function renderEvents() {
     if (ev.title && ev.title.includes("購物")) {
       const shopBtn = document.createElement("button");
       shopBtn.className = "event-shopping-btn";
-      shopBtn.title = "開啟購物清單";
-      shopBtn.textContent = "🛒";
+      shopBtn.title = "開啟清單";
+      shopBtn.textContent = "📝";
       shopBtn.addEventListener("click", openShoppingModal);
       metaRow.appendChild(shopBtn);
     }
@@ -943,16 +943,51 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
 });
 
 // ====== 購物清單 ======
+// 「清單」彈窗分兩個分類：shopping（購物）、idea（想法），同一張 ShoppingList 表用
+// category 欄位區分；舊資料沒有 category，一律當 shopping。
+const LIST_TAB_KEY = "listTab";
+const LIST_META = {
+  shopping: { placeholder: "新增購買項目…", rows: 1, emptyText: "購物清單是空的", addedToast: "已新增購物項目" },
+  idea: { placeholder: "記下一個想法…（可換行）", rows: 3, emptyText: "還沒有想法", addedToast: "已新增想法" },
+};
+let listCategory = "shopping";
+try {
+  const saved = localStorage.getItem(LIST_TAB_KEY);
+  if (saved === "idea") listCategory = "idea";
+} catch (e) { /* 讀不到就用預設 */ }
+
+function getItemCategory(item) {
+  return item.category === "idea" ? "idea" : "shopping";
+}
+
+function setListCategory(category) {
+  listCategory = category;
+  try { localStorage.setItem(LIST_TAB_KEY, category); } catch (e) { /* ignore */ }
+  document.querySelectorAll(".list-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.category === category);
+  });
+  const input = document.getElementById("shoppingInput");
+  input.placeholder = LIST_META[category].placeholder;
+  input.rows = LIST_META[category].rows;
+  renderShoppingList();
+}
+
 function renderShoppingList() {
   const list = document.getElementById("shoppingList");
   list.innerHTML = "";
 
-  if (!state.shoppingList.length) {
-    list.innerHTML = `<li class="empty-hint">清單是空的</li>`;
+  const items = state.shoppingList.filter(i => getItemCategory(i) === listCategory);
+  const doneCount = items.filter(i => isTruthy(i.done)).length;
+  const clearBtn = document.getElementById("clearDoneBtn");
+  clearBtn.classList.toggle("hidden", doneCount === 0);
+  clearBtn.textContent = `清除已完成（${doneCount}）`;
+
+  if (!items.length) {
+    list.innerHTML = `<li class="empty-hint">${LIST_META[listCategory].emptyText}</li>`;
     return;
   }
 
-  const rows = [...state.shoppingList].sort((a, b) => isTruthy(a.done) - isTruthy(b.done));
+  const rows = [...items].sort((a, b) => isTruthy(a.done) - isTruthy(b.done));
 
   rows.forEach(item => {
     const done = isTruthy(item.done);
@@ -963,7 +998,12 @@ function renderShoppingList() {
       <span class="item-text"></span>
       <button class="delete-btn" title="刪除">✕</button>
     `;
-    li.querySelector(".item-text").textContent = item.item;
+    const textEl = li.querySelector(".item-text");
+    textEl.textContent = item.item;
+    if (listCategory === "idea") {
+      textEl.classList.add("clamp");
+      textEl.addEventListener("click", () => textEl.classList.toggle("clamp"));
+    }
     li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       await withRowLock(li, async () => {
         const box = li.querySelector('input[type="checkbox"]');
@@ -979,7 +1019,7 @@ function renderShoppingList() {
       });
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
-      if (!(await showConfirm("確定要刪除這個購物項目嗎？"))) return;
+      if (!(await showConfirm("確定要刪除這個項目嗎？"))) return;
       await withRowLock(li, async () => {
         try {
           applyData(await api("deleteShoppingItem", { id: item.id }));
@@ -993,9 +1033,30 @@ function renderShoppingList() {
   });
 }
 
+document.querySelectorAll(".list-tab").forEach(btn => {
+  btn.addEventListener("click", () => setListCategory(btn.dataset.category));
+});
+
+document.getElementById("clearDoneBtn").addEventListener("click", async (e) => {
+  const doneCount = state.shoppingList.filter(i => getItemCategory(i) === listCategory && isTruthy(i.done)).length;
+  if (!doneCount) return;
+  if (!(await showConfirm(`確定要清除 ${doneCount} 個已完成的項目嗎？`))) return;
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    applyData(await api("clearDoneShoppingItems", { category: listCategory }));
+    renderShoppingList();
+  } catch (err) {
+    setStatus("清除失敗：" + err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // showConfirm / showPrompt 在 shared.js
 
 function openShoppingModal() {
+  setListCategory(listCategory);
   document.getElementById("shoppingModal").classList.remove("hidden");
 }
 
@@ -1009,17 +1070,26 @@ document.getElementById("shoppingModal").addEventListener("click", (e) => {
   if (e.target.id === "shoppingModal") closeShoppingModal();
 });
 
+// 購物是單行輸入，Enter 直接送出；想法可以換行，用按鈕送出
+document.getElementById("shoppingInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && listCategory === "shopping") {
+    e.preventDefault();
+    document.getElementById("shoppingForm").requestSubmit();
+  }
+});
+
 document.getElementById("shoppingForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = document.getElementById("shoppingInput");
   const item = input.value.trim();
   if (!item) return;
+  const category = listCategory;
   setFormBusy(e.target, true);
   try {
-    applyData(await api("addShoppingItem", { item }));
+    applyData(await api("addShoppingItem", { item, category }));
     input.value = "";
     renderShoppingList();
-    showToast("已新增購物項目");
+    showToast(LIST_META[category].addedToast);
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);
   } finally {

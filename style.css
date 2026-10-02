@@ -701,3 +701,39 @@ a.ghost-btn {
   cursor: pointer;
 }
 .dialog-card input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+/* 清單（購物/想法）彈窗 */
+.list-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.list-tab {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+}
+.list-tab.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+.inline-form textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+#shoppingList .item-text { white-space: pre-wrap; word-break: break-word; }
+/* 想法可能很長：預設只顯示 3 行，點一下展開 */
+#shoppingList .item-text.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+.clear-done-btn { margin-top: 12px; width: 100%; }
