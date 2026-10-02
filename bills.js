@@ -91,6 +91,7 @@ function renderUnpaid() {
     .filter(b => getPaidVal(b) === null)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   card.classList.toggle("hidden", unpaid.length === 0);
+  card.classList.toggle("has-overdue", unpaid.some(b => String(b.date) <= today));
   list.innerHTML = "";
   unpaid.forEach(b => {
     const overdue = String(b.date) <= today;
