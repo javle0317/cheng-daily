@@ -616,12 +616,21 @@ function toggleHabitLog(habitId, periodKey, target) {
 // 連線設定放「專案設定 → 指令碼屬性」（不能寫進程式，repo 是公開的）：
 //   CHALLENGE_URL（朋友的 web app 網址）、CHALLENGE_PLAYER（玩家名稱）、CHALLENGE_PIN（密碼）。
 // CHALLENGE_URL 沒設定時是開發模式：抽卡從內建清單隨機挑、完成不呼叫朋友。
+// 另可設 CHALLENGE_DRY_RUN=true：同樣不送出，但會把要送的內容記在執行記錄。
 var CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 var CHALLENGE_STUB_EXERCISES = ["開合跳 50 下", "深蹲 30 下", "棒式 1 分鐘", "伏地挺身 15 下", "原地高抬腿 2 分鐘"];
 
 function callChallengeApi_(payload) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty("CHALLENGE_URL");
+  // CHALLENGE_DRY_RUN=true：不真的送出，只把「會送出的內容」（密碼遮掉）寫進執行記錄，
+  // 用來先確認內容再正式開啟
+  if (props.getProperty("CHALLENGE_DRY_RUN") === "true") {
+    var preview = { url: url, player: props.getProperty("CHALLENGE_PLAYER"), pin: "****" };
+    Object.keys(payload).forEach(function (k) { preview[k] = payload[k]; });
+    Logger.log("[挑戰站 DRY RUN] " + JSON.stringify(preview));
+    url = "";
+  }
   if (!url) {
     if (payload.action === "draw") {
       return { exercise: CHALLENGE_STUB_EXERCISES[Math.floor(Math.random() * CHALLENGE_STUB_EXERCISES.length)] };
