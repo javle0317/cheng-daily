@@ -616,6 +616,7 @@ function toggleHabitLog(habitId, periodKey, target) {
 // 連線設定放「專案設定 → 指令碼屬性」（不能寫進程式，repo 是公開的）：
 //   CHALLENGE_URL（朋友的 web app 網址）、CHALLENGE_PLAYER（玩家名稱）、CHALLENGE_PIN（密碼）。
 // CHALLENGE_URL 沒設定時是開發模式：抽卡從內建清單隨機挑、完成不呼叫朋友。
+// 另可設 CHALLENGE_DEBUG=true：真的送出，並把送出內容跟對方原始回應顯示在網頁彈窗。
 // 另可設 CHALLENGE_DRY_RUN=true：同樣不送出，但會把要送的內容隨回應帶回網頁，顯示在彈窗裡。
 var CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 var CHALLENGE_STUB_EXERCISES = ["開合跳 50 下", "深蹲 30 下", "棒式 1 分鐘", "伏地挺身 15 下", "原地高抬腿 2 分鐘"];
@@ -637,7 +638,7 @@ function callChallengeApi_(payload) {
     var preview = { url: url, player: props.getProperty("CHALLENGE_PLAYER"), pin: "****" };
     Object.keys(payload).forEach(function (k) { preview[k] = payload[k]; });
     Logger.log("[挑戰站 DRY RUN] " + JSON.stringify(preview));
-    challengePreviews_.push(JSON.stringify(preview));
+    challengePreviews_.push("[預覽，沒有送出] " + JSON.stringify(preview));
     url = "";
   }
   if (!url) {
@@ -658,11 +659,21 @@ function callChallengeApi_(payload) {
     muteHttpExceptions: true,
     followRedirects: true,
   });
+  var code = res.getResponseCode();
+  var text = res.getContentText();
+  // CHALLENGE_DEBUG=true：把「實際送出的內容（密碼遮掉）」跟「對方原始回應」隨回應帶回網頁顯示
+  if (props.getProperty("CHALLENGE_DEBUG") === "true") {
+    var sent = {};
+    Object.keys(body).forEach(function (k) { sent[k] = body[k]; });
+    sent.pin = "****";
+    challengePreviews_.push("[已送出] " + JSON.stringify(sent));
+    challengePreviews_.push("[對方回應 HTTP " + code + "] " + text.slice(0, 500));
+  }
   var json;
   try {
-    json = JSON.parse(res.getContentText());
+    json = JSON.parse(text);
   } catch (e) {
-    throw new Error("運動挑戰站回應格式錯誤");
+    throw new Error("運動挑戰站回應格式錯誤（HTTP " + code + "）：" + text.slice(0, 200));
   }
   if (json.error) throw new Error(String(json.error));
   return json;

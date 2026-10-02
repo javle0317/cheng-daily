@@ -1278,14 +1278,17 @@ async function runChallengeAction(action, failText) {
     const data = await api(action);
     applyData(data);
     renderDailyHabits();
-    // 後端開了預覽模式（CHALLENGE_DRY_RUN）時，不會真的送出，把「會送出的內容」顯示出來確認
+    // 後端開了 CHALLENGE_DRY_RUN（預覽、不送出）或 CHALLENGE_DEBUG（送出並附對方回應）時，
+    // 把細節顯示出來確認
     if (data.dryRunPreview) {
-      await showConfirm("【預覽模式，沒有真的送出】\n會送出的內容：\n" + data.dryRunPreview.join("\n"));
+      await showConfirm("【挑戰站除錯資訊】\n" + data.dryRunPreview.join("\n"));
     }
   } catch (err) {
     // 失敗時後端已還原，重畫一次讓畫面回到真實狀態、可以重按
     setStatus(failText + "：" + err.message, true);
     renderDailyHabits();
+    // 狀態列在頁面最下面容易沒看到，失敗時再跳彈窗確保看得到原因
+    await showConfirm(failText + "：" + err.message);
   }
 }
 
