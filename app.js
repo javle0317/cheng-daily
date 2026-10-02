@@ -1016,7 +1016,7 @@ function renderShoppingList() {
           li.classList.toggle("done", box.checked);
           setStatus("更新失敗：" + err.message, true);
         }
-      });
+      }, [document.getElementById("clearDoneBtn")]);
     });
     li.querySelector(".delete-btn").addEventListener("click", async () => {
       if (!(await showConfirm("確定要刪除這個項目嗎？"))) return;
@@ -1027,7 +1027,7 @@ function renderShoppingList() {
         } catch (err) {
           setStatus("刪除失敗：" + err.message, true);
         }
-      });
+      }, [document.getElementById("clearDoneBtn")]);
     });
     list.appendChild(li);
   });
@@ -1041,16 +1041,15 @@ document.getElementById("clearDoneBtn").addEventListener("click", async (e) => {
   const doneCount = state.shoppingList.filter(i => getItemCategory(i) === listCategory && isTruthy(i.done)).length;
   if (!doneCount) return;
   if (!(await showConfirm(`確定要清除 ${doneCount} 個已完成的項目嗎？`))) return;
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  try {
-    applyData(await api("clearDoneShoppingItems", { category: listCategory }));
-    renderShoppingList();
-  } catch (err) {
-    setStatus("清除失敗：" + err.message, true);
-  } finally {
-    btn.disabled = false;
-  }
+  // 清除期間整個清單彈窗（項目、分頁、輸入框、按鈕）都鎖住
+  await withRowLock(document.querySelector("#shoppingModal .modal-card"), async () => {
+    try {
+      applyData(await api("clearDoneShoppingItems", { category: listCategory }));
+      renderShoppingList();
+    } catch (err) {
+      setStatus("清除失敗：" + err.message, true);
+    }
+  });
 });
 
 // showConfirm / showPrompt 在 shared.js

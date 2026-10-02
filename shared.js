@@ -54,11 +54,13 @@ function setFormBusy(form, busy) {
 
 // 列表裡單一項目（勾選、刪除、改金額等）的操作：呼叫後端期間把那一列的
 // 所有控制項鎖住，回來前不能再點，避免連點送出重複請求
-async function withRowLock(el, fn) {
+async function withRowLock(el, fn, alsoLock = []) {
   const row = el.closest("li") || el;
   if (row.classList.contains("pending")) return;
   row.classList.add("pending");
-  const controls = row.querySelectorAll("input, button, select, textarea");
+  // alsoLock：同一畫面上會跟這個操作互相影響的其他控制項（例如清單裡的「清除已完成」）
+  const controls = [row, ...alsoLock].flatMap(r => [...r.querySelectorAll("input, button, select, textarea")]
+    .concat(r.matches("input, button, select, textarea") ? [r] : []));
   controls.forEach(c => { c.dataset.wasDisabled = c.disabled ? "1" : ""; c.disabled = true; });
   try {
     return await fn();
@@ -67,6 +69,7 @@ async function withRowLock(el, fn) {
     controls.forEach(c => { c.disabled = c.dataset.wasDisabled === "1"; delete c.dataset.wasDisabled; });
   }
 }
+
 
 
 // ====== API ======
