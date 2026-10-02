@@ -656,7 +656,19 @@ a.ghost-btn {
 
 /* 血壓頁：新增卡片在最上面（窄版優先看到），量測紀錄獨立一張卡片放最下面 */
 @media (min-width: 760px) {
-  .new-bp-card { grid-column: 2; grid-row: 1; }
-  .bp-chart-card { grid-column: 1; grid-row: 1; }
+  .grid.dense { grid-auto-flow: row dense; }
+  .new-bp-card { grid-column: 2; }
+  .bp-chart-card { grid-column: 1; }
   .bp-list-card { grid-column: span 2; }
+}
+
+/* 信用卡頁：待繳款卡片最上面，窄版新增表單緊接著；量測/帳單紀錄獨立卡片放最下面 */
+.bill-unpaid-card { border-color: var(--status-critical); }
+.bill-unpaid-card h2 { margin-top: 0; }
+.bill-overdue { color: var(--status-critical); font-weight: 600; }
+.bill-unpaid-card .bill-overdue .item-text,
+.bill-unpaid-card .bill-overdue .item-time { color: var(--status-critical); }
+@media (min-width: 760px) {
+  .bill-unpaid-card { grid-column: span 2; }
+  .bill-list-card { grid-column: span 2; }
 }

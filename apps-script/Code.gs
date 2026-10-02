@@ -435,8 +435,14 @@ function setCreditCardBillPaid(id, paidAmount) {
   var values = sheet.getDataRange().getValues();
   var headers = values[0];
   var paidCol = headers.indexOf("paidAmount") + 1;
+  var fullCol = headers.indexOf("fullAmount") + 1;
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
+      // 已繳金額等於帳單全額就視為繳清，鎖定不能再改（前端也會擋，這裡是最後防線）
+      var currentPaid = values[i][paidCol - 1];
+      if (currentPaid !== "" && Number(currentPaid) === Number(values[i][fullCol - 1])) {
+        throw new Error("這筆帳單已繳清，不能再修改");
+      }
       sheet.getRange(i + 1, paidCol).setValue(paidAmount === "" ? "" : parseFloat(paidAmount) || 0);
       break;
     }

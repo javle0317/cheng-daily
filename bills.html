@@ -32,48 +32,10 @@
       </div>
     </header>
 
-    <main class="grid">
-      <section class="card bp-chart-card">
-        <div class="calendar-nav">
-          <button id="billYearPrev" class="ghost-btn">‹</button>
-          <h2 id="billYearLabel"></h2>
-          <button id="billYearNext" class="ghost-btn">›</button>
-        </div>
-        <div class="bp-chart-controls">
-          <label class="checkbox-label">
-            <input id="billCompareLastYear" type="checkbox">
-            跟去年比較
-          </label>
-          <select id="billCompareExtraYear">
-            <option value="">+ 再加一個年份</option>
-          </select>
-        </div>
-
-        <div id="billStatsRow" class="bp-stats-row"></div>
-        <div id="billYearChart"></div>
-
-        <div class="bp-list-header">
-          <h3 class="sub-heading">各銀行比較</h3>
-          <select id="billBankChartMonth"></select>
-        </div>
-        <div id="billBankChart"></div>
-
-        <div class="bp-list-header">
-          <h3 class="sub-heading">帳單紀錄</h3>
-          <select id="billListFilter">
-            <option value="all">全部銀行</option>
-            <option value="聯邦">聯邦</option>
-            <option value="國泰">國泰</option>
-            <option value="中信">中信</option>
-            <option value="富邦">富邦</option>
-            <option value="兆豐">兆豐</option>
-            <option value="玉山">玉山</option>
-            <option value="星展">星展（已停用）</option>
-            <option value="富邦貸">富邦貸（已停用）</option>
-            <option value="中信貸">中信貸（已停用）</option>
-          </select>
-        </div>
-        <div id="billList"></div>
+    <main class="grid dense">
+      <section id="billUnpaidCard" class="card bill-unpaid-card hidden">
+        <h2>待繳款</h2>
+        <ul id="billUnpaidList" class="item-list"></ul>
       </section>
 
       <section class="card new-bp-card">
@@ -102,6 +64,52 @@
           </div>
         </form>
       </section>
+
+      <section class="card bp-chart-card">
+        <div class="calendar-nav">
+          <button id="billYearPrev" class="ghost-btn">‹</button>
+          <h2 id="billYearLabel"></h2>
+          <button id="billYearNext" class="ghost-btn">›</button>
+        </div>
+        <div class="bp-chart-controls">
+          <label class="checkbox-label">
+            <input id="billCompareLastYear" type="checkbox">
+            跟去年比較
+          </label>
+          <select id="billCompareExtraYear">
+            <option value="">+ 再加一個年份</option>
+          </select>
+        </div>
+
+        <div id="billStatsRow" class="bp-stats-row"></div>
+        <div id="billYearChart"></div>
+
+        <div class="bp-list-header">
+          <h3 class="sub-heading">各銀行比較</h3>
+          <select id="billBankChartMonth"></select>
+        </div>
+        <div id="billBankChart"></div>
+      </section>
+
+      <section class="card bill-list-card">
+        <div class="bp-list-header">
+          <h2>帳單紀錄</h2>
+          <select id="billListFilter">
+            <option value="all">全部銀行</option>
+            <option value="聯邦">聯邦</option>
+            <option value="國泰">國泰</option>
+            <option value="中信">中信</option>
+            <option value="富邦">富邦</option>
+            <option value="兆豐">兆豐</option>
+            <option value="玉山">玉山</option>
+            <option value="星展">星展（已停用）</option>
+            <option value="富邦貸">富邦貸（已停用）</option>
+            <option value="中信貸">中信貸（已停用）</option>
+          </select>
+        </div>
+        <div id="billList"></div>
+      </section>
+
     </main>
 
     <p id="statusLine" class="status-line"></p>

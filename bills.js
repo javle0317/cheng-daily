@@ -48,8 +48,84 @@ function getAvailableYears() {
   return [...years].sort((a, b) => b - a);
 }
 
+// ====== 繳款狀態 ======
+function getPaidVal(b) {
+  return b.paidAmount === "" || b.paidAmount === undefined || b.paidAmount === null ? null : Number(b.paidAmount);
+}
+
+// 已繳金額等於全額 = 繳清，鎖定不能再修改
+function isPaidOff(b) {
+  const paid = getPaidVal(b);
+  return paid !== null && paid === Number(b.fullAmount);
+}
+
+function buildPayBtn(b, paidVal) {
+  const payBtn = document.createElement("button");
+  payBtn.className = "event-shopping-btn";
+  payBtn.title = "登記/修改已繳金額";
+  payBtn.textContent = "💰";
+  payBtn.addEventListener("click", async () => {
+    const input = await showPrompt("已繳金額（留空清除）：", paidVal === null ? "" : String(paidVal));
+    if (input === null) return;
+    if (input.trim() !== "" && Number(input) === Number(b.fullAmount)) {
+      if (!(await showConfirm("已繳金額等於帳單全額，登記後就視為繳清、不能再修改，確定嗎？"))) return;
+    }
+    await withRowLock(payBtn, async () => {
+      try {
+        applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: input.trim() }));
+        renderBillsAll();
+      } catch (err) {
+        setStatus("更新失敗：" + err.message, true);
+      }
+    });
+  });
+  return payBtn;
+}
+
+// 還沒登記過已繳金額的帳單集中放最上面；已到截止日（含當天）還沒繳的標紅字、排最前
+function renderUnpaid() {
+  const card = document.getElementById("billUnpaidCard");
+  const list = document.getElementById("billUnpaidList");
+  const today = toDateStr(new Date());
+  const unpaid = state.bills
+    .filter(b => getPaidVal(b) === null)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  card.classList.toggle("hidden", unpaid.length === 0);
+  list.innerHTML = "";
+  unpaid.forEach(b => {
+    const overdue = String(b.date) <= today;
+    const li = document.createElement("li");
+    li.className = "item-row" + (overdue ? " bill-overdue" : "");
+
+    const bankBadge = document.createElement("span");
+    bankBadge.className = "owner-badge";
+    bankBadge.textContent = `${b.bank} ${String(b.billingMonth).slice(5)}月`;
+
+    const fullSpan = document.createElement("span");
+    fullSpan.className = "item-text";
+    fullSpan.textContent = `全額 $${formatAmount(b.fullAmount)}`;
+
+    const lowestSpan = document.createElement("span");
+    lowestSpan.className = "item-time";
+    lowestSpan.textContent = `最低 $${formatAmount(b.lowestAmount)}`;
+
+    const dateSpan = document.createElement("span");
+    dateSpan.className = "item-time";
+    if (overdue) {
+      const days = Math.round((new Date(today) - new Date(b.date)) / 86400000);
+      dateSpan.textContent = days === 0 ? `⚠️ 今天截止` : `⚠️ 已逾期 ${days} 天（${b.date}）`;
+    } else {
+      dateSpan.textContent = `截止 ${b.date}`;
+    }
+
+    li.append(bankBadge, fullSpan, lowestSpan, dateSpan, buildPayBtn(b, null));
+    list.appendChild(li);
+  });
+}
+
 // ====== Rendering ======
 function renderBillsAll() {
+  renderUnpaid();
   renderYearNav();
   renderCompareOptions();
   renderStats();
@@ -282,7 +358,7 @@ function renderList() {
       const paidVal = b.paidAmount === "" || b.paidAmount === undefined || b.paidAmount === null ? null : Number(b.paidAmount);
       const paidSpan = document.createElement("span");
       paidSpan.className = "item-time";
-      paidSpan.textContent = paidVal === null ? "尚未登記已繳" : `已繳 $${formatAmount(paidVal)}`;
+      paidSpan.textContent = paidVal === null ? "尚未登記已繳" : isPaidOff(b) ? "✅ 已繳清" : `已繳 $${formatAmount(paidVal)}`;
 
       const dateSpan = document.createElement("span");
       dateSpan.className = "item-time";
@@ -301,22 +377,8 @@ function renderList() {
         }
       }
 
-      const payBtn = document.createElement("button");
-      payBtn.className = "event-shopping-btn";
-      payBtn.title = "登記/修改已繳金額";
-      payBtn.textContent = "💰";
-      payBtn.addEventListener("click", async () => {
-        const input = await showPrompt("已繳金額（留空清除）：", paidVal === null ? "" : String(paidVal));
-        if (input === null) return;
-        await withRowLock(payBtn, async () => {
-          try {
-            applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: input.trim() }));
-            renderBillsAll();
-          } catch (err) {
-            setStatus("更新失敗：" + err.message, true);
-          }
-        });
-      });
+      const paidOff = isPaidOff(b);
+      const payBtn = paidOff ? null : buildPayBtn(b, paidVal);
 
       const delBtn = document.createElement("button");
       delBtn.className = "delete-btn";
@@ -334,7 +396,7 @@ function renderList() {
         });
       });
 
-      li2.appendChild(payBtn);
+      if (payBtn) li2.appendChild(payBtn);
       li2.appendChild(delBtn);
 
       li.appendChild(bankBadge);
