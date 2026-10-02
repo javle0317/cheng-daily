@@ -353,6 +353,7 @@ function renderDailyHabits() {
       li.appendChild(pop);
     }
     if (isChallenge) {
+      li.querySelector(".delete-btn").remove(); // 刪掉這個習慣整個挑戰就沒了，不給刪
       setupChallengeRow(li, periodKey, challengeLog);
     } else if (habitUrl) {
       const link = document.createElement("a");
@@ -376,7 +377,8 @@ function renderDailyHabits() {
         }
       });
     });
-    li.querySelector(".delete-btn").addEventListener("click", async () => {
+    const dailyDeleteBtn = li.querySelector(".delete-btn");
+    if (dailyDeleteBtn) dailyDeleteBtn.addEventListener("click", async () => {
       if (!(await showConfirm("確定要刪除這個習慣嗎？"))) return;
       await withRowLock(li, async () => {
         try {
