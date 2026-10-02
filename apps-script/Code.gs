@@ -617,11 +617,6 @@ function toggleHabitLog(habitId, periodKey, target) {
 //   CHALLENGE_URL（朋友的 web app 網址）、CHALLENGE_PLAYER（玩家名稱）、CHALLENGE_PIN（密碼）。
 var CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 
-// 暫時：朋友的 draw 還沒做好，先用假的（從下面清單隨機挑，不呼叫朋友）。done 仍然是真的。
-// 朋友的 draw 上線後，把 CHALLENGE_FAKE_DRAW 改成 false（清單可以一起刪掉）。
-var CHALLENGE_FAKE_DRAW = true;
-var CHALLENGE_FAKE_EXERCISES = ["開合跳 50 下", "深蹲 30 下", "棒式 1 分鐘", "伏地挺身 15 下", "原地高抬腿 2 分鐘"];
-
 function callChallengeApi_(payload) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty("CHALLENGE_URL");
@@ -695,9 +690,7 @@ function drawChallenge() {
 
     var exercise;
     try {
-      var res = CHALLENGE_FAKE_DRAW
-        ? { exercise: CHALLENGE_FAKE_EXERCISES[Math.floor(Math.random() * CHALLENGE_FAKE_EXERCISES.length)] }
-        : callChallengeApi_({ action: "draw", date: today });
+      var res = callChallengeApi_({ action: "draw", date: today });
       exercise = String(res.exercise || "").trim();
       if (!exercise) throw new Error("運動挑戰站沒有回傳運動內容");
     } catch (err) {
