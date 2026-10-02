@@ -56,8 +56,7 @@ function getPaidVal(b) {
 // 已繳金額等於全額 = 繳清，鎖定不能再修改
 function isPaidOff(b) {
   const paid = getPaidVal(b);
-  // 畫面上金額是四捨五入到整數顯示的，這裡也用整數比對，避免全額帶小數時看起來一樣卻判成沒繳清
-  return paid !== null && Math.round(paid) === Math.round(Number(b.fullAmount));
+  return paid !== null && paid === Number(b.fullAmount);
 }
 
 function buildPayBtn(b, paidVal) {
@@ -68,7 +67,7 @@ function buildPayBtn(b, paidVal) {
   payBtn.addEventListener("click", async () => {
     const input = await showPrompt("已繳金額（留空清除）：", paidVal === null ? "" : String(paidVal));
     if (input === null) return;
-    if (input.trim() !== "" && Math.round(Number(input)) === Math.round(Number(b.fullAmount))) {
+    if (input.trim() !== "" && Number(input) === Number(b.fullAmount)) {
       if (!(await showConfirm("已繳金額等於帳單全額，登記後就視為繳清、不能再修改，確定嗎？"))) return;
     }
     await withRowLock(payBtn, async () => {
