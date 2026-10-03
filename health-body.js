@@ -338,11 +338,17 @@
     setFormBusy(e.target, true);
     try {
       apply(await api("addInBodyReading", params));
-      Object.keys(FIELD_MAP).forEach(id => {
-        if (id !== "bodyHeight") document.getElementById(id).value = "";
-      });
+      // 送出成功後整張表單清空（身高會由 prefillForm 帶回上次的值，日期回到今天）
+      Object.keys(FIELD_MAP).forEach(id => { document.getElementById(id).value = ""; });
+      document.getElementById("bodyImportText").value = "";
+      document.getElementById("bodyImportMsg").textContent = "";
+      document.querySelectorAll("#bodyForm details").forEach(d => { d.open = false; });
+      document.getElementById("bodyDate").value = "";
       renderAll();
       showToast("已新增體組成紀錄");
+      if (state.readings.filter(r => r.date === params.date).length > 1) {
+        showConfirm(`⚠️ ${fmtHealthDate(params.date)} 出現了不只一筆體組成紀錄。\n後端（Apps Script）可能還是舊版，請重新部署新版本，再執行一次 mergeDuplicateHealthRows 合併重複的紀錄。`);
+      }
     } catch (err) {
       setStatus("新增失敗：" + err.message, true);
     } finally {

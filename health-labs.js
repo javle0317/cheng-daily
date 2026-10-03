@@ -370,6 +370,13 @@
 
   document.getElementById("labDate").addEventListener("input", updateForm);
 
+  // 同一天出現不只一筆固定項目紀錄 = 後端還是舊版（沒有「同一天合併更新」），提醒使用者
+  function warnIfDuplicated(date) {
+    if (state.results.filter(r => r.date === date).length > 1) {
+      showConfirm(`⚠️ ${fmtHealthDate(date)} 出現了不只一筆驗血紀錄。\n後端（Apps Script）可能還是舊版，請重新部署新版本，再執行一次 mergeDuplicateHealthRows 合併重複的紀錄。`);
+    }
+  }
+
   function hasDay(date) {
     return state.results.some(r => r.date === date) || state.extras.some(e => e.date === date);
   }
@@ -429,10 +436,16 @@
     setFormBusy(e.target, true);
     try {
       apply(await api("addLabEntry", params));
+      // 送出成功後整張表單清空（日期回到今天、其他項目列移除、匯入框清掉並收合）
       ITEMS.forEach(i => { document.getElementById("lab_" + i.key).value = ""; });
       document.getElementById("labExtraRows").innerHTML = "";
+      document.getElementById("labImportText").value = "";
+      document.getElementById("labImportMsg").textContent = "";
+      document.querySelectorAll("#labForm details").forEach(d => { d.open = false; });
+      document.getElementById("labDate").value = "";
       renderAll();
       showToast("已新增驗血紀錄");
+      warnIfDuplicated(params.date);
     } catch (err) {
       setStatus("新增失敗：" + err.message, true);
     } finally {
