@@ -825,3 +825,10 @@ a.ghost-btn {
 .lab-block-head .sub-heading { margin: 0; }
 .lab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .lab-chip { font-size: 12px; padding: 3px 8px; border-radius: 8px; background: var(--bg); }
+
+.lab-extra-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; margin-bottom: 10px; align-items: center; }
+.lab-extra-row .x-name { grid-column: 1 / -1; }
+.lab-extra-row .x-low, .lab-extra-row .x-high { grid-column: auto; }
+.lab-extra-row .x-remove { justify-self: end; }
+.lab-extra-row input { width: 100%; box-sizing: border-box; min-width: 0; }
+#labAddExtraBtn { width: 100%; margin-top: 4px; }

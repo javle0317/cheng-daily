@@ -50,38 +50,95 @@
       bands: [[0, 30, "warning", "偏低"], [30, 223, "good", "正常"], [223, 1000, "warning", "偏高"], [1000, 20000, "serious", "明顯偏高"]] },
   ];
 
-  const state = { results: [], chartKey: "glucose" };
+  // 「其他項目」：報告上有、ITEMS 沒列的項目，存在 LabExtra（一個項目一列），
+  // 每筆自帶報告上的參考範圍；分級就用那個範圍判斷（醫學意義不用我們懂，報告怎麼標就怎麼標）。
+  const state = { results: [], extras: [], chartKey: "glucose" };
+
+  function classifyRange(v, low, high) {
+    let over = 0;
+    let dir = "";
+    if (high !== null && v > high) { over = high === 0 ? 1 : (v - high) / Math.abs(high); dir = "偏高"; }
+    else if (low !== null && v < low) { over = low === 0 ? 1 : (low - v) / Math.abs(low); dir = "偏低"; }
+    if (!dir) return (low === null && high === null) ? null : R("good", "正常");
+    if (over <= 0.15) return R("warning", dir);
+    if (over <= 0.5) return R("serious", dir);
+    return R("critical", "明顯" + dir);
+  }
+
+  function refText(low, high) {
+    if (low !== null && high !== null) return `${low}-${high}`;
+    if (high !== null) return `<${high}`;
+    if (low !== null) return `>${low}`;
+    return "未填";
+  }
+
+  function extraHistory(name) {
+    return state.extras
+      .filter(e => e.name === name)
+      .map(e => ({ date: e.date, value: toNum(e.value), low: toNum(e.refLow), high: toNum(e.refHigh), unit: e.unit || "" }))
+      .filter(p => p.value !== null)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // ITEMS（固定項目）+ 其他項目（依名稱分組）統一成同一種 item 介面
+  function allItems() {
+    const known = ITEMS.map(item => ({
+      ...item,
+      history: () => sortedResults()
+        .map(r => ({ date: r.date, value: toNum(r[item.key]) }))
+        .filter(p => p.value !== null),
+      classifyPoint: p => item.classify(p.value),
+      refLabel: () => item.ref,
+      bandList: () => item.bands.map(([from, to, level, label]) => ({ from, to, level, label })),
+    }));
+    const names = [...new Set(state.extras.map(e => e.name))].sort();
+    const extra = names.map(name => {
+      const hist = () => extraHistory(name);
+      const last = () => { const h = hist(); return h[h.length - 1] || {}; };
+      return {
+        key: "x:" + name,
+        label: name,
+        get unit() { return last().unit || ""; },
+        dec: 2,
+        extra: true,
+        history: hist,
+        classifyPoint: p => classifyRange(p.value, p.low, p.high),
+        refLabel: () => refText(last().low ?? null, last().high ?? null),
+        bandList: () => {
+          const { low = null, high = null } = last();
+          if (low !== null && high !== null) {
+            return [{ from: -1e9, to: low, level: "warning", label: "偏低" }, { from: low, to: high, level: "good", label: "正常" }, { from: high, to: 1e9, level: "serious", label: "偏高" }];
+          }
+          if (high !== null) return [{ from: -1e9, to: high, level: "good", label: "正常" }, { from: high, to: 1e9, level: "warning", label: "偏高" }];
+          if (low !== null) return [{ from: -1e9, to: low, level: "warning", label: "偏低" }, { from: low, to: 1e9, level: "good", label: "正常" }];
+          return [];
+        },
+      };
+    });
+    return [...known, ...extra].filter(i => i.history().length);
+  }
 
   function sortedResults() {
     return [...state.results].sort((a, b) => a.date.localeCompare(b.date));
-  }
-
-  // 某個項目的歷史（只含有填的）
-  function historyOf(item) {
-    return sortedResults()
-      .map(r => ({ date: r.date, value: toNum(r[item.key]) }))
-      .filter(p => p.value !== null);
   }
 
   // ====== 各項目最近一次 ======
   function renderLatest() {
     const grid = document.getElementById("labLatest");
     grid.innerHTML = "";
-    const tiles = [];
-    ITEMS.forEach(item => {
-      const hist = historyOf(item);
-      if (!hist.length) return;
-      tiles.push({ item, last: hist[hist.length - 1], prev: hist.length > 1 ? hist[hist.length - 2] : null });
-    });
-    if (!tiles.length) {
+    const items = allItems();
+    if (!items.length) {
       grid.innerHTML = `<p class="empty-hint">還沒有驗血紀錄</p>`;
       return;
     }
-    tiles.forEach(({ item, last, prev }) => {
-      const c = item.classify(last.value);
+    items.forEach(item => {
+      const hist = item.history();
+      const last = hist[hist.length - 1];
+      const prev = hist.length > 1 ? hist[hist.length - 2] : null;
+      const c = item.classifyPoint(last);
       const tile = document.createElement("button");
       tile.type = "button";
-      tile.className = `lab-tile lab-tile-${c.level}` + (item.key === state.chartKey ? " selected" : "");
+      tile.className = `lab-tile${c ? " lab-tile-" + c.level : ""}` + (item.key === state.chartKey ? " selected" : "");
       tile.title = "點一下看趨勢圖";
 
       const name = document.createElement("div");
@@ -94,16 +151,17 @@
       unit.className = "lab-unit";
       unit.textContent = item.unit ? ` ${item.unit}` : "";
       value.appendChild(unit);
-      tile.append(name, value, buildLevelBadge(c.level, c.text));
+      tile.append(name, value);
+      if (c) tile.appendChild(buildLevelBadge(c.level, c.text));
 
       const ref = document.createElement("div");
       ref.className = "tile-delta";
-      let refText = `參考 ${item.ref}`;
+      let text = `參考 ${item.refLabel()}`;
       if (prev) {
         const d = roundTo(last.value - prev.value, item.dec);
-        refText += d === 0 ? " · 與上次持平" : ` · ${d > 0 ? "▲" : "▼"}${Math.abs(d)}`;
+        text += d === 0 ? " · 與上次持平" : ` · ${d > 0 ? "▲" : "▼"}${Math.abs(d)}`;
       }
-      ref.textContent = refText;
+      ref.textContent = text;
       const when = document.createElement("div");
       when.className = "tile-delta";
       when.textContent = fmtHealthDate(last.date);
@@ -124,42 +182,49 @@
     const select = document.getElementById("labChartItem");
     const prev = select.value || state.chartKey;
     select.innerHTML = "";
-    const withData = ITEMS.filter(i => historyOf(i).length);
-    withData.forEach(i => {
+    const items = allItems();
+    items.forEach(i => {
       const opt = document.createElement("option");
       opt.value = i.key;
       opt.textContent = i.label;
       select.appendChild(opt);
     });
-    if (withData.some(i => i.key === prev)) select.value = prev;
+    if (items.some(i => i.key === prev)) select.value = prev;
     state.chartKey = select.value || state.chartKey;
   }
 
   function renderChart() {
     const container = document.getElementById("labChart");
-    const item = ITEMS.find(i => i.key === state.chartKey);
-    if (!item || !historyOf(item).length) {
+    const item = allItems().find(i => i.key === state.chartKey);
+    if (!item) {
       container.innerHTML = `<p class="empty-hint">還沒有資料可以畫圖</p>`;
       return;
     }
-    const points = historyOf(item).map(p => ({ ...p, level: item.classify(p.value).level }));
-    drawTimeChart(container, points, {
-      unit: item.unit,
-      decimals: item.dec,
-      bands: item.bands.map(([from, to, level, label]) => ({ from, to, level, label })),
+    const points = item.history().map(p => {
+      const c = item.classifyPoint(p);
+      return c ? { date: p.date, value: p.value, level: c.level } : { date: p.date, value: p.value };
     });
+    drawTimeChart(container, points, { unit: item.unit, decimals: item.dec, bands: item.bandList() });
   }
 
-  // ====== 歷史列表 ======
+  // ====== 歷史列表（一天一塊，固定項目 + 其他項目都顯示）======
+  function addChip(chips, label, v, dec, c, title) {
+    const chip = document.createElement("span");
+    chip.className = `lab-chip level-text${c ? " level-" + c.level : ""}`;
+    chip.textContent = `${label} ${roundTo(v, dec)}`;
+    chip.title = title;
+    chips.appendChild(chip);
+  }
+
   function renderList() {
     const container = document.getElementById("labList");
     container.innerHTML = "";
-    const results = sortedResults().reverse();
-    if (!results.length) {
+    const dates = [...new Set([...state.results.map(r => r.date), ...state.extras.map(e => e.date)])].sort().reverse();
+    if (!dates.length) {
       container.innerHTML = `<p class="empty-hint">還沒有驗血紀錄</p>`;
       return;
     }
-    results.forEach(r => {
+    dates.forEach(date => {
       const block = document.createElement("div");
       block.className = "lab-block";
 
@@ -167,16 +232,16 @@
       head.className = "lab-block-head";
       const h = document.createElement("h3");
       h.className = "sub-heading";
-      h.textContent = fmtHealthDate(r.date);
+      h.textContent = fmtHealthDate(date);
       const del = document.createElement("button");
       del.className = "delete-btn";
-      del.title = "刪除這次驗血";
+      del.title = "刪除這一天的驗血紀錄";
       del.textContent = "✕";
       del.addEventListener("click", async () => {
-        if (!(await showConfirm(`確定要刪除 ${fmtHealthDate(r.date)} 這次驗血紀錄嗎？`))) return;
+        if (!(await showConfirm(`確定要刪除 ${fmtHealthDate(date)} 這天的驗血紀錄嗎？（包含其他項目）`))) return;
         await withRowLock(del, async () => {
           try {
-            apply(await api("deleteLabResult", { id: r.id }));
+            apply(await api("deleteLabDay", { date }));
             renderAll();
           } catch (err) {
             setStatus("刪除失敗：" + err.message, true);
@@ -188,15 +253,20 @@
 
       const chips = document.createElement("div");
       chips.className = "lab-chips";
-      ITEMS.forEach(item => {
-        const v = toNum(r[item.key]);
+      state.results.filter(r => r.date === date).forEach(r => {
+        ITEMS.forEach(item => {
+          const v = toNum(r[item.key]);
+          if (v === null) return;
+          const c = item.classify(v);
+          addChip(chips, item.label.split(" ")[0], v, item.dec, c, `${c.text}（參考 ${item.ref}）`);
+        });
+      });
+      state.extras.filter(e => e.date === date).forEach(e => {
+        const v = toNum(e.value);
         if (v === null) return;
-        const c = item.classify(v);
-        const chip = document.createElement("span");
-        chip.className = `lab-chip level-text level-${c.level}`;
-        chip.textContent = `${item.label.split(" ")[0]} ${roundTo(v, item.dec)}`;
-        chip.title = `${c.text}（參考 ${item.ref}）`;
-        chips.appendChild(chip);
+        const low = toNum(e.refLow), high = toNum(e.refHigh);
+        const c = classifyRange(v, low, high);
+        addChip(chips, e.name, v, 2, c, `${c ? c.text + "，" : ""}參考 ${refText(low, high)}${e.unit ? "，單位 " + e.unit : ""}`);
       });
       block.appendChild(chips);
       container.appendChild(block);
@@ -239,23 +309,74 @@
     });
   }
 
+  // 其他項目的輸入列：名稱（可從以前用過的挑，會自動帶入單位跟參考範圍）、數值、單位、參考低、參考高
+  function addExtraRow() {
+    const rows = document.getElementById("labExtraRows");
+    const row = document.createElement("div");
+    row.className = "lab-extra-row";
+    row.innerHTML = `
+      <input class="x-name" type="text" list="labExtraNames" placeholder="項目名稱（如 鉀 K）">
+      <input class="x-value" type="number" step="any" inputmode="decimal" placeholder="數值">
+      <input class="x-unit" type="text" placeholder="單位">
+      <input class="x-low" type="number" step="any" inputmode="decimal" placeholder="參考下限">
+      <input class="x-high" type="number" step="any" inputmode="decimal" placeholder="參考上限">
+      <button type="button" class="delete-btn x-remove" title="移除這一列">✕</button>
+    `;
+    const name = row.querySelector(".x-name");
+    name.addEventListener("change", () => {
+      const hist = extraHistory(name.value.trim());
+      const last = hist[hist.length - 1];
+      if (!last) return;
+      if (!row.querySelector(".x-unit").value) row.querySelector(".x-unit").value = last.unit;
+      if (row.querySelector(".x-low").value === "" && last.low !== null) row.querySelector(".x-low").value = last.low;
+      if (row.querySelector(".x-high").value === "" && last.high !== null) row.querySelector(".x-high").value = last.high;
+    });
+    row.querySelectorAll("input").forEach(i => i.addEventListener("input", updateForm));
+    row.querySelector(".x-remove").addEventListener("click", () => { row.remove(); updateForm(); });
+    rows.appendChild(row);
+  }
+
+  function collectExtras() {
+    return [...document.querySelectorAll("#labExtraRows .lab-extra-row")].map(row => ({
+      name: row.querySelector(".x-name").value.trim(),
+      value: row.querySelector(".x-value").value,
+      unit: row.querySelector(".x-unit").value.trim(),
+      refLow: row.querySelector(".x-low").value,
+      refHigh: row.querySelector(".x-high").value,
+    })).filter(x => x.name && x.value !== "");
+  }
+
+  function renderExtraNames() {
+    const dl = document.getElementById("labExtraNames");
+    dl.innerHTML = "";
+    [...new Set(state.extras.map(e => e.name))].sort().forEach(n => {
+      const o = document.createElement("option");
+      o.value = n;
+      dl.appendChild(o);
+    });
+  }
+
   function updateForm() {
     const date = document.getElementById("labDate").value;
-    const any = ITEMS.some(i => document.getElementById("lab_" + i.key).value !== "");
+    const any = ITEMS.some(i => document.getElementById("lab_" + i.key).value !== "") || collectExtras().length > 0;
     document.getElementById("labSubmitBtn").disabled = !(date && any);
   }
 
   document.getElementById("labDate").addEventListener("input", updateForm);
+  document.getElementById("labAddExtraBtn").addEventListener("click", addExtraRow);
 
   document.getElementById("labForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const params = { date: document.getElementById("labDate").value };
     ITEMS.forEach(i => { params[i.key] = document.getElementById("lab_" + i.key).value; });
-    if (!params.date || !ITEMS.some(i => params[i.key] !== "")) return;
+    const extras = collectExtras();
+    params.extra = JSON.stringify(extras);
+    if (!params.date || !(ITEMS.some(i => params[i.key] !== "") || extras.length)) return;
     setFormBusy(e.target, true);
     try {
-      apply(await api("addLabResult", params));
+      apply(await api("addLabEntry", params));
       ITEMS.forEach(i => { document.getElementById("lab_" + i.key).value = ""; });
+      document.getElementById("labExtraRows").innerHTML = "";
       renderAll();
       showToast("已新增驗血紀錄");
     } catch (err) {
@@ -273,7 +394,8 @@
   });
 
   function apply(data) {
-    state.results = data || [];
+    state.results = (data && data.results) || [];
+    state.extras = (data && data.extras) || [];
   }
 
   function renderAll() {
@@ -281,6 +403,7 @@
     renderLatest();
     renderChart();
     renderList();
+    renderExtraNames();
     const dateInput = document.getElementById("labDate");
     if (!dateInput.value) dateInput.value = toDateStr(new Date());
     updateForm();
@@ -290,7 +413,7 @@
 
   window.healthLoaders = window.healthLoaders || [];
   window.healthLoaders.push(async () => {
-    apply(await api("getLabResults"));
+    apply(await api("getLabData"));
     renderAll();
   });
 })();
