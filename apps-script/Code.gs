@@ -641,6 +641,55 @@ function deleteLabDay(date) {
   return getLabData();
 }
 
+// 一次性清理：把「同一天有多筆」的 InBody / LabResults 合併成一筆（後來的非空值覆蓋前面的，
+// 其他欄位保留），LabExtra 同一天同名稱只留一筆（以最新的為準）。部署到舊版時匯入會多出重複列，
+// 部署新版後在 Apps Script 編輯器手動執行一次即可；沒有重複時什麼都不會動，可以重複執行。
+function mergeDuplicateHealthRows() {
+  var report = [];
+  ["InBody", "LabResults"].forEach(function (name) {
+    var sheet = getSheet(name);
+    var values = sheet.getDataRange().getValues();
+    var headers = values[0];
+    var dateCol = headers.indexOf("date");
+    var skip = { id: true, date: true, createdAt: true };
+    var groups = {};
+    for (var i = 1; i < values.length; i++) {
+      var key = normalizeDateCell_(values[i][dateCol]);
+      (groups[key] = groups[key] || []).push(i);
+    }
+    var toDelete = [];
+    Object.keys(groups).forEach(function (key) {
+      var rows = groups[key];
+      if (rows.length < 2) return;
+      var target = rows[0];
+      for (var r = 1; r < rows.length; r++) {
+        headers.forEach(function (h, c) {
+          var v = values[rows[r]][c];
+          if (skip[h] || v === "" || v === null) return;
+          sheet.getRange(target + 1, c + 1).setValue(v);
+        });
+        toDelete.push(rows[r]);
+      }
+    });
+    toDelete.sort(function (a, b) { return b - a; }).forEach(function (idx) { sheet.deleteRow(idx + 1); });
+    report.push(name + " 合併掉 " + toDelete.length + " 筆重複");
+  });
+
+  var extra = getSheet("LabExtra");
+  var ev = extra.getDataRange().getValues();
+  var eh = ev[0];
+  var dCol = eh.indexOf("date"), nCol = eh.indexOf("name");
+  var seen = {};
+  var del = [];
+  for (var j = ev.length - 1; j >= 1; j--) {
+    var k = normalizeDateCell_(ev[j][dCol]) + "|" + ev[j][nCol];
+    if (seen[k]) del.push(j); else seen[k] = true;
+  }
+  del.forEach(function (idx) { extra.deleteRow(idx + 1); });
+  report.push("LabExtra 移除 " + del.length + " 筆重複");
+  return report.join("、");
+}
+
 // 信用卡帳單是獨立頁面，有自己專屬的 action，故意不回傳 getData()，理由跟
 // BloodPressure 一樣：不要讓主頁面每個操作都順便撈一份用不到的資料。
 function getCreditCardBills() {
