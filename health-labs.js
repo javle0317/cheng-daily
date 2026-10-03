@@ -370,6 +370,10 @@
 
   document.getElementById("labDate").addEventListener("input", updateForm);
 
+  function hasDay(date) {
+    return state.results.some(r => r.date === date) || state.extras.some(e => e.date === date);
+  }
+
   // 貼上匯入：把 { date, values: {glucose: 98, ...}, extra: [{name,value,unit,refLow,refHigh}] }
   // 填進新增表單（只填、不送出，讓使用者核對後再按「新增」）
   document.getElementById("labImportBtn").addEventListener("click", () => {
@@ -407,7 +411,7 @@
     updateForm();
     const notes = [`已填入 ${filled} 個項目，請核對後按「新增」`];
     if (unknown.length) notes.push(`有 ${unknown.length} 個不認得的欄位沒填入：${unknown.join("、")}`);
-    if (data.date && state.results.some(r => r.date === data.date)) notes.push("⚠️ 這一天已經有驗血紀錄，再新增會多一筆");
+    if (data.date && hasDay(data.date)) notes.push("⚠️ 這一天已經有驗血紀錄，按「新增」會更新這天你有填的項目（沒填的保留）");
     msg.textContent = notes.join("；");
   });
 
@@ -420,6 +424,8 @@
     const extras = collectExtras();
     params.extra = JSON.stringify(extras);
     if (!params.date || !(ITEMS.some(i => params[i.key] !== "") || extras.length)) return;
+    // 同一天已經有紀錄：只更新這次有填的項目，沒填的保留（可用來修正或補漏）
+    if (hasDay(params.date) && !(await showConfirm(`${fmtHealthDate(params.date)} 已經有驗血紀錄。\n只會更新你這次有填的項目，沒填的會保留。確定嗎？`))) return;
     setFormBusy(e.target, true);
     try {
       apply(await api("addLabEntry", params));
