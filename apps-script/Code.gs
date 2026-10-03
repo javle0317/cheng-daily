@@ -21,7 +21,7 @@
  *   InBody          欄位: id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass |
  *                         bodyWater | protein | bmr | visceralFat | bodyAge | whr | createdAt
  *   LabResults      欄位: id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt |
- *                         creatinine | egfr | uricAcid | tsh | ck | bun | createdAt（除 date 外都可留空）
+ *                         creatinine | egfr | uricAcid | tsh | ck | bun | sodium | potassium | createdAt（除 date 外都可留空）
  *   LabExtra        欄位: id | date | name | value | unit | refLow | refHigh | createdAt
  *                         （驗血「其他項目」：報告上有、LabResults 沒列的項目，一個項目一列，自帶報告參考範圍）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
@@ -480,7 +480,7 @@ function deleteBloodPressureReading(id) {
 var INBODY_FIELDS = ["weight", "height", "bmi", "bodyFat", "fatMass", "skeletalMuscle", "muscleMass",
   "bodyWater", "protein", "bmr", "visceralFat", "bodyAge", "whr"];
 var LAB_FIELDS = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt",
-  "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
+  "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun", "sodium", "potassium"];
 
 function appendHealthRow_(sheetName, fields, p) {
   var sheet = getSheet(sheetName);
