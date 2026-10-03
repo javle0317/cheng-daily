@@ -832,3 +832,5 @@ a.ghost-btn {
 .lab-extra-row .x-remove { justify-self: end; }
 .lab-extra-row input { width: 100%; box-sizing: border-box; min-width: 0; }
 #labAddExtraBtn { width: 100%; margin-top: 4px; }
+
+.more-fields textarea { width: 100%; box-sizing: border-box; margin: 4px 0 8px; font: inherit; font-size: 12px; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }

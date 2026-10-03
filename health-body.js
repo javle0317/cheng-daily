@@ -291,6 +291,35 @@
     updateForm();
   }
 
+  // 貼上匯入：{ date, values: {weight: 113.3, bodyFat: 39.0, ...} } 填進表單（不送出，核對後再按新增）
+  document.getElementById("bodyImportBtn").addEventListener("click", () => {
+    const msg = document.getElementById("bodyImportMsg");
+    let data;
+    try {
+      data = JSON.parse(document.getElementById("bodyImportText").value);
+    } catch (e) {
+      msg.textContent = "格式不對，請整段貼上對話裡給你的資料";
+      return;
+    }
+    const keyToId = {};
+    Object.entries(FIELD_MAP).forEach(([id, key]) => { keyToId[key] = id; });
+    const unknown = Object.keys(data.values || {}).filter(k => !keyToId[k]);
+    if (data.date) document.getElementById("bodyDate").value = data.date;
+    let filled = 0;
+    Object.entries(keyToId).forEach(([key, id]) => {
+      const v = data.values && data.values[key];
+      if (v !== undefined && v !== null && v !== "") {
+        document.getElementById(id).value = v;
+        filled++;
+      }
+    });
+    updateForm();
+    const notes = [`已填入 ${filled} 個欄位，請核對後按「新增」`];
+    if (unknown.length) notes.push(`有 ${unknown.length} 個不認得的欄位沒填入：${unknown.join("、")}`);
+    if (data.date && state.readings.some(r => r.date === data.date)) notes.push("⚠️ 這一天已經有體組成紀錄，再新增會多一筆");
+    msg.textContent = notes.join("；");
+  });
+
   Object.keys(FIELD_MAP).concat(["bodyDate"]).forEach(id => {
     document.getElementById(id).addEventListener("input", updateForm);
   });
