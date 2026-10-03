@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>健康 · Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261003101103">
+<link rel="stylesheet" href="style.css?v=20261003102015">
 </head>
 <body>
 
@@ -123,15 +123,7 @@
             </div>
             <div class="form-row">
               <input id="bodyProtein" type="number" step="any" min="0" inputmode="decimal" placeholder="蛋白質 kg">
-              <input id="bodyMineral" type="number" step="any" min="0" inputmode="decimal" placeholder="礦物質 kg">
-            </div>
-            <div class="form-row">
-              <input id="bodyVisceral" type="number" step="any" min="0" inputmode="decimal" placeholder="內臟脂肪等級">
               <input id="bodyBmr" type="number" step="any" min="0" inputmode="decimal" placeholder="基礎代謝率 kcal">
-            </div>
-            <div class="form-row">
-              <input id="bodyWhr" type="number" step="any" min="0" inputmode="decimal" placeholder="腰臀比">
-              <input id="bodyScore" type="number" step="any" min="0" inputmode="decimal" placeholder="體型評估分數">
             </div>
           </details>
           <p id="bodyBmiPreview" class="progress-line"></p>
@@ -159,7 +151,7 @@
         <div id="bodyFatChart"></div>
         <h3 class="sub-heading">骨骼肌量（kg）</h3>
         <div id="bodyMuscleChart"></div>
-        <p class="health-disclaimer">BMI 依國健署成人標準；體脂率、腰臀比依男性標準；內臟脂肪依 InBody 等級。分級僅供參考，請以醫師診斷為準。</p>
+        <p class="health-disclaimer">BMI 依國健署成人標準；體脂率依男性標準。分級僅供參考，請以醫師診斷為準。</p>
       </section>
 
       <section class="card health-list-card hidden" data-tab="body">
@@ -215,11 +207,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261003101103"></script>
-  <script src="health-charts.js?v=20261003101103"></script>
-  <script src="health.js?v=20261003101103"></script>
-  <script src="health-body.js?v=20261003101103"></script>
-  <script src="health-labs.js?v=20261003101103"></script>
+  <script src="shared.js?v=20261003102015"></script>
+  <script src="health-charts.js?v=20261003102015"></script>
+  <script src="health.js?v=20261003102015"></script>
+  <script src="health-body.js?v=20261003102015"></script>
+  <script src="health-labs.js?v=20261003102015"></script>
   <script>initAuth();</script>
 </body>
 </html>

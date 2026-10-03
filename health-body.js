@@ -1,7 +1,6 @@
 // ====== 健康頁：體重（InBody）分頁 ======
 // 共用工具（drawTimeChart / buildLevelBadge / toNum ...）在 health-charts.js。
-// 分級依據：BMI 用國健署成人標準；體脂率、腰臀比用男性標準（Dean 男、42 歲）；
-// 內臟脂肪用 InBody 的等級（1-9 標準、10-14 偏高、15+ 高）。
+// 分級依據：BMI 用國健署成人標準；體脂率用男性標準（Dean 男、42 歲）。
 (function () {
   const TARGET_WEIGHT = 90; // 目標體重（kg）
 
@@ -21,18 +20,6 @@
     if (v <= 20) return { level: "good", text: "標準" };
     if (v <= 25) return { level: "warning", text: "偏高" };
     return { level: "serious", text: "肥胖" };
-  }
-
-  function classifyVisceral(v) {
-    if (v < 10) return { level: "good", text: "標準" };
-    if (v < 15) return { level: "warning", text: "偏高" };
-    return { level: "serious", text: "高" };
-  }
-
-  function classifyWhr(v) {
-    if (v < 0.9) return { level: "good", text: "正常" };
-    if (v < 1.0) return { level: "warning", text: "偏高" };
-    return { level: "serious", text: "過高" };
   }
 
   function sortedReadings() {
@@ -96,15 +83,11 @@
     const bmi = toNum(latest.bmi);
     const bodyFat = toNum(latest.bodyFat);
     const skeletal = toNum(latest.skeletalMuscle);
-    const visceral = toNum(latest.visceralFat);
-    const whr = toNum(latest.whr);
 
     if (weight !== null) row.appendChild(makeTile("體重 kg", String(weight), { delta: delta("weight"), unit: " kg" }));
     if (bmi !== null) row.appendChild(makeTile("BMI", String(bmi), { badge: classifyBmi(bmi) }));
     if (bodyFat !== null) row.appendChild(makeTile("體脂率 %", String(bodyFat), { delta: delta("bodyFat"), unit: "%", badge: classifyBodyFat(bodyFat) }));
     if (skeletal !== null) row.appendChild(makeTile("骨骼肌量 kg", String(skeletal), { delta: delta("skeletalMuscle"), unit: " kg" }));
-    if (visceral !== null) row.appendChild(makeTile("內臟脂肪等級", String(visceral), { badge: classifyVisceral(visceral) }));
-    if (whr !== null) row.appendChild(makeTile("腰臀比", String(whr), { badge: classifyWhr(whr) }));
 
     // 目標進度：從第一筆體重到目標體重
     const first = toNum(all[0].weight);
@@ -228,8 +211,7 @@
   const FIELD_MAP = {
     bodyWeight: "weight", bodyHeight: "height", bodyFatInput: "bodyFat", bodyFatMass: "fatMass",
     bodySkeletal: "skeletalMuscle", bodyMuscle: "muscleMass", bodyWater: "bodyWater",
-    bodyProtein: "protein", bodyMineral: "mineral", bodyVisceral: "visceralFat",
-    bodyBmr: "bmr", bodyWhr: "whr", bodyScore: "score",
+    bodyProtein: "protein", bodyBmr: "bmr",
   };
 
   function computeBmi() {
