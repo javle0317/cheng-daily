@@ -316,7 +316,7 @@
     updateForm();
     const notes = [`已填入 ${filled} 個欄位，請核對後按「新增」`];
     if (unknown.length) notes.push(`有 ${unknown.length} 個不認得的欄位沒填入：${unknown.join("、")}`);
-    if (data.date && state.readings.some(r => r.date === data.date)) notes.push("⚠️ 這一天已經有體組成紀錄，再新增會多一筆");
+    if (data.date && state.readings.some(r => r.date === data.date)) notes.push("⚠️ 這一天已經有體組成紀錄，按「新增」會更新這天你有填的欄位（沒填的保留）");
     msg.textContent = notes.join("；");
   });
 
@@ -333,6 +333,8 @@
     const bmi = computeBmi();
     params.bmi = bmi === null ? "" : bmi;
     if (!params.date || !params.weight) return;
+    // 同一天已經有紀錄：只更新這次有填的欄位，沒填的保留（同一天量兩次會合併成一筆）
+    if (state.readings.some(r => r.date === params.date) && !(await showConfirm(`${fmtHealthDate(params.date)} 已經有體組成紀錄。\n只會更新你這次有填的欄位，沒填的會保留。確定嗎？`))) return;
     setFormBusy(e.target, true);
     try {
       apply(await api("addInBodyReading", params));

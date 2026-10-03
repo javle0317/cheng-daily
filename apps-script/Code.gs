@@ -504,6 +504,33 @@ function appendHealthRow_(sheetName, fields, p) {
   sheet.appendRow(row);
 }
 
+// 同一天已經有紀錄時：只更新這次有填的欄位（其他欄位保留），沒有紀錄才新增一列。
+// 用來修正舊資料、或補上同一天漏填的項目；不會把沒填的欄位清掉。
+function upsertHealthRow_(sheetName, fields, p) {
+  var sheet = getSheet(sheetName);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  fields.forEach(function (f) {
+    if (headers.indexOf(f) < 0) throw new Error(sheetName + " 缺少欄位 " + f + "，請先在表頭補上");
+  });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.date || ""))) throw new Error("日期格式錯誤");
+  var dateCol = headers.indexOf("date");
+  if (dateCol >= 0) {
+    for (var i = 1; i < values.length; i++) {
+      if (normalizeDateCell_(values[i][dateCol]) !== String(p.date)) continue;
+      fields.forEach(function (f) {
+        var col = headers.indexOf(f);
+        var v = p[f];
+        if (col < 0 || v === undefined || v === null || v === "") return;
+        var n = parseFloat(v);
+        if (!isNaN(n)) sheet.getRange(i + 1, col + 1).setValue(n);
+      });
+      return;
+    }
+  }
+  appendHealthRow_(sheetName, fields, p);
+}
+
 function deleteRowById_(sheetName, id) {
   var sheet = getSheet(sheetName);
   var values = sheet.getDataRange().getValues();
@@ -521,7 +548,7 @@ function getInBodyData() {
 
 function addInBodyReading(p) {
   if (!p.weight) throw new Error("請填體重");
-  appendHealthRow_("InBody", INBODY_FIELDS, p);
+  upsertHealthRow_("InBody", INBODY_FIELDS, p);
   return getInBodyData();
 }
 
@@ -556,7 +583,7 @@ function addLabEntry(p) {
   if (!anyFixed && !extras.length) throw new Error("至少要填一個項目");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.date || ""))) throw new Error("日期格式錯誤");
 
-  if (anyFixed) appendHealthRow_("LabResults", LAB_FIELDS, p);
+  if (anyFixed) upsertHealthRow_("LabResults", LAB_FIELDS, p);
 
   if (extras.length) {
     var sheet = getSheet("LabExtra");
@@ -564,11 +591,25 @@ function addLabEntry(p) {
     ["date", "name", "value", "unit", "refLow", "refHigh"].forEach(function (h) {
       if (headers.indexOf(h) < 0) throw new Error("LabExtra 缺少欄位 " + h + "，請先在表頭補上");
     });
+    var existing = sheet.getDataRange().getValues();
+    var dateCol = headers.indexOf("date"), nameCol = headers.indexOf("name");
     extras.forEach(function (x) {
       var name = String(x.name || "").trim();
       var value = parseFloat(x.value);
       if (!name || isNaN(value)) return;
       var lowN = parseFloat(x.refLow), highN = parseFloat(x.refHigh);
+      // 同一天同名稱的項目：更新那一列
+      for (var i = 1; i < existing.length; i++) {
+        if (normalizeDateCell_(existing[i][dateCol]) === String(p.date) && String(existing[i][nameCol]) === name) {
+          headers.forEach(function (h, c) {
+            if (h === "value") sheet.getRange(i + 1, c + 1).setValue(value);
+            if (h === "unit") sheet.getRange(i + 1, c + 1).setValue(String(x.unit || "").trim());
+            if (h === "refLow") sheet.getRange(i + 1, c + 1).setValue(isNaN(lowN) ? "" : lowN);
+            if (h === "refHigh") sheet.getRange(i + 1, c + 1).setValue(isNaN(highN) ? "" : highN);
+          });
+          return;
+        }
+      }
       var row = headers.map(function (h) {
         if (h === "id") return Utilities.getUuid();
         if (h === "date") return p.date;
