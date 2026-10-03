@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>健康 · Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261004013518">
+<link rel="stylesheet" href="style.css?v=20261004014259">
 </head>
 <body>
 
@@ -133,6 +133,12 @@
               <input id="bodyWhr" type="number" step="any" min="0" inputmode="decimal" placeholder="腰臀比">
             </div>
           </details>
+          <details class="more-fields">
+            <summary>貼上匯入（從體脂計報告）</summary>
+            <textarea id="bodyImportText" rows="4" placeholder="貼上對話裡給你的體組成資料（JSON）…"></textarea>
+            <button id="bodyImportBtn" type="button" class="ghost-btn">填入表單</button>
+            <p id="bodyImportMsg" class="progress-line"></p>
+          </details>
           <p id="bodyBmiPreview" class="progress-line"></p>
           <div class="form-row">
             <button id="bodySubmitBtn" type="submit" disabled>新增</button>
@@ -175,6 +181,12 @@
           <div class="form-row">
             <input id="labDate" type="date" required>
           </div>
+          <details class="more-fields">
+            <summary>貼上匯入（從報告照片）</summary>
+            <textarea id="labImportText" rows="4" placeholder="貼上對話裡給你的驗血資料（JSON）…"></textarea>
+            <button id="labImportBtn" type="button" class="ghost-btn">填入表單</button>
+            <p id="labImportMsg" class="progress-line"></p>
+          </details>
           <div id="labFormFields"></div>
           <div class="lab-group-title">其他項目（報告上有、上面沒列的）</div>
           <div id="labExtraRows"></div>
@@ -220,11 +232,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261004013518"></script>
-  <script src="health-charts.js?v=20261004013518"></script>
-  <script src="health.js?v=20261004013518"></script>
-  <script src="health-body.js?v=20261004013518"></script>
-  <script src="health-labs.js?v=20261004013518"></script>
+  <script src="shared.js?v=20261004014259"></script>
+  <script src="health-charts.js?v=20261004014259"></script>
+  <script src="health.js?v=20261004014259"></script>
+  <script src="health-body.js?v=20261004014259"></script>
+  <script src="health-labs.js?v=20261004014259"></script>
   <script>initAuth();</script>
 </body>
 </html>

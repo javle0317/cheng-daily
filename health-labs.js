@@ -369,6 +369,48 @@
   }
 
   document.getElementById("labDate").addEventListener("input", updateForm);
+
+  // 貼上匯入：把 { date, values: {glucose: 98, ...}, extra: [{name,value,unit,refLow,refHigh}] }
+  // 填進新增表單（只填、不送出，讓使用者核對後再按「新增」）
+  document.getElementById("labImportBtn").addEventListener("click", () => {
+    const msg = document.getElementById("labImportMsg");
+    let data;
+    try {
+      data = JSON.parse(document.getElementById("labImportText").value);
+    } catch (e) {
+      msg.textContent = "格式不對，請整段貼上對話裡給你的資料";
+      return;
+    }
+    const known = new Set(ITEMS.map(i => i.key));
+    const unknown = Object.keys(data.values || {}).filter(k => !known.has(k));
+    if (data.date) document.getElementById("labDate").value = data.date;
+    let filled = 0;
+    ITEMS.forEach(i => {
+      const v = data.values && data.values[i.key];
+      if (v !== undefined && v !== null && v !== "") {
+        document.getElementById("lab_" + i.key).value = v;
+        filled++;
+      }
+    });
+    document.getElementById("labExtraRows").innerHTML = "";
+    (data.extra || []).forEach(x => {
+      addExtraRow();
+      const rows = document.querySelectorAll("#labExtraRows .lab-extra-row");
+      const row = rows[rows.length - 1];
+      row.querySelector(".x-name").value = x.name || "";
+      row.querySelector(".x-value").value = x.value ?? "";
+      row.querySelector(".x-unit").value = x.unit || "";
+      row.querySelector(".x-low").value = x.refLow ?? "";
+      row.querySelector(".x-high").value = x.refHigh ?? "";
+      filled++;
+    });
+    updateForm();
+    const notes = [`已填入 ${filled} 個項目，請核對後按「新增」`];
+    if (unknown.length) notes.push(`有 ${unknown.length} 個不認得的欄位沒填入：${unknown.join("、")}`);
+    if (data.date && state.results.some(r => r.date === data.date)) notes.push("⚠️ 這一天已經有驗血紀錄，再新增會多一筆");
+    msg.textContent = notes.join("；");
+  });
+
   document.getElementById("labAddExtraBtn").addEventListener("click", addExtraRow);
 
   document.getElementById("labForm").addEventListener("submit", async (e) => {
