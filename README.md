@@ -113,8 +113,8 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 
 **LabResults**（驗血，健康頁「驗血」分頁）
 
-| id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt | creatinine | egfr | uricAcid | tsh | ck | bun | createdAt |
-|----|------|---------|-------|-------------|-----|-----|--------------|-----|-----|------------|------|----------|-----|----|-----|-----------|
+| id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt | creatinine | egfr | uricAcid | tsh | ck | bun | sodium | potassium | createdAt |
+|----|------|---------|-------|-------------|-----|-----|--------------|-----|-----|------------|------|----------|-----|----|-----|--------|-----------|-----------|
 
 - 除 `date` 外都可留空（每次驗血不一定每項都有）；一列 = 一次抽血
 - 參考範圍與分級邏輯寫在 `health-labs.js` 的 `ITEMS`（參考範圍採 Dean 驗血報告上的標示，分級另參考

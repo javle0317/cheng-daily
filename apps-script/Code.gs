@@ -21,7 +21,7 @@
  *   InBody          欄位: id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass |
  *                         bodyWater | protein | bmr | visceralFat | bodyAge | whr | createdAt
  *   LabResults      欄位: id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt |
- *                         creatinine | egfr | uricAcid | tsh | ck | bun | createdAt（除 date 外都可留空）
+ *                         creatinine | egfr | uricAcid | tsh | ck | bun | sodium | potassium | createdAt（除 date 外都可留空）
  *   LabExtra        欄位: id | date | name | value | unit | refLow | refHigh | createdAt
  *                         （驗血「其他項目」：報告上有、LabResults 沒列的項目，一個項目一列，自帶報告參考範圍）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
@@ -480,7 +480,7 @@ function deleteBloodPressureReading(id) {
 var INBODY_FIELDS = ["weight", "height", "bmi", "bodyFat", "fatMass", "skeletalMuscle", "muscleMass",
   "bodyWater", "protein", "bmr", "visceralFat", "bodyAge", "whr"];
 var LAB_FIELDS = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt",
-  "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
+  "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun", "sodium", "potassium"];
 
 function appendHealthRow_(sheetName, fields, p) {
   var sheet = getSheet(sheetName);
@@ -619,9 +619,9 @@ function seedHealthFromTracker() {
     ["2025-09-30", 106, 6.1, 186, 123, "", 132, "", 18, 1.3, 64.7, 9, "", "", 24],
     ["2025-12-23", 99, 6.1, 172, 119, "", 110, "", 16, 1.3, 64.7, 5.3, "", "", 23],
     ["2026-06-09", 98, 6.4, 193, 137, "", 121, "", 23, 1.4, 59.1, 8.2, "", 260, ""],
-    ["2026-09-02", 98, 6, 183, 121, "", 141, "", 23, 1.4, 55, 7.2, "", 260, ""],
+    ["2026-09-02", 98, 6, 183, 121, "", 141, "", 19, 1.49, 55, 7.2, "", 221, "", 139.3, 4.2],
   ];
-  var labKeys = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt", "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
+  var labKeys = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt", "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun", "sodium", "potassium"];
   // 兩張表各自判斷：已經有資料的那張就跳過，所以中途失敗（例如某張表頭沒補齊）修好後可以直接重跑
   var done = [];
   if (getSheet("InBody").getLastRow() <= 1) {
