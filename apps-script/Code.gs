@@ -18,6 +18,10 @@
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
+ *   InBody          欄位: id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass |
+ *                         bodyWater | protein | mineral | visceralFat | bmr | whr | score | createdAt
+ *   LabResults      欄位: id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt |
+ *                         creatinine | egfr | uricAcid | tsh | ck | bun | createdAt（除 date 外都可留空）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
@@ -128,6 +132,18 @@ function handleRequest(e) {
         });
       case "deleteBloodPressureReading":
         return respond({ ok: true, data: deleteBloodPressureReading(p.id) });
+      case "getInBodyData":
+        return respond({ ok: true, data: getInBodyData() });
+      case "addInBodyReading":
+        return respond({ ok: true, data: addInBodyReading(p) });
+      case "deleteInBodyReading":
+        return respond({ ok: true, data: deleteInBodyReading(p.id) });
+      case "getLabResults":
+        return respond({ ok: true, data: getLabResults() });
+      case "addLabResult":
+        return respond({ ok: true, data: addLabResult(p) });
+      case "deleteLabResult":
+        return respond({ ok: true, data: deleteLabResult(p.id) });
       case "getCreditCardBills":
         return respond({ ok: true, data: getCreditCardBills() });
       case "addCreditCardBill":
@@ -454,6 +470,115 @@ function deleteBloodPressureReading(id) {
     }
   }
   return getBloodPressureData();
+}
+
+// ====== 健康頁：體重（InBody）與驗血 ======
+// 跟血壓一樣是獨立 action、不經過 getData()。兩張表都依「表頭名稱」寫入（不依欄位順序），
+// 數值欄位都可以留空（InBody 只有 date、weight 必填；驗血只有 date 必填、至少一項數值）。
+var INBODY_FIELDS = ["weight", "height", "bmi", "bodyFat", "fatMass", "skeletalMuscle", "muscleMass",
+  "bodyWater", "protein", "mineral", "visceralFat", "bmr", "whr", "score"];
+var LAB_FIELDS = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt",
+  "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
+
+function appendHealthRow_(sheetName, fields, p) {
+  var sheet = getSheet(sheetName);
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  fields.forEach(function (f) {
+    if (headers.indexOf(f) < 0) throw new Error(sheetName + " 缺少欄位 " + f + "，請先在表頭補上");
+  });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.date || ""))) throw new Error("日期格式錯誤");
+  var row = headers.map(function (h) {
+    if (h === "id") return Utilities.getUuid();
+    if (h === "date") return p.date;
+    if (h === "createdAt") return new Date();
+    if (fields.indexOf(h) >= 0) {
+      var v = p[h];
+      if (v === undefined || v === null || v === "") return "";
+      var n = parseFloat(v);
+      return isNaN(n) ? "" : n;
+    }
+    return "";
+  });
+  sheet.appendRow(row);
+}
+
+function deleteRowById_(sheetName, id) {
+  var sheet = getSheet(sheetName);
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+}
+
+function getInBodyData() {
+  return sheetToObjects(getSheet("InBody"));
+}
+
+function addInBodyReading(p) {
+  if (!p.weight) throw new Error("請填體重");
+  appendHealthRow_("InBody", INBODY_FIELDS, p);
+  return getInBodyData();
+}
+
+function deleteInBodyReading(id) {
+  deleteRowById_("InBody", id);
+  return getInBodyData();
+}
+
+function getLabResults() {
+  return sheetToObjects(getSheet("LabResults"));
+}
+
+function addLabResult(p) {
+  var any = LAB_FIELDS.some(function (f) { return p[f] !== undefined && p[f] !== ""; });
+  if (!any) throw new Error("至少要填一個項目");
+  appendHealthRow_("LabResults", LAB_FIELDS, p);
+  return getLabResults();
+}
+
+function deleteLabResult(id) {
+  deleteRowById_("LabResults", id);
+  return getLabResults();
+}
+
+// 一次性搬移：把舊的 health_tracker 試算表裡 InBody紀錄 / 驗血報告 的資料搬進來。
+// 只在 Apps Script 編輯器手動執行一次（確認資料正確、搬完後整段刪除）。
+// 兩張表已經有資料時會拒絕執行，避免重複搬。
+function seedHealthFromTracker() {
+  var inbody = [
+    ["2026-04-25", 114.3, 181, 34.9, 39.4, 45.0, 36.8, 64.4, 39.2, 13.7, 1864],
+    ["2026-05-10", 113.1, 181, 34.5, 38.9, 44.0, 39.1, 64.3, 50.6, 13.7, 1873],
+    ["2026-06-16", 114.0, 181, 34.8, 38.5, 43.9, 39.7, 65.2, 51.3, 13.9, 1882],
+    ["2026-06-28", 113.9, 181, 34.8, 39.7, 45.2, 38.8, 63.9, 50.3, 13.6, 1851],
+    ["2026-07-01", 113.7, 181, 34.7, 39.7, 45.1, 38.7, 63.8, 50.2, 13.6, 1849],
+    ["2026-07-03", 113.7, 181, 34.7, 39.1, 44.5, 39.2, 64.4, 50.7, 13.7, 1864],
+  ];
+  var inbodyKeys = ["weight", "height", "bmi", "bodyFat", "fatMass", "skeletalMuscle", "muscleMass", "bodyWater", "protein", "bmr"];
+  var labs = [
+    ["2025-06-27", 100, 6.2, 167, 113, "", 136, "", 16, 1.3, 64.7, 8.4, "", "", 24],
+    ["2025-09-30", 106, 6.1, 186, 123, "", 132, "", 18, 1.3, 64.7, 9, "", "", 24],
+    ["2025-12-23", 99, 6.1, 172, 119, "", 110, "", 16, 1.3, 64.7, 5.3, "", "", 23],
+    ["2026-06-09", 98, 6.4, 193, 137, "", 121, "", 23, 1.4, 59.1, 8.2, "", 260, ""],
+    ["2026-09-02", 98, 6, 183, 121, "", 141, "", 23, 1.4, 55, 7.2, "", 260, ""],
+  ];
+  var labKeys = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt", "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
+  if (getSheet("InBody").getLastRow() > 1 || getSheet("LabResults").getLastRow() > 1) {
+    throw new Error("InBody / LabResults 已經有資料，不重複搬移");
+  }
+  inbody.forEach(function (r) {
+    var p = { date: r[0] };
+    inbodyKeys.forEach(function (k, i) { p[k] = r[i + 1]; });
+    appendHealthRow_("InBody", INBODY_FIELDS, p);
+  });
+  labs.forEach(function (r) {
+    var p = { date: r[0] };
+    labKeys.forEach(function (k, i) { p[k] = r[i + 1]; });
+    appendHealthRow_("LabResults", LAB_FIELDS, p);
+  });
+  return "InBody " + inbody.length + " 筆、LabResults " + labs.length + " 筆";
 }
 
 // 信用卡帳單是獨立頁面，有自己專屬的 action，故意不回傳 getData()，理由跟

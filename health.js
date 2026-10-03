@@ -14,10 +14,38 @@ function applyBpData(readings) {
   state.readings = readings || [];
 }
 
+// 血壓、體重（health-body.js）、驗血（health-labs.js）三個分頁並行載入；某一個失敗不影響其他
 window.loadPageData = async function () {
-  applyBpData(await api("getBloodPressureData"));
-  renderBpAll();
+  const loaders = [
+    async () => { applyBpData(await api("getBloodPressureData")); renderBpAll(); },
+    ...(window.healthLoaders || []),
+  ];
+  const results = await Promise.allSettled(loaders.map(f => f()));
+  const failed = results.find(r => r.status === "rejected");
+  if (failed) setStatus("部分資料載入失敗：" + failed.reason.message, true);
 };
+
+// ====== 分頁切換（血壓 / 體重 / 驗血）======
+const HEALTH_TAB_KEY = "healthTab";
+
+function setHealthTab(tab) {
+  document.querySelectorAll(".health-tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll("main [data-tab]").forEach(el => el.classList.toggle("hidden", el.dataset.tab !== tab));
+  try { localStorage.setItem(HEALTH_TAB_KEY, tab); } catch (e) { /* ignore */ }
+}
+
+document.querySelectorAll(".health-tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => setHealthTab(btn.dataset.tab));
+});
+
+(function initHealthTab() {
+  let tab = "bp";
+  try {
+    const saved = localStorage.getItem(HEALTH_TAB_KEY);
+    if (["bp", "body", "labs"].includes(saved)) tab = saved;
+  } catch (e) { /* ignore */ }
+  setHealthTab(tab);
+})();
 
 function avg(arr) {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -466,6 +494,3 @@ document.getElementById("bpForm").addEventListener("submit", async (e) => {
     updateBpFormValidity();
   }
 });
-
-// ====== Boot ======
-initAuth();

@@ -102,6 +102,26 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   `getBloodPressureData`/`addBloodPressureReading`/`deleteBloodPressureReading`
   三個 action，確保主頁面的操作速度不受血壓資料量增長影響
 
+**InBody**（體重/體組成，健康頁「體重」分頁）
+
+| id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass | bodyWater | protein | mineral | visceralFat | bmr | whr | score | createdAt |
+|----|------|--------|--------|-----|---------|---------|----------------|------------|-----------|---------|---------|-------------|-----|-----|-------|-----------|
+
+- 只有 `date`、`weight` 必填，其他可留空；寫入依「表頭名稱」，欄位順序不影響
+- 目標體重（90 kg）寫在 `health-body.js` 最上面的 `TARGET_WEIGHT`
+- 分級：BMI 用國健署成人標準；體脂率、腰臀比用男性標準；內臟脂肪用 InBody 等級
+
+**LabResults**（驗血，健康頁「驗血」分頁）
+
+| id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt | creatinine | egfr | uricAcid | tsh | ck | bun | createdAt |
+|----|------|---------|-------|-------------|-----|-----|--------------|-----|-----|------------|------|----------|-----|----|-----|-----------|
+
+- 除 `date` 外都可留空（每次驗血不一定每項都有）；一列 = 一次抽血
+- 參考範圍與分級邏輯寫在 `health-labs.js` 的 `ITEMS`（參考範圍採 Dean 驗血報告上的標示，分級另參考
+  ADA、台灣血脂指引、KDIGO 等，依男性）。要加新項目：Sheet 加欄位、`Code.gs` 的 `LAB_FIELDS`
+  加 key、`ITEMS` 加一筆
+- 這兩張表跟 BloodPressure 一樣不經過主頁面的 `getData()`
+
 **CreditCardBills**（信用卡帳單，獨立頁面 `bills.html`）
 
 | id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt |
