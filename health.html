@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>健康 · Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261004015751">
+<link rel="stylesheet" href="style.css?v=20261004020605">
 </head>
 <body>
 
@@ -148,13 +148,14 @@
 
       <section class="card health-main-card hidden" data-tab="body">
         <div class="bp-list-header">
-          <h2>體重與體組成</h2>
+          <h2>體重與體組成 <button type="button" id="bodyInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
           <select id="bodyRange">
             <option value="all">全部</option>
             <option value="1y">近 1 年</option>
             <option value="3m">近 3 個月</option>
           </select>
         </div>
+        <div id="bodyInfoBox" class="info-box hidden">BMI 依國健署成人標準（24 過重、27 輕度肥胖、30 中度、35 重度）；體脂率 25% 以上為肥胖是國健署標準，10–20% 標準、20–25% 偏高是一般體脂計慣用分法；腰臀比 0.9 以上依 WHO 男性腹部肥胖標準；內臟脂肪等級與身體年齡是體脂計廠商的算法，每個品牌分界不同，請以你的體脂計報告標示為準。僅供參考。</div>
         <p id="bodyLatestMeta" class="progress-line"></p>
         <div id="bodyStatsRow" class="bp-stats-row"></div>
         <div id="bodyProgress" class="body-progress"></div>
@@ -166,7 +167,6 @@
         <div id="bodyMuscleChart"></div>
         <h3 class="sub-heading">內臟脂肪</h3>
         <div id="bodyVisceralChart"></div>
-        <p class="health-disclaimer">BMI 依國健署成人標準（24 過重、27 輕度肥胖、30 中度、35 重度）；體脂率 25% 以上為肥胖是國健署標準，10–20% 標準、20–25% 偏高是一般體脂計慣用分法；腰臀比 0.9 以上依 WHO 男性腹部肥胖標準；內臟脂肪等級與身體年齡是體脂計廠商的算法，每個品牌分界不同，請以你的體脂計報告標示為準。僅供參考。分級僅供參考，請以醫師診斷為準。</p>
       </section>
 
       <section class="card health-list-card hidden" data-tab="body">
@@ -200,14 +200,15 @@
       </section>
 
       <section class="card health-main-card hidden" data-tab="labs">
-        <h2>各項目最近一次</h2>
+        <h2>各項目最近一次 <button type="button" id="labInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
+        <div id="labInfoBox" class="info-box hidden">參考範圍採你驗血報告上的標示；分級（🟢正常 🟡注意 🟠偏高 🔴嚴重）：血糖與 HbA1c 依 ADA、血脂（總膽固醇、三酸甘油酯、HDL、LDL）依台灣血脂指引、eGFR 依 KDIGO；AST/ALT、肌酸酐、BUN、尿酸、TSH、CK、鈉、鉀的「注意/偏高」分界是依報告參考範圍推估，不是正式指引。LDL 的 130 是一般成人目標，有高血壓、糖尿病或腎臟病等風險時醫師的目標常更低（如 100），請以醫師設定為準。單次數值不能做診斷，僅供參考。</div>
         <div id="labLatest" class="lab-latest"></div>
         <div class="bp-list-header">
           <h3 class="sub-heading">趨勢</h3>
           <select id="labChartItem"></select>
         </div>
         <div id="labChart"></div>
-        <p class="health-disclaimer">參考範圍採你驗血報告上的標示；分級（🟢正常 🟡注意 🟠偏高 🔴嚴重）：血糖與 HbA1c 依 ADA、血脂（總膽固醇、三酸甘油酯、HDL、LDL）依台灣血脂指引、eGFR 依 KDIGO；AST/ALT、肌酸酐、BUN、尿酸、TSH、CK 的「注意/偏高」分界是依報告參考範圍推估，不是正式指引。LDL 的 130 是一般成人目標，有高血壓、糖尿病或腎臟病等風險時醫師的目標常更低（如 100），請以醫師設定為準。單次數值不能做診斷，僅供參考。</p>
+        <div id="labExplain" class="lab-explain"></div>
       </section>
 
       <section class="card health-list-card hidden" data-tab="labs">
@@ -232,11 +233,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261004015751"></script>
-  <script src="health-charts.js?v=20261004015751"></script>
-  <script src="health.js?v=20261004015751"></script>
-  <script src="health-body.js?v=20261004015751"></script>
-  <script src="health-labs.js?v=20261004015751"></script>
+  <script src="shared.js?v=20261004020605"></script>
+  <script src="health-charts.js?v=20261004020605"></script>
+  <script src="health.js?v=20261004020605"></script>
+  <script src="health-body.js?v=20261004020605"></script>
+  <script src="health-labs.js?v=20261004020605"></script>
   <script>initAuth();</script>
 </body>
 </html>

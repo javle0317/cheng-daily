@@ -357,6 +357,10 @@
     }
   });
 
+  document.getElementById("bodyInfoBtn").addEventListener("click", () => {
+    document.getElementById("bodyInfoBox").classList.toggle("hidden");
+  });
+
   document.getElementById("bodyRange").addEventListener("change", (e) => {
     state.range = e.target.value;
     renderCharts();

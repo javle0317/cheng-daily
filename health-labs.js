@@ -6,52 +6,52 @@
   const R = (level, text) => ({ level, text });
 
   const ITEMS = [
-    { key: "glucose", label: "空腹血糖", unit: "mg/dL", ref: "<100", dec: 0, group: "血糖",
+    { key: "glucose", label: "空腹血糖", unit: "mg/dL", ref: "<100", dec: 0, group: "血糖", better: "lower", desc: "空腹血糖，反映當下血糖控制。越低越好，但 70 以下算偏低，也要留意。",
       classify: v => v < 70 ? R("warning", "偏低") : v < 100 ? R("good", "正常") : v < 126 ? R("warning", "糖尿病前期範圍") : R("serious", "達糖尿病標準"),
       bands: [[0, 70, "warning", "偏低"], [70, 100, "good", "正常"], [100, 126, "warning", "前期"], [126, 600, "serious", "糖尿病"]] },
-    { key: "hba1c", label: "醣化血色素 HbA1c", unit: "%", ref: "<5.7（ADA；報告 4-6）", dec: 1, group: "血糖",
+    { key: "hba1c", label: "醣化血色素 HbA1c", unit: "%", ref: "<5.7（ADA；報告 4-6）", dec: 1, group: "血糖", better: "lower", desc: "過去約 2–3 個月的平均血糖，比單次血糖穩定。越低越好。",
       classify: v => v < 5.7 ? R("good", "正常") : v < 6.5 ? R("warning", "糖尿病前期範圍") : R("serious", "達糖尿病標準"),
       bands: [[0, 5.7, "good", "正常"], [5.7, 6.5, "warning", "前期"], [6.5, 20, "serious", "糖尿病"]] },
-    { key: "cholesterol", label: "總膽固醇", unit: "mg/dL", ref: "<200", dec: 0, group: "血脂",
+    { key: "cholesterol", label: "總膽固醇", unit: "mg/dL", ref: "<200", dec: 0, group: "血脂", better: "lower", desc: "血中膽固醇總量（好壞加總）。越低越好，要搭配 LDL、HDL 一起看。",
       classify: v => v < 200 ? R("good", "正常") : v < 240 ? R("warning", "邊緣偏高") : R("serious", "偏高"),
       bands: [[0, 200, "good", "正常"], [200, 240, "warning", "邊緣"], [240, 600, "serious", "偏高"]] },
-    { key: "ldl", label: "LDL 壞膽固醇", unit: "mg/dL", ref: "<130", dec: 0, group: "血脂",
+    { key: "ldl", label: "LDL 壞膽固醇", unit: "mg/dL", ref: "<130", dec: 0, group: "血脂", better: "lower", desc: "壞膽固醇，會堆積在血管壁。越低越好；有高血壓、糖尿病或腎臟病等風險時，醫師設定的目標通常更低。",
       classify: v => v < 130 ? R("good", "正常") : v < 160 ? R("warning", "邊緣偏高") : v < 190 ? R("serious", "偏高") : R("critical", "很高"),
       bands: [[0, 130, "good", "正常"], [130, 160, "warning", "邊緣"], [160, 190, "serious", "偏高"], [190, 600, "critical", "很高"]] },
-    { key: "hdl", label: "HDL 好膽固醇", unit: "mg/dL", ref: ">40", dec: 0, group: "血脂",
+    { key: "hdl", label: "HDL 好膽固醇", unit: "mg/dL", ref: ">40", dec: 0, group: "血脂", better: "higher", desc: "好膽固醇，幫忙把膽固醇運走。越高越好（男性要大於 40）。",
       classify: v => v > 40 ? R("good", "正常") : v >= 35 ? R("warning", "偏低") : R("serious", "過低"),
       bands: [[0, 35, "serious", "過低"], [35, 40, "warning", "偏低"], [40, 200, "good", "正常"]] },
-    { key: "triglyceride", label: "三酸甘油酯（中性脂肪）", unit: "mg/dL", ref: "<150", dec: 0, group: "血脂",
+    { key: "triglyceride", label: "三酸甘油酯（中性脂肪）", unit: "mg/dL", ref: "<150", dec: 0, group: "血脂", better: "lower", desc: "血中的脂肪（中性脂肪），受飲食、酒精、體重影響大。越低越好。",
       classify: v => v < 150 ? R("good", "正常") : v < 200 ? R("warning", "邊緣偏高") : v < 500 ? R("serious", "偏高") : R("critical", "很高"),
       bands: [[0, 150, "good", "正常"], [150, 200, "warning", "邊緣"], [200, 500, "serious", "偏高"], [500, 3000, "critical", "很高"]] },
-    { key: "ast", label: "AST/GOT", unit: "U/L", ref: "<40", dec: 0, group: "肝功能",
+    { key: "ast", label: "AST/GOT", unit: "U/L", ref: "<40", dec: 0, group: "肝功能", better: "lower", desc: "肝臟與肌肉細胞受損時會升高，劇烈運動後也可能暫時偏高。越低越好。",
       classify: v => v < 40 ? R("good", "正常") : v < 80 ? R("warning", "偏高") : R("serious", "明顯偏高"),
       bands: [[0, 40, "good", "正常"], [40, 80, "warning", "偏高"], [80, 1000, "serious", "明顯偏高"]] },
-    { key: "alt", label: "ALT/GPT", unit: "U/L", ref: "7-52", dec: 0, group: "肝功能",
+    { key: "alt", label: "ALT/GPT", unit: "U/L", ref: "7-52", dec: 0, group: "肝功能", better: "lower", desc: "主要反映肝臟細胞受損，比 AST 更專一於肝。越低越好。",
       classify: v => v <= 52 ? R("good", "正常") : v <= 104 ? R("warning", "偏高") : R("serious", "明顯偏高"),
       bands: [[0, 52, "good", "正常"], [52, 104, "warning", "偏高"], [104, 1000, "serious", "明顯偏高"]] },
-    { key: "creatinine", label: "肌酸酐 Creatinine", unit: "mg/dL", ref: "0.7-1.3", dec: 2, group: "腎功能與尿酸",
+    { key: "creatinine", label: "肌酸酐 Creatinine", unit: "mg/dL", ref: "0.7-1.3", dec: 2, group: "腎功能與尿酸", better: "lower", desc: "肌肉代謝的產物，經腎臟排出，用來看腎功能。肌肉量大的人可能偏高，要搭配 eGFR 看；越低越好但不要低於下限。",
       classify: v => v < 0.7 ? R("warning", "偏低") : v <= 1.3 ? R("good", "正常") : v <= 1.5 ? R("warning", "偏高") : R("serious", "明顯偏高"),
       bands: [[0, 0.7, "warning", "偏低"], [0.7, 1.3, "good", "正常"], [1.3, 1.5, "warning", "偏高"], [1.5, 20, "serious", "明顯偏高"]] },
-    { key: "egfr", label: "eGFR 腎絲球過濾率", unit: "", ref: ">90", dec: 1, group: "腎功能與尿酸",
+    { key: "egfr", label: "eGFR 腎絲球過濾率", unit: "", ref: ">90", dec: 1, group: "腎功能與尿酸", better: "higher", desc: "由肌酸酐算出來的腎絲球過濾率，代表腎臟過濾能力。越高越好；持續低於 60 超過 3 個月，請跟醫師討論。",
       classify: v => v >= 90 ? R("good", "正常") : v >= 60 ? R("warning", "輕度下降") : v >= 30 ? R("serious", "中度下降") : R("critical", "重度下降"),
       bands: [[0, 30, "critical", "重度"], [30, 60, "serious", "中度"], [60, 90, "warning", "輕度"], [90, 300, "good", "正常"]] },
-    { key: "bun", label: "尿素氮 BUN", unit: "mg/dL", ref: "7-25", dec: 0, group: "腎功能與尿酸",
+    { key: "bun", label: "尿素氮 BUN", unit: "mg/dL", ref: "7-25", dec: 0, group: "腎功能與尿酸", better: "range", desc: "尿素氮，另一個看腎功能的指標，也受飲水、蛋白質攝取影響。落在參考範圍內最好。",
       classify: v => v < 7 ? R("warning", "偏低") : v <= 25 ? R("good", "正常") : v <= 40 ? R("warning", "偏高") : R("serious", "明顯偏高"),
       bands: [[0, 7, "warning", "偏低"], [7, 25, "good", "正常"], [25, 40, "warning", "偏高"], [40, 300, "serious", "明顯偏高"]] },
-    { key: "uricAcid", label: "尿酸 Uric acid", unit: "mg/dL", ref: "4.4-7.6", dec: 1, group: "腎功能與尿酸",
+    { key: "uricAcid", label: "尿酸 Uric acid", unit: "mg/dL", ref: "4.4-7.6", dec: 1, group: "腎功能與尿酸", better: "lower", desc: "尿酸過高會增加痛風和腎結石風險。越低越好，但不要低於下限。",
       classify: v => v < 4.4 ? R("warning", "偏低") : v <= 7.6 ? R("good", "正常") : v < 9 ? R("warning", "偏高（高尿酸）") : R("serious", "明顯偏高"),
       bands: [[0, 4.4, "warning", "偏低"], [4.4, 7.6, "good", "正常"], [7.6, 9, "warning", "偏高"], [9, 30, "serious", "明顯偏高"]] },
-    { key: "sodium", label: "鈉 Na", unit: "mmol/L", ref: "136-145", dec: 1, group: "電解質",
+    { key: "sodium", label: "鈉 Na", unit: "mmol/L", ref: "136-145", dec: 1, group: "電解質", better: "range", desc: "血中的鈉，與水分平衡和血壓有關。太高太低都不好，落在參考範圍內最好。",
       classify: v => v >= 136 && v <= 145 ? R("good", "正常") : (v >= 130 && v < 136) || (v > 145 && v <= 150) ? R("warning", v < 136 ? "偏低" : "偏高") : R("serious", v < 130 ? "明顯偏低" : "明顯偏高"),
       bands: [[0, 130, "serious", "明顯偏低"], [130, 136, "warning", "偏低"], [136, 145, "good", "正常"], [145, 150, "warning", "偏高"], [150, 200, "serious", "明顯偏高"]] },
-    { key: "potassium", label: "鉀 K", unit: "mmol/L", ref: "3.5-5.1", dec: 1, group: "電解質",
+    { key: "potassium", label: "鉀 K", unit: "mmol/L", ref: "3.5-5.1", dec: 1, group: "電解質", better: "range", desc: "血中的鉀，影響心律與肌肉。部分降血壓藥（利尿劑、ARB、ACEI）會影響血鉀，太高太低都要留意，落在參考範圍內最好。",
       classify: v => v >= 3.5 && v <= 5.1 ? R("good", "正常") : (v >= 3.0 && v < 3.5) || (v > 5.1 && v <= 5.5) ? R("warning", v < 3.5 ? "偏低" : "偏高") : R("serious", v < 3.0 ? "明顯偏低" : "明顯偏高"),
       bands: [[0, 3.0, "serious", "明顯偏低"], [3.0, 3.5, "warning", "偏低"], [3.5, 5.1, "good", "正常"], [5.1, 5.5, "warning", "偏高"], [5.5, 10, "serious", "明顯偏高"]] },
-    { key: "tsh", label: "甲狀腺 TSH", unit: "", ref: "0.4-4.0", dec: 2, group: "其他",
+    { key: "tsh", label: "甲狀腺 TSH", unit: "", ref: "0.4-4.0", dec: 2, group: "其他", better: "range", desc: "甲狀腺刺激素，用來看甲狀腺功能。太高太低都不好，落在參考範圍內最好。",
       classify: v => v < 0.4 ? R("warning", "偏低") : v <= 4.0 ? R("good", "正常") : v <= 10 ? R("warning", "偏高") : R("serious", "明顯偏高"),
       bands: [[0, 0.4, "warning", "偏低"], [0.4, 4, "good", "正常"], [4, 10, "warning", "偏高"], [10, 100, "serious", "明顯偏高"]] },
-    { key: "ck", label: "肌酸激酶 CK", unit: "U/L", ref: "30-223", dec: 0, group: "其他",
+    { key: "ck", label: "肌酸激酶 CK", unit: "U/L", ref: "30-223", dec: 0, group: "其他", better: "lower", desc: "肌肉細胞受損時會升高，劇烈運動後常暫時偏高。越低越好，但運動後偏高通常不必緊張。",
       classify: v => v < 30 ? R("warning", "偏低") : v <= 223 ? R("good", "正常") : v <= 1000 ? R("warning", "偏高（劇烈運動後常見）") : R("serious", "明顯偏高"),
       bands: [[0, 30, "warning", "偏低"], [30, 223, "good", "正常"], [223, 1000, "warning", "偏高"], [1000, 20000, "serious", "明顯偏高"]] },
   ];
@@ -107,6 +107,8 @@
         get unit() { return last().unit || ""; },
         dec: 2,
         extra: true,
+        better: "range",
+        desc: "這是你自己加的項目，分級依報告上印的參考範圍判斷：落在範圍內最好。",
         history: hist,
         classifyPoint: p => classifyRange(p.value, p.low, p.high),
         refLabel: () => refText(last().low ?? null, last().high ?? null),
@@ -162,12 +164,12 @@
 
       const ref = document.createElement("div");
       ref.className = "tile-delta";
-      let text = `參考 ${item.refLabel()}`;
       if (prev) {
         const d = roundTo(last.value - prev.value, item.dec);
-        text += d === 0 ? " · 與上次持平" : ` · ${d > 0 ? "▲" : "▼"}${Math.abs(d)}`;
+        ref.textContent = d === 0 ? "與上次持平" : `與上次 ${d > 0 ? "▲" : "▼"}${Math.abs(d)}`;
+      } else {
+        ref.textContent = "第一筆";
       }
-      ref.textContent = text;
       const when = document.createElement("div");
       when.className = "tile-delta";
       when.textContent = fmtHealthDate(last.date);
@@ -204,6 +206,7 @@
     const item = allItems().find(i => i.key === state.chartKey);
     if (!item) {
       container.innerHTML = `<p class="empty-hint">還沒有資料可以畫圖</p>`;
+      renderExplain(null);
       return;
     }
     const points = item.history().map(p => {
@@ -211,6 +214,81 @@
       return c ? { date: p.date, value: p.value, level: c.level } : { date: p.date, value: p.value };
     });
     drawTimeChart(container, points, { unit: item.unit, decimals: item.dec, bands: item.bandList() });
+    renderExplain(item);
+  }
+
+  // ====== 趨勢說明（圖表下方）：這個指標是越高/越低越好、趨勢是變好還是變壞、各級切點 ======
+  const LEVEL_RANK = { good: 0, warning: 1, serious: 2, critical: 3 };
+  const BETTER_TEXT = { lower: "越低越好", higher: "越高越好", range: "落在參考範圍內最好" };
+
+  // 比較兩個點：往好、往壞、或持平。先比分級（燈號），同燈號再看數值方向。
+  function compareHealth(item, from, to) {
+    const cf = item.classifyPoint(from), ct = item.classifyPoint(to);
+    if (cf && ct && cf.level !== ct.level) {
+      return LEVEL_RANK[ct.level] < LEVEL_RANK[cf.level]
+        ? { icon: "✅", text: "往好的方向（燈號變好）" }
+        : { icon: "⚠️", text: "往壞的方向（燈號變差）" };
+    }
+    if (cf && ct && ct.level === "good") return { icon: "✅", text: "維持在正常範圍" };
+    if (from.value === to.value) return { icon: "➖", text: "沒有變化" };
+    let improved;
+    if (item.better === "lower") improved = to.value < from.value;
+    else if (item.better === "higher") improved = to.value > from.value;
+    else {
+      const good = item.bandList().find(b => b.level === "good");
+      const center = good ? (good.from + good.to) / 2 : null;
+      improved = center === null ? null : Math.abs(to.value - center) < Math.abs(from.value - center);
+    }
+    if (improved === null) return { icon: "➖", text: from.value < to.value ? "上升" : "下降" };
+    return improved ? { icon: "✅", text: "往好的方向（燈號沒變，數值朝好的方向）" } : { icon: "⚠️", text: "往壞的方向（燈號沒變，數值朝不好的方向）" };
+  }
+
+  function renderExplain(item) {
+    const box = document.getElementById("labExplain");
+    box.innerHTML = "";
+    if (!item) return;
+    const hist = item.history();
+    const addLine = (html) => {
+      const p = document.createElement("p");
+      p.className = "explain-line";
+      p.innerHTML = html;
+      box.appendChild(p);
+    };
+    const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+    const head = document.createElement("div");
+    head.className = "explain-head";
+    head.textContent = `${item.label}：${BETTER_TEXT[item.better] || ""}`;
+    box.appendChild(head);
+
+    if (hist.length >= 2) {
+      const last = hist[hist.length - 1];
+      const prev = hist[hist.length - 2];
+      const first = hist[0];
+      const a = compareHealth(item, prev, last);
+      addLine(`<b>與上次（${fmtHealthDate(prev.date)}）</b>：${roundTo(prev.value, item.dec)} → ${roundTo(last.value, item.dec)}　${a.icon} ${a.text}`);
+      if (hist.length > 2) {
+        const b = compareHealth(item, first, last);
+        addLine(`<b>整體（${fmtHealthDate(first.date)} 起）</b>：${roundTo(first.value, item.dec)} → ${roundTo(last.value, item.dec)}　${b.icon} ${b.text}`);
+      }
+    } else {
+      addLine("只有一筆紀錄，還看不出趨勢。");
+    }
+
+    addLine(`<b>參考範圍</b>：${esc(item.refLabel())}${item.unit ? "（" + esc(item.unit) + "）" : ""}`);
+    const bands = item.bandList();
+    if (bands.length) {
+      const fmt = n => (Math.abs(n) >= 1e8 ? "∞" : roundTo(n, item.dec));
+      const parts = bands.map((b, i) => {
+        // 第一段視為「小於上界」、最後一段視為「大於等於下界」（資料裡的 300、600 只是畫圖用的上限）
+        const from = i === 0 ? "" : fmt(b.from);
+        const to = i === bands.length - 1 ? "" : fmt(b.to);
+        const range = !from ? `< ${to}` : !to ? `≥ ${from}` : `${from}–${to}`;
+        return `${LEVEL_ICON[b.level]} ${esc(b.label || "")} ${range}`;
+      });
+      addLine(`<b>燈號切點</b>：${parts.join("　")}`);
+    }
+    if (item.desc) addLine(esc(item.desc));
   }
 
   // ====== 歷史列表（一天一塊，固定項目 + 其他項目都顯示）======
@@ -477,6 +555,10 @@
   }
 
   buildForm();
+
+  document.getElementById("labInfoBtn").addEventListener("click", () => {
+    document.getElementById("labInfoBox").classList.toggle("hidden");
+  });
 
   window.healthLoaders = window.healthLoaders || [];
   window.healthLoaders.push(async () => {
