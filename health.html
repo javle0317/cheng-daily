@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>健康 · Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261003102426">
+<link rel="stylesheet" href="style.css?v=20261003105337">
 </head>
 <body>
 
@@ -176,7 +176,11 @@
             <input id="labDate" type="date" required>
           </div>
           <div id="labFormFields"></div>
-          <p class="progress-line">只填這次有驗的項目就好，其他留空。</p>
+          <div class="lab-group-title">其他項目（報告上有、上面沒列的）</div>
+          <div id="labExtraRows"></div>
+          <datalist id="labExtraNames"></datalist>
+          <button id="labAddExtraBtn" type="button" class="ghost-btn">＋ 新增一個項目</button>
+          <p class="progress-line">只填這次有驗的項目就好，其他留空。其他項目請照報告填名稱、數值、單位和報告上印的參考範圍（沒有就留空）。</p>
           <div class="form-row">
             <button id="labSubmitBtn" type="submit" disabled>新增</button>
           </div>
@@ -216,11 +220,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261003102426"></script>
-  <script src="health-charts.js?v=20261003102426"></script>
-  <script src="health.js?v=20261003102426"></script>
-  <script src="health-body.js?v=20261003102426"></script>
-  <script src="health-labs.js?v=20261003102426"></script>
+  <script src="shared.js?v=20261003105337"></script>
+  <script src="health-charts.js?v=20261003105337"></script>
+  <script src="health.js?v=20261003105337"></script>
+  <script src="health-body.js?v=20261003105337"></script>
+  <script src="health-labs.js?v=20261003105337"></script>
   <script>initAuth();</script>
 </body>
 </html>

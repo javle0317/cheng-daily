@@ -22,6 +22,8 @@
  *                         bodyWater | protein | bmr | visceralFat | bodyAge | whr | createdAt
  *   LabResults      欄位: id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt |
  *                         creatinine | egfr | uricAcid | tsh | ck | bun | createdAt（除 date 外都可留空）
+ *   LabExtra        欄位: id | date | name | value | unit | refLow | refHigh | createdAt
+ *                         （驗血「其他項目」：報告上有、LabResults 沒列的項目，一個項目一列，自帶報告參考範圍）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
@@ -138,12 +140,12 @@ function handleRequest(e) {
         return respond({ ok: true, data: addInBodyReading(p) });
       case "deleteInBodyReading":
         return respond({ ok: true, data: deleteInBodyReading(p.id) });
-      case "getLabResults":
-        return respond({ ok: true, data: getLabResults() });
-      case "addLabResult":
-        return respond({ ok: true, data: addLabResult(p) });
-      case "deleteLabResult":
-        return respond({ ok: true, data: deleteLabResult(p.id) });
+      case "getLabData":
+        return respond({ ok: true, data: getLabData() });
+      case "addLabEntry":
+        return respond({ ok: true, data: addLabEntry(p) });
+      case "deleteLabDay":
+        return respond({ ok: true, data: deleteLabDay(p.date) });
       case "getCreditCardBills":
         return respond({ ok: true, data: getCreditCardBills() });
       case "addCreditCardBill":
@@ -528,20 +530,74 @@ function deleteInBodyReading(id) {
   return getInBodyData();
 }
 
-function getLabResults() {
-  return sheetToObjects(getSheet("LabResults"));
+// 驗血分兩張表：LabResults（固定項目，一次抽血一列）跟 LabExtra（其他項目，一個項目一列）。
+// 讀寫都回傳 { results, extras }。
+function getLabData() {
+  return {
+    results: sheetToObjects(getSheet("LabResults")),
+    extras: sheetToObjects(getSheet("LabExtra")),
+  };
 }
 
-function addLabResult(p) {
-  var any = LAB_FIELDS.some(function (f) { return p[f] !== undefined && p[f] !== ""; });
-  if (!any) throw new Error("至少要填一個項目");
-  appendHealthRow_("LabResults", LAB_FIELDS, p);
-  return getLabResults();
+function normalizeDateCell_(v) {
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, TIME_ZONE, "yyyy-MM-dd");
+  }
+  return String(v);
 }
 
-function deleteLabResult(id) {
-  deleteRowById_("LabResults", id);
-  return getLabResults();
+// p.extra 是 JSON 字串：[{name, value, unit, refLow, refHigh}, ...]
+function addLabEntry(p) {
+  var extras = [];
+  if (p.extra) {
+    try { extras = JSON.parse(p.extra); } catch (e) { throw new Error("其他項目格式錯誤"); }
+  }
+  var anyFixed = LAB_FIELDS.some(function (f) { return p[f] !== undefined && p[f] !== ""; });
+  if (!anyFixed && !extras.length) throw new Error("至少要填一個項目");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.date || ""))) throw new Error("日期格式錯誤");
+
+  if (anyFixed) appendHealthRow_("LabResults", LAB_FIELDS, p);
+
+  if (extras.length) {
+    var sheet = getSheet("LabExtra");
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    ["date", "name", "value", "unit", "refLow", "refHigh"].forEach(function (h) {
+      if (headers.indexOf(h) < 0) throw new Error("LabExtra 缺少欄位 " + h + "，請先在表頭補上");
+    });
+    extras.forEach(function (x) {
+      var name = String(x.name || "").trim();
+      var value = parseFloat(x.value);
+      if (!name || isNaN(value)) return;
+      var lowN = parseFloat(x.refLow), highN = parseFloat(x.refHigh);
+      var row = headers.map(function (h) {
+        if (h === "id") return Utilities.getUuid();
+        if (h === "date") return p.date;
+        if (h === "name") return name;
+        if (h === "value") return value;
+        if (h === "unit") return String(x.unit || "").trim();
+        if (h === "refLow") return isNaN(lowN) ? "" : lowN;
+        if (h === "refHigh") return isNaN(highN) ? "" : highN;
+        if (h === "createdAt") return new Date();
+        return "";
+      });
+      sheet.appendRow(row);
+    });
+  }
+  return getLabData();
+}
+
+// 刪掉某一天的所有驗血紀錄（固定項目 + 其他項目）
+function deleteLabDay(date) {
+  ["LabResults", "LabExtra"].forEach(function (name) {
+    var sheet = getSheet(name);
+    var values = sheet.getDataRange().getValues();
+    var dateCol = values[0].indexOf("date");
+    if (dateCol < 0) return;
+    for (var i = values.length - 1; i >= 1; i--) {
+      if (normalizeDateCell_(values[i][dateCol]) === String(date)) sheet.deleteRow(i + 1);
+    }
+  });
+  return getLabData();
 }
 
 // 信用卡帳單是獨立頁面，有自己專屬的 action，故意不回傳 getData()，理由跟

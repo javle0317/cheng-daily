@@ -122,6 +122,16 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   加 key、`ITEMS` 加一筆
 - 這兩張表跟 BloodPressure 一樣不經過主頁面的 `getData()`
 
+**LabExtra**（驗血「其他項目」：報告上有、`LabResults` 沒列的項目，例如鈉、鉀、血紅素、尿蛋白）
+
+| id | date | name | value | unit | refLow | refHigh | createdAt |
+|----|------|------|-------|------|--------|---------|-----------|
+
+- 一個項目一列；同名稱的項目會在畫面上自動接成同一條趨勢線
+- `refLow` / `refHigh` 是那份報告上印的參考範圍，可只填一邊或都不填；分級就用這個範圍判斷
+  （範圍內 🟢、超出 15% 以內 🟡、超出 50% 以內 🟠、更多 🔴），不需要我們懂每個項目的醫學意義
+- 某項目如果發現每次都會驗，可以升級成 `LabResults` 的固定項目（補完整醫學分級）
+
 **CreditCardBills**（信用卡帳單，獨立頁面 `bills.html`）
 
 | id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt |
