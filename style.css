@@ -746,3 +746,82 @@ a.ghost-btn {
 /* 循環行程截止日 */
 .recurring-end-label { gap: 8px; }
 .item-row.recurring-ended { opacity: 0.55; }
+
+/* ====== 健康頁：分頁、體重、驗血 ====== */
+.health-tabs { display: flex; gap: 8px; margin: 0 0 16px; }
+.health-tab-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--text-dim);
+  font-size: 15px;
+  cursor: pointer;
+}
+.health-tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+
+@media (min-width: 760px) {
+  .health-form-card { grid-column: 2; }
+  .health-main-card { grid-column: 1; }
+  .health-list-card { grid-column: span 2; }
+}
+
+.more-fields { margin: 4px 0; }
+.more-fields summary { cursor: pointer; color: var(--text-dim); font-size: 14px; padding: 4px 0 8px; }
+.more-fields .form-row { margin-bottom: 8px; }
+
+.health-disclaimer { font-size: 12px; color: var(--text-dim); margin: 16px 0 0; line-height: 1.5; }
+
+/* 分級標籤與文字 */
+.level-badge { display: inline-block; margin-top: 4px; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg); }
+.level-badge.level-good { background: color-mix(in srgb, var(--status-good) 18%, var(--card-bg)); }
+.level-badge.level-warning { background: color-mix(in srgb, var(--status-warning) 28%, var(--card-bg)); }
+.level-badge.level-serious { background: color-mix(in srgb, var(--status-serious) 28%, var(--card-bg)); }
+.level-badge.level-critical { background: color-mix(in srgb, var(--status-critical) 30%, var(--card-bg)); }
+.level-text.level-warning { color: #b07a00; }
+.level-text.level-serious { color: #c2561f; }
+.level-text.level-critical { color: var(--status-critical); font-weight: 600; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .level-text.level-warning { color: var(--status-warning); }
+  :root:not([data-theme="light"]) .level-text.level-serious { color: var(--status-serious); }
+}
+
+.tile-delta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+.body-progress { margin: 0 0 12px; }
+.progress-text { font-size: 13px; margin-bottom: 6px; }
+.progress-bar { height: 8px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.progress-fill { height: 100%; background: var(--status-good); border-radius: 999px; }
+
+.health-record-row { gap: 8px; }
+
+/* 驗血 */
+.lab-group-title { font-size: 13px; font-weight: 600; color: var(--text-dim); margin: 10px 0 6px; }
+.lab-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.lab-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); }
+.lab-field input { width: 100%; box-sizing: border-box; }
+
+.lab-latest { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.lab-tile {
+  text-align: center;
+  background: var(--bg);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 10px 6px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.lab-tile.selected { border-color: var(--accent); }
+.lab-tile-warning { box-shadow: inset 0 0 0 1px var(--status-warning); }
+.lab-tile-serious { box-shadow: inset 0 0 0 1px var(--status-serious); }
+.lab-tile-critical { box-shadow: inset 0 0 0 1px var(--status-critical); }
+.lab-unit { font-size: 11px; font-weight: 400; color: var(--text-dim); }
+
+.lab-block { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.lab-block:last-child { border-bottom: none; }
+.lab-block-head { display: flex; align-items: center; justify-content: space-between; }
+.lab-block-head .sub-heading { margin: 0; }
+.lab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.lab-chip { font-size: 12px; padding: 3px 8px; border-radius: 8px; background: var(--bg); }

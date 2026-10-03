@@ -7,7 +7,7 @@ V=$(date +%Y%m%d%H%M%S)
 for f in *.html; do
   sed -i.bak -E \
     -e "s#(href=\"style\.css)(\?v=[0-9]+)?\"#\1?v=$V\"#" \
-    -e "s#(src=\"[A-Za-z]+\.js)(\?v=[0-9]+)?\"#\1?v=$V\"#" \
+    -e "s#(src=\"[A-Za-z-]+\.js)(\?v=[0-9]+)?\"#\1?v=$V\"#" \
     "$f" && rm -f "$f.bak"
 done
 echo "version -> $V"

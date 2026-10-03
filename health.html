@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>健康記錄 · Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261003011702">
+<title>健康 · Daily Hub</title>
+<link rel="stylesheet" href="style.css?v=20261003101103">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   <div id="app" class="app hidden">
     <header class="app-header">
       <div>
-        <h1>健康記錄</h1>
+        <h1>健康</h1>
         <p class="progress-line"><a href="index.html" class="back-link">← 返回</a></p>
       </div>
       <div class="header-actions">
@@ -32,8 +32,14 @@
       </div>
     </header>
 
+    <nav class="health-tabs">
+      <button type="button" class="health-tab-btn active" data-tab="bp">🩸 血壓</button>
+      <button type="button" class="health-tab-btn" data-tab="body">⚖️ 體重</button>
+      <button type="button" class="health-tab-btn" data-tab="labs">🧪 驗血</button>
+    </nav>
+
     <main class="grid dense">
-      <section class="card new-bp-card">
+      <section class="card new-bp-card" data-tab="bp">
         <h2>新增血壓紀錄</h2>
         <form id="bpForm" class="entry-form entry-form-rows">
           <div class="form-row">
@@ -54,7 +60,7 @@
         </form>
       </section>
 
-      <section class="card bp-chart-card">
+      <section class="card bp-chart-card" data-tab="bp">
         <div class="calendar-nav">
           <button id="bpPeriodPrev" class="ghost-btn">‹</button>
           <h2 id="bpPeriodLabel"></h2>
@@ -80,7 +86,7 @@
 
       </section>
 
-      <section class="card bp-list-card">
+      <section class="card bp-list-card" data-tab="bp">
         <div class="bp-list-header">
           <h2 id="bpListTitle">每日量測紀錄</h2>
           <select id="bpListFilter">
@@ -92,6 +98,105 @@
         <div id="bpList"></div>
       </section>
 
+
+      <!-- ====== 體重（InBody）====== -->
+      <section class="card health-form-card hidden" data-tab="body">
+        <h2>新增體重 / InBody 紀錄</h2>
+        <form id="bodyForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <input id="bodyDate" type="date" required>
+            <input id="bodyWeight" type="number" step="any" min="0" inputmode="decimal" placeholder="體重 kg（必填）" required>
+          </div>
+          <div class="form-row">
+            <input id="bodyFatInput" type="number" step="any" min="0" inputmode="decimal" placeholder="體脂率 %">
+            <input id="bodySkeletal" type="number" step="any" min="0" inputmode="decimal" placeholder="骨骼肌量 kg">
+          </div>
+          <details class="more-fields">
+            <summary>更多 InBody 欄位</summary>
+            <div class="form-row">
+              <input id="bodyHeight" type="number" step="any" min="0" inputmode="decimal" placeholder="身高 cm">
+              <input id="bodyFatMass" type="number" step="any" min="0" inputmode="decimal" placeholder="體脂重量 kg">
+            </div>
+            <div class="form-row">
+              <input id="bodyMuscle" type="number" step="any" min="0" inputmode="decimal" placeholder="全身肌肉量 kg">
+              <input id="bodyWater" type="number" step="any" min="0" inputmode="decimal" placeholder="體水分 kg">
+            </div>
+            <div class="form-row">
+              <input id="bodyProtein" type="number" step="any" min="0" inputmode="decimal" placeholder="蛋白質 kg">
+              <input id="bodyMineral" type="number" step="any" min="0" inputmode="decimal" placeholder="礦物質 kg">
+            </div>
+            <div class="form-row">
+              <input id="bodyVisceral" type="number" step="any" min="0" inputmode="decimal" placeholder="內臟脂肪等級">
+              <input id="bodyBmr" type="number" step="any" min="0" inputmode="decimal" placeholder="基礎代謝率 kcal">
+            </div>
+            <div class="form-row">
+              <input id="bodyWhr" type="number" step="any" min="0" inputmode="decimal" placeholder="腰臀比">
+              <input id="bodyScore" type="number" step="any" min="0" inputmode="decimal" placeholder="體型評估分數">
+            </div>
+          </details>
+          <p id="bodyBmiPreview" class="progress-line"></p>
+          <div class="form-row">
+            <button id="bodySubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card health-main-card hidden" data-tab="body">
+        <div class="bp-list-header">
+          <h2>體重與體組成</h2>
+          <select id="bodyRange">
+            <option value="all">全部</option>
+            <option value="1y">近 1 年</option>
+            <option value="3m">近 3 個月</option>
+          </select>
+        </div>
+        <p id="bodyLatestMeta" class="progress-line"></p>
+        <div id="bodyStatsRow" class="bp-stats-row"></div>
+        <div id="bodyProgress" class="body-progress"></div>
+        <h3 class="sub-heading">體重（kg）</h3>
+        <div id="bodyWeightChart"></div>
+        <h3 class="sub-heading">體脂率（%）</h3>
+        <div id="bodyFatChart"></div>
+        <h3 class="sub-heading">骨骼肌量（kg）</h3>
+        <div id="bodyMuscleChart"></div>
+        <p class="health-disclaimer">BMI 依國健署成人標準；體脂率、腰臀比依男性標準；內臟脂肪依 InBody 等級。分級僅供參考，請以醫師診斷為準。</p>
+      </section>
+
+      <section class="card health-list-card hidden" data-tab="body">
+        <h2>體重紀錄</h2>
+        <div id="bodyList"></div>
+      </section>
+
+      <!-- ====== 驗血 ====== -->
+      <section class="card health-form-card hidden" data-tab="labs">
+        <h2>新增驗血紀錄</h2>
+        <form id="labForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <input id="labDate" type="date" required>
+          </div>
+          <div id="labFormFields"></div>
+          <p class="progress-line">只填這次有驗的項目就好，其他留空。</p>
+          <div class="form-row">
+            <button id="labSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card health-main-card hidden" data-tab="labs">
+        <h2>各項目最近一次</h2>
+        <div id="labLatest" class="lab-latest"></div>
+        <div class="bp-list-header">
+          <h3 class="sub-heading">趨勢</h3>
+          <select id="labChartItem"></select>
+        </div>
+        <div id="labChart"></div>
+        <p class="health-disclaimer">參考範圍採你驗血報告上的標示；分級（🟢正常 🟡注意 🟠偏高 🔴嚴重）另參考 ADA 血糖與 HbA1c、台灣血脂指引、KDIGO eGFR 等，依男性。各檢驗所上限略有不同，單次數值不能做診斷，僅供參考，請以醫師診斷為準。</p>
+      </section>
+
+      <section class="card health-list-card hidden" data-tab="labs">
+        <h2>驗血紀錄</h2>
+        <div id="labList"></div>
+      </section>
     </main>
 
     <p id="statusLine" class="status-line"></p>
@@ -110,7 +215,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261003011702"></script>
-  <script src="health.js?v=20261003011702"></script>
+  <script src="shared.js?v=20261003101103"></script>
+  <script src="health-charts.js?v=20261003101103"></script>
+  <script src="health.js?v=20261003101103"></script>
+  <script src="health-body.js?v=20261003101103"></script>
+  <script src="health-labs.js?v=20261003101103"></script>
+  <script>initAuth();</script>
 </body>
 </html>
