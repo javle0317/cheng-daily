@@ -1,8 +1,11 @@
-// ====== 健康頁：體重（InBody）分頁 ======
+// ====== 健康頁：體組成分頁 ======
 // 共用工具（drawTimeChart / buildLevelBadge / toNum ...）在 health-charts.js。
-// 分級依據：BMI 用國健署成人標準；體脂率用男性標準（Dean 男、42 歲）。
+// 分級依據：BMI 用國健署成人標準；體脂率、腰臀比用男性標準；內臟脂肪用常見等級；
+// 身體年齡跟實際年齡比。（Dean 男、42 歲；設備是 Tokuyo 體脂計，不是 InBody，
+// 但 Sheet 分頁名稱維持 InBody。）
 (function () {
   const TARGET_WEIGHT = 90; // 目標體重（kg）
+  const ACTUAL_AGE = 42; // 實際年齡（歲），身體年齡拿來比；生日過了要手動更新
 
   const state = { readings: [], range: "all" };
 
@@ -20,6 +23,26 @@
     if (v <= 20) return { level: "good", text: "標準" };
     if (v <= 25) return { level: "warning", text: "偏高" };
     return { level: "serious", text: "肥胖" };
+  }
+
+  function classifyVisceral(v) {
+    if (v < 10) return { level: "good", text: "標準" };
+    if (v < 15) return { level: "warning", text: "偏高" };
+    return { level: "serious", text: "高" };
+  }
+
+  function classifyWhr(v) {
+    if (v < 0.9) return { level: "good", text: "正常" };
+    if (v < 1.0) return { level: "warning", text: "偏高" };
+    return { level: "serious", text: "過高" };
+  }
+
+  // 身體年齡跟實際年齡的差
+  function classifyBodyAge(v) {
+    const diff = roundTo(v - ACTUAL_AGE, 0);
+    if (diff <= 0) return { level: "good", text: `比實際年輕 ${Math.abs(diff)} 歲` };
+    if (diff <= 5) return { level: "warning", text: `比實際大 ${diff} 歲` };
+    return { level: "serious", text: `比實際大 ${diff} 歲` };
   }
 
   function sortedReadings() {
@@ -83,11 +106,17 @@
     const bmi = toNum(latest.bmi);
     const bodyFat = toNum(latest.bodyFat);
     const skeletal = toNum(latest.skeletalMuscle);
+    const visceral = toNum(latest.visceralFat);
+    const bodyAge = toNum(latest.bodyAge);
+    const whr = toNum(latest.whr);
 
     if (weight !== null) row.appendChild(makeTile("體重 kg", String(weight), { delta: delta("weight"), unit: " kg" }));
     if (bmi !== null) row.appendChild(makeTile("BMI", String(bmi), { badge: classifyBmi(bmi) }));
     if (bodyFat !== null) row.appendChild(makeTile("體脂率 %", String(bodyFat), { delta: delta("bodyFat"), unit: "%", badge: classifyBodyFat(bodyFat) }));
     if (skeletal !== null) row.appendChild(makeTile("骨骼肌量 kg", String(skeletal), { delta: delta("skeletalMuscle"), unit: " kg" }));
+    if (visceral !== null) row.appendChild(makeTile("內臟脂肪", String(visceral), { delta: delta("visceralFat", 0), badge: classifyVisceral(visceral) }));
+    if (bodyAge !== null) row.appendChild(makeTile("身體年齡", String(bodyAge), { delta: delta("bodyAge", 0), unit: " 歲", badge: classifyBodyAge(bodyAge) }));
+    if (whr !== null) row.appendChild(makeTile("腰臀比", String(whr), { badge: classifyWhr(whr) }));
 
     // 目標進度：從第一筆體重到目標體重
     const first = toNum(all[0].weight);
@@ -136,6 +165,15 @@
       decimals: 1,
       color: "var(--series-pulse)",
     });
+    drawTimeChart(document.getElementById("bodyVisceralChart"), pointsFor("visceralFat", classifyVisceral), {
+      decimals: 0,
+      color: "var(--series-diastolic)",
+      bands: [
+        { from: 0, to: 10, level: "good", label: "標準" },
+        { from: 10, to: 15, level: "warning", label: "偏高" },
+        { from: 15, to: 60, level: "serious", label: "高" },
+      ],
+    });
   }
 
   // ====== 紀錄列表 ======
@@ -178,6 +216,14 @@
         s.textContent = `體脂 ${bf}%（${c.text}）`;
         li.appendChild(s);
       }
+      const vf = toNum(r.visceralFat);
+      if (vf !== null) {
+        const c = classifyVisceral(vf);
+        const s = document.createElement("span");
+        s.className = `item-time level-text level-${c.level}`;
+        s.textContent = `內臟脂肪 ${vf}（${c.text}）`;
+        li.appendChild(s);
+      }
       const sk = toNum(r.skeletalMuscle);
       if (sk !== null) {
         const s = document.createElement("span");
@@ -191,7 +237,7 @@
       del.title = "刪除";
       del.textContent = "✕";
       del.addEventListener("click", async () => {
-        if (!(await showConfirm("確定要刪除這筆體重紀錄嗎？"))) return;
+        if (!(await showConfirm("確定要刪除這筆體組成紀錄嗎？"))) return;
         await withRowLock(del, async () => {
           try {
             apply(await api("deleteInBodyReading", { id: r.id }));
@@ -211,7 +257,7 @@
   const FIELD_MAP = {
     bodyWeight: "weight", bodyHeight: "height", bodyFatInput: "bodyFat", bodyFatMass: "fatMass",
     bodySkeletal: "skeletalMuscle", bodyMuscle: "muscleMass", bodyWater: "bodyWater",
-    bodyProtein: "protein", bodyBmr: "bmr",
+    bodyProtein: "protein", bodyBmr: "bmr", bodyVisceral: "visceralFat", bodyAge: "bodyAge", bodyWhr: "whr",
   };
 
   function computeBmi() {
@@ -265,7 +311,7 @@
         if (id !== "bodyHeight") document.getElementById(id).value = "";
       });
       renderAll();
-      showToast("已新增體重紀錄");
+      showToast("已新增體組成紀錄");
     } catch (err) {
       setStatus("新增失敗：" + err.message, true);
     } finally {
