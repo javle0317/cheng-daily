@@ -102,14 +102,14 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   `getBloodPressureData`/`addBloodPressureReading`/`deleteBloodPressureReading`
   三個 action，確保主頁面的操作速度不受血壓資料量增長影響
 
-**InBody**（體重/體組成，健康頁「體重」分頁）
+**InBody**（體組成紀錄，健康頁「體組成」分頁；設備其實是 Tokuyo 體脂計，Sheet 分頁名稱沿用 InBody）
 
-| id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass | bodyWater | protein | bmr | createdAt |
-|----|------|--------|--------|-----|---------|---------|----------------|------------|-----------|---------|-----|-----------|
+| id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass | bodyWater | protein | bmr | visceralFat | bodyAge | whr | createdAt |
+|----|------|--------|--------|-----|---------|---------|----------------|------------|-----------|---------|-----|-------------|---------|-----|-----------|
 
 - 只有 `date`、`weight` 必填，其他可留空；寫入依「表頭名稱」，欄位順序不影響
-- 目標體重（90 kg）寫在 `health-body.js` 最上面的 `TARGET_WEIGHT`
-- 分級：BMI 用國健署成人標準；體脂率用男性標準。礦物質、內臟脂肪、腰臀比、體型評估分數沒在追蹤，故意不放
+- 目標體重（90 kg）和實際年齡寫在 `health-body.js` 最上面的 `TARGET_WEIGHT`、`ACTUAL_AGE`
+- 分級：BMI 用國健署成人標準；體脂率、腰臀比用男性標準；內臟脂肪 1-9 標準、10-14 偏高、15+ 高；身體年齡跟實際年齡（`health-body.js` 的 `ACTUAL_AGE`）比。體脂計報告裡其他欄位（礦物質、肌肉率、皮下脂肪、四肢分段、健康評分…）刻意不放：不是從體重算出來的衍生值就是日常很少看
 
 **LabResults**（驗血，健康頁「驗血」分頁）
 

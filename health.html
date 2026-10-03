@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>健康 · Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261003102015">
+<link rel="stylesheet" href="style.css?v=20261003102426">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
 
     <nav class="health-tabs">
       <button type="button" class="health-tab-btn active" data-tab="bp">🩸 血壓</button>
-      <button type="button" class="health-tab-btn" data-tab="body">⚖️ 體重</button>
+      <button type="button" class="health-tab-btn" data-tab="body">⚖️ 體組成</button>
       <button type="button" class="health-tab-btn" data-tab="labs">🧪 驗血</button>
     </nav>
 
@@ -99,9 +99,9 @@
       </section>
 
 
-      <!-- ====== 體重（InBody）====== -->
+      <!-- ====== 體組成（體脂計，Sheet 分頁名稱 InBody）====== -->
       <section class="card health-form-card hidden" data-tab="body">
-        <h2>新增體重 / InBody 紀錄</h2>
+        <h2>新增體組成紀錄</h2>
         <form id="bodyForm" class="entry-form entry-form-rows">
           <div class="form-row">
             <input id="bodyDate" type="date" required>
@@ -112,7 +112,7 @@
             <input id="bodySkeletal" type="number" step="any" min="0" inputmode="decimal" placeholder="骨骼肌量 kg">
           </div>
           <details class="more-fields">
-            <summary>更多 InBody 欄位</summary>
+            <summary>更多欄位</summary>
             <div class="form-row">
               <input id="bodyHeight" type="number" step="any" min="0" inputmode="decimal" placeholder="身高 cm">
               <input id="bodyFatMass" type="number" step="any" min="0" inputmode="decimal" placeholder="體脂重量 kg">
@@ -124,6 +124,13 @@
             <div class="form-row">
               <input id="bodyProtein" type="number" step="any" min="0" inputmode="decimal" placeholder="蛋白質 kg">
               <input id="bodyBmr" type="number" step="any" min="0" inputmode="decimal" placeholder="基礎代謝率 kcal">
+            </div>
+            <div class="form-row">
+              <input id="bodyVisceral" type="number" step="any" min="0" inputmode="decimal" placeholder="內臟脂肪">
+              <input id="bodyAge" type="number" step="any" min="0" inputmode="decimal" placeholder="身體年齡">
+            </div>
+            <div class="form-row">
+              <input id="bodyWhr" type="number" step="any" min="0" inputmode="decimal" placeholder="腰臀比">
             </div>
           </details>
           <p id="bodyBmiPreview" class="progress-line"></p>
@@ -151,11 +158,13 @@
         <div id="bodyFatChart"></div>
         <h3 class="sub-heading">骨骼肌量（kg）</h3>
         <div id="bodyMuscleChart"></div>
-        <p class="health-disclaimer">BMI 依國健署成人標準；體脂率依男性標準。分級僅供參考，請以醫師診斷為準。</p>
+        <h3 class="sub-heading">內臟脂肪</h3>
+        <div id="bodyVisceralChart"></div>
+        <p class="health-disclaimer">BMI 依國健署成人標準；體脂率、腰臀比依男性標準；內臟脂肪依常見等級（1-9 標準、10-14 偏高、15+ 高）；身體年齡與實際年齡比較。分級僅供參考，請以醫師診斷為準。</p>
       </section>
 
       <section class="card health-list-card hidden" data-tab="body">
-        <h2>體重紀錄</h2>
+        <h2>體組成紀錄</h2>
         <div id="bodyList"></div>
       </section>
 
@@ -207,11 +216,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261003102015"></script>
-  <script src="health-charts.js?v=20261003102015"></script>
-  <script src="health.js?v=20261003102015"></script>
-  <script src="health-body.js?v=20261003102015"></script>
-  <script src="health-labs.js?v=20261003102015"></script>
+  <script src="shared.js?v=20261003102426"></script>
+  <script src="health-charts.js?v=20261003102426"></script>
+  <script src="health.js?v=20261003102426"></script>
+  <script src="health-body.js?v=20261003102426"></script>
+  <script src="health-labs.js?v=20261003102426"></script>
   <script>initAuth();</script>
 </body>
 </html>

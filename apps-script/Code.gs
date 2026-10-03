@@ -19,7 +19,7 @@
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
  *   InBody          欄位: id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass |
- *                         bodyWater | protein | bmr | createdAt
+ *                         bodyWater | protein | bmr | visceralFat | bodyAge | whr | createdAt
  *   LabResults      欄位: id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt |
  *                         creatinine | egfr | uricAcid | tsh | ck | bun | createdAt（除 date 外都可留空）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
@@ -476,7 +476,7 @@ function deleteBloodPressureReading(id) {
 // 跟血壓一樣是獨立 action、不經過 getData()。兩張表都依「表頭名稱」寫入（不依欄位順序），
 // 數值欄位都可以留空（InBody 只有 date、weight 必填；驗血只有 date 必填、至少一項數值）。
 var INBODY_FIELDS = ["weight", "height", "bmi", "bodyFat", "fatMass", "skeletalMuscle", "muscleMass",
-  "bodyWater", "protein", "bmr"];
+  "bodyWater", "protein", "bmr", "visceralFat", "bodyAge", "whr"];
 var LAB_FIELDS = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt",
   "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
 
