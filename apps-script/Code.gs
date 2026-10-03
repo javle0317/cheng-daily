@@ -602,7 +602,7 @@ function deleteLabDay(date) {
 
 // 一次性搬移：把舊的 health_tracker 試算表裡 InBody紀錄 / 驗血報告 的資料搬進來。
 // 只在 Apps Script 編輯器手動執行一次（確認資料正確、搬完後整段刪除）。
-// 兩張表已經有資料時會拒絕執行，避免重複搬。
+// 兩張表各自判斷，已經有資料的就略過，所以可以安全地重跑。
 function seedHealthFromTracker() {
   var inbody = [
     ["2026-04-25", 114.3, 181, 34.9, 39.4, 45.0, 36.8, 64.4, 39.2, 13.7, 1864],
@@ -622,20 +622,29 @@ function seedHealthFromTracker() {
     ["2026-09-02", 98, 6, 183, 121, "", 141, "", 23, 1.4, 55, 7.2, "", 260, ""],
   ];
   var labKeys = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt", "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun"];
-  if (getSheet("InBody").getLastRow() > 1 || getSheet("LabResults").getLastRow() > 1) {
-    throw new Error("InBody / LabResults 已經有資料，不重複搬移");
+  // 兩張表各自判斷：已經有資料的那張就跳過，所以中途失敗（例如某張表頭沒補齊）修好後可以直接重跑
+  var done = [];
+  if (getSheet("InBody").getLastRow() <= 1) {
+    inbody.forEach(function (r) {
+      var p = { date: r[0] };
+      inbodyKeys.forEach(function (k, i) { p[k] = r[i + 1]; });
+      appendHealthRow_("InBody", INBODY_FIELDS, p);
+    });
+    done.push("InBody " + inbody.length + " 筆");
+  } else {
+    done.push("InBody 已有資料，略過");
   }
-  inbody.forEach(function (r) {
-    var p = { date: r[0] };
-    inbodyKeys.forEach(function (k, i) { p[k] = r[i + 1]; });
-    appendHealthRow_("InBody", INBODY_FIELDS, p);
-  });
-  labs.forEach(function (r) {
-    var p = { date: r[0] };
-    labKeys.forEach(function (k, i) { p[k] = r[i + 1]; });
-    appendHealthRow_("LabResults", LAB_FIELDS, p);
-  });
-  return "InBody " + inbody.length + " 筆、LabResults " + labs.length + " 筆";
+  if (getSheet("LabResults").getLastRow() <= 1) {
+    labs.forEach(function (r) {
+      var p = { date: r[0] };
+      labKeys.forEach(function (k, i) { p[k] = r[i + 1]; });
+      appendHealthRow_("LabResults", LAB_FIELDS, p);
+    });
+    done.push("LabResults " + labs.length + " 筆");
+  } else {
+    done.push("LabResults 已有資料，略過");
+  }
+  return done.join("、");
 }
 
 // 信用卡帳單是獨立頁面，有自己專屬的 action，故意不回傳 getData()，理由跟
