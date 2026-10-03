@@ -104,12 +104,12 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 
 **InBody**（體重/體組成，健康頁「體重」分頁）
 
-| id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass | bodyWater | protein | mineral | visceralFat | bmr | whr | score | createdAt |
-|----|------|--------|--------|-----|---------|---------|----------------|------------|-----------|---------|---------|-------------|-----|-----|-------|-----------|
+| id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass | bodyWater | protein | bmr | createdAt |
+|----|------|--------|--------|-----|---------|---------|----------------|------------|-----------|---------|-----|-----------|
 
 - 只有 `date`、`weight` 必填，其他可留空；寫入依「表頭名稱」，欄位順序不影響
 - 目標體重（90 kg）寫在 `health-body.js` 最上面的 `TARGET_WEIGHT`
-- 分級：BMI 用國健署成人標準；體脂率、腰臀比用男性標準；內臟脂肪用 InBody 等級
+- 分級：BMI 用國健署成人標準；體脂率用男性標準。礦物質、內臟脂肪、腰臀比、體型評估分數沒在追蹤，故意不放
 
 **LabResults**（驗血，健康頁「驗血」分頁）
 
