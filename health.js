@@ -21,8 +21,13 @@ window.loadPageData = async function () {
     ...(window.healthLoaders || []),
   ];
   const results = await Promise.allSettled(loaders.map(f => f()));
-  const failed = results.find(r => r.status === "rejected");
-  if (failed) setStatus("部分資料載入失敗：" + failed.reason.message, true);
+  const failed = results.filter(r => r.status === "rejected");
+  if (failed.length) {
+    let msg = "部分資料載入失敗：" + failed.map(f => f.reason.message).join("；");
+    if (msg.includes("unknown action")) msg += "（Apps Script 可能還沒重新部署成新版本）";
+    // 登入成功後 shared.js 會把狀態列蓋成「已連上 Google Sheet」，所以延後顯示，並用彈窗確保看得到
+    setTimeout(() => { setStatus(msg, true); showConfirm(msg); }, 500);
+  }
 };
 
 // ====== 分頁切換（血壓 / 體重 / 驗血）======
