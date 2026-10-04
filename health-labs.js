@@ -5,6 +5,16 @@
 (function () {
   const R = (level, text) => ({ level, text });
 
+  // LDL 目標值（依個人風險由醫師設定）；只存在這台裝置的 localStorage，預設 130（一般成人）。
+  const LDL_TARGETS = [130, 115, 100, 70];
+  function ldlTarget() {
+    try {
+      const t = Number(localStorage.getItem("ldlTarget"));
+      if (LDL_TARGETS.includes(t)) return t;
+    } catch (e) { /* 讀不到就用預設 */ }
+    return 130;
+  }
+
   const ITEMS = [
     { key: "glucose", label: "空腹血糖", unit: "mg/dL", ref: "<100", dec: 0, group: "血糖", better: "lower", desc: "空腹血糖，反映當下血糖控制。越低越好，但 70 以下算偏低，也要留意。",
       classify: v => v < 70 ? R("warning", "偏低") : v < 100 ? R("good", "正常") : v < 126 ? R("warning", "糖尿病前期範圍") : R("serious", "達糖尿病標準"),
@@ -15,9 +25,10 @@
     { key: "cholesterol", label: "總膽固醇", unit: "mg/dL", ref: "<200", dec: 0, group: "血脂", better: "lower", desc: "血中膽固醇總量（好壞加總）。越低越好，要搭配 LDL、HDL 一起看。",
       classify: v => v < 200 ? R("good", "正常") : v < 240 ? R("warning", "邊緣偏高") : R("serious", "偏高"),
       bands: [[0, 200, "good", "正常"], [200, 240, "warning", "邊緣"], [240, 600, "serious", "偏高"]] },
-    { key: "ldl", label: "LDL 壞膽固醇", unit: "mg/dL", ref: "<130", dec: 0, group: "血脂", better: "lower", desc: "壞膽固醇，會堆積在血管壁。越低越好；有高血壓、糖尿病或腎臟病等風險時，醫師設定的目標通常更低。",
-      classify: v => v < 130 ? R("good", "正常") : v < 160 ? R("warning", "邊緣偏高") : v < 190 ? R("serious", "偏高") : R("critical", "很高"),
-      bands: [[0, 130, "good", "正常"], [130, 160, "warning", "邊緣"], [160, 190, "serious", "偏高"], [190, 600, "critical", "很高"]] },
+    { key: "ldl", label: "LDL 壞膽固醇", unit: "mg/dL", dec: 0, group: "血脂", better: "lower", desc: "壞膽固醇，會堆積在血管壁。越低越好；有高血壓、糖尿病或腎臟病等風險時，醫師設定的目標通常更低。目標值可在下方「LDL 目標」切換。",
+      get ref() { return "<" + ldlTarget(); },
+      classify: v => { const t = ldlTarget(); return v < t ? R("good", "達標") : v < t + 30 ? R("warning", "略高於目標") : v < 190 ? R("serious", "偏高") : R("critical", "很高"); },
+      get bands() { const t = ldlTarget(); return [[0, t, "good", "達標"], [t, t + 30, "warning", "略高"], [t + 30, 190, "serious", "偏高"], [190, 600, "critical", "很高"]]; } },
     { key: "hdl", label: "HDL 好膽固醇", unit: "mg/dL", ref: ">40", dec: 0, group: "血脂", better: "higher", desc: "好膽固醇，幫忙把膽固醇運走。越高越好（男性要大於 40）。",
       classify: v => v > 40 ? R("good", "正常") : v >= 35 ? R("warning", "偏低") : R("serious", "過低"),
       bands: [[0, 35, "serious", "過低"], [35, 40, "warning", "偏低"], [40, 200, "good", "正常"]] },
@@ -555,6 +566,17 @@
   }
 
   buildForm();
+
+  const ldlSelect = document.getElementById("labLdlTarget");
+  ldlSelect.value = String(ldlTarget());
+  ldlSelect.addEventListener("change", () => {
+    try { localStorage.setItem("ldlTarget", ldlSelect.value); } catch (e) { /* 存不了就只對本次有效 */ }
+    const input = document.getElementById("lab_ldl");
+    if (input) input.placeholder = `參考 <${ldlTarget()}`;
+    renderLatest();
+    renderChart();
+    renderList();
+  });
 
   document.getElementById("labInfoBtn").addEventListener("click", () => {
     document.getElementById("labInfoBox").classList.toggle("hidden");
