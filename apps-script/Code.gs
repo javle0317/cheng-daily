@@ -323,7 +323,7 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
     title,
     notes,
     new Date(),
-    amount === undefined || amount === "" ? "" : parseFloat(amount),
+    numArg_(amount, "金額", { emptyValue: "", min: 0 }),
     hideFromCalendar === "true" || hideFromCalendar === true,
   ]);
   return getData(["events"]);
@@ -346,9 +346,10 @@ function setEventAmount(id, amount) {
   var values = sheet.getDataRange().getValues();
   var headers = values[0];
   var amountCol = headers.indexOf("amount") + 1;
+  var newAmount = numArg_(amount, "金額", { emptyValue: "", min: 0 });
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
-      sheet.getRange(i + 1, amountCol).setValue(amount === "" ? "" : parseFloat(amount));
+      sheet.getRange(i + 1, amountCol).setValue(newAmount);
       break;
     }
   }
@@ -364,8 +365,8 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     time || "",
     notes || "",
     frequency,
-    dayOfWeek === undefined || dayOfWeek === "" ? "" : parseInt(dayOfWeek, 10),
-    dayOfMonth === undefined || dayOfMonth === "" ? "" : parseInt(dayOfMonth, 10),
+    numArg_(dayOfWeek, "星期", { emptyValue: "", int: true, min: 0, max: 6 }),
+    numArg_(dayOfMonth, "日期", { emptyValue: "", int: true, min: 1, max: 31 }),
     new Date(),
     endDate || "",
   ]);
@@ -481,9 +482,9 @@ function addBloodPressureReading(date, period, systolic, diastolic, pulse) {
     Utilities.getUuid(),
     date,
     period,
-    parseInt(systolic, 10),
-    parseInt(diastolic, 10),
-    parseInt(pulse, 10),
+    numArg_(systolic, "收縮壓", { int: true, min: 30, max: 300 }),
+    numArg_(diastolic, "舒張壓", { int: true, min: 20, max: 200 }),
+    numArg_(pulse, "脈搏", { emptyValue: "", int: true, min: 20, max: 300 }),
     new Date(),
   ]);
   return getBloodPressureData();
@@ -519,6 +520,23 @@ function parseNumStrict_(v) {
   if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, "");
   var n = Number(t);
   return isFinite(n) ? n : NaN;
+}
+
+// 金額、次數、血壓等所有「使用者輸入的數字」寫入前都走這個：嚴格解析（允許千分位）、
+// 無效就丟錯讓前端顯示，不要偷偷存成 0 或截斷（parseFloat("1,000")=1、parseFloat("abc")||0=0）。
+// opts: emptyValue（空白時回傳的值；沒給就是必填）、int（必須整數）、min、max。
+function numArg_(v, label, opts) {
+  opts = opts || {};
+  var n = parseNumStrict_(v);
+  if (n === null) {
+    if (opts.emptyValue !== undefined) return opts.emptyValue;
+    throw new Error(label + "請填數字");
+  }
+  if (isNaN(n)) throw new Error(label + "「" + v + "」不是有效數字");
+  if (opts.int && Math.floor(n) !== n) throw new Error(label + "必須是整數");
+  if (opts.min !== undefined && n < opts.min) throw new Error(label + "不能小於 " + opts.min);
+  if (opts.max !== undefined && n > opts.max) throw new Error(label + "不能大於 " + opts.max);
+  return n;
 }
 
 // 使用者輸入的文字存進 Sheet 前的公式防護：開頭是 = + - @（或 Tab/換行）的字串會被 Sheets
@@ -782,8 +800,8 @@ function addCreditCardBill(bank, billingMonth, date, fullAmount, lowestAmount) {
     bank,
     billingMonth,
     date,
-    parseFloat(fullAmount) || 0,
-    parseFloat(lowestAmount) || 0,
+    numArg_(fullAmount, "帳單全額", { min: 0 }),
+    numArg_(lowestAmount, "最低應繳", { emptyValue: 0, min: 0 }),
     "", // paidAmount 先留空，收到帳單當下通常還沒繳
     new Date(),
   ]);
@@ -796,6 +814,7 @@ function setCreditCardBillPaid(id, paidAmount) {
   var headers = values[0];
   var paidCol = headers.indexOf("paidAmount") + 1;
   var fullCol = headers.indexOf("fullAmount") + 1;
+  var newPaid = numArg_(paidAmount, "已繳金額", { emptyValue: "", min: 0 });
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       // 已繳金額等於帳單全額就視為繳清，鎖定不能再改（前端也會擋，這裡是最後防線）
@@ -803,7 +822,7 @@ function setCreditCardBillPaid(id, paidAmount) {
       if (currentPaid !== "" && Number(currentPaid) === Number(values[i][fullCol - 1])) {
         throw new Error("這筆帳單已繳清，不能再修改");
       }
-      sheet.getRange(i + 1, paidCol).setValue(paidAmount === "" ? "" : parseFloat(paidAmount) || 0);
+      sheet.getRange(i + 1, paidCol).setValue(newPaid);
       break;
     }
   }
@@ -833,7 +852,7 @@ function deleteCreditCardBill(id) {
 
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
-  var finalTarget = frequency === "daily" ? 1 : (parseInt(target, 10) || 1);
+  var finalTarget = frequency === "daily" ? 1 : numArg_(target, "目標次數", { emptyValue: 1, int: true, min: 1, max: 31 });
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
     name,
@@ -854,7 +873,7 @@ function updateHabit(id, name, workdaysOnly, target) {
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       var frequency = values[i][2];
-      var finalTarget = frequency === "daily" ? 1 : (parseInt(target, 10) || 1);
+      var finalTarget = frequency === "daily" ? 1 : numArg_(target, "目標次數", { emptyValue: 1, int: true, min: 1, max: 31 });
       setTextSafe_(sheet.getRange(i + 1, 2), name);
       sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? (workdaysOnly === "true" || workdaysOnly === true) : values[i][3]);
       sheet.getRange(i + 1, 5).setValue(finalTarget);
@@ -894,7 +913,7 @@ function toggleHabitLog(habitId, periodKey, target) {
   {
     var sheet = getSheet("HabitLog");
     var values = sheet.getDataRange().getValues();
-    var maxTarget = parseInt(target, 10) || 1;
+    var maxTarget = numArg_(target, "目標次數", { emptyValue: 1, int: true, min: 1, max: 31 });
 
     var matchingRows = [];
     for (var i = 1; i < values.length; i++) {

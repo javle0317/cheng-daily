@@ -264,8 +264,14 @@ Repo 目前是公開的（免費方案的 Pages 需要），所以**原始碼與
   讓舊回應蓋掉新畫面。讀取不排隊。
 - **文字寫入防公式**：任何帶使用者文字的寫入一律走 `appendRowSafe_` / `setTextSafe_`（`=`、`+`、`-`、`@` 開頭的
   字串會先把那格設成純文字），不要直接 `sheet.appendRow` / `range.setValue` 寫字串。
-- **數字一律嚴格解析**：後端 `parseNumStrict_`、前端 `parseStrictNumber`（允許千分位 `1,000`，`12abc` 算無效）；
-  不要用 `parseFloat`。
+- **數字一律嚴格解析**：前端 `parseStrictNumber`；後端所有使用者輸入的數字（金額、帳單、血壓、次數、星期/日期、目標）
+  都走 `numArg_`（底層 `parseNumStrict_`）：允許千分位 `1,000`，`abc`／`12abc` 直接回錯誤訊息，不會存成 0 或截斷。
+  不要在 `Code.gs` 用 `parseFloat` / `parseInt` 解析輸入（回歸腳本會檢查）。
+- **處理中的鎖跟著資料走**：寫入排隊時，前一筆回來會重畫整份清單；列的 `data-lock-key`（`goal:id`、`item:id`、
+  `habit:id|週期`）讓還在處理中的那一筆重畫後仍被鎖住（`lockIfPending`），完成前用 `releasePending(li)` 釋放。
+  新增會重畫清單的操作時，在 render 設 `li.dataset.lockKey` 並呼叫 `lockIfPending(li)`。目前只有待辦、清單、習慣接上，
+  其他列表（事件、循環行程、帳單、健康紀錄）仍是只鎖畫面上的那一列。
+- **背景載入不能蓋掉新寫入**：健康頁各分頁的 state 有 `version`，寫入回應 +1；背景載入拿到結果時 version 變了就丟掉。
 - 每個 API 的耗時會記在瀏覽器 console 的 `apiTimings`，覺得慢時先看這個再決定要不要加快取。
 
 ## 回歸檢查

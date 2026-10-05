@@ -53,10 +53,50 @@ function setFormBusy(form, busy) {
 }
 
 // 列表裡單一項目（勾選、刪除、改金額等）的操作：呼叫後端期間把那一列的
-// 所有控制項鎖住，回來前不能再點，避免連點送出重複請求
+// 所有控制項鎖住，回來前不能再點，避免連點送出重複請求。
+//
+// 鎖要「跟著資料走」，不能只綁在畫面上的那一列：寫入是排隊送的，前一筆回來會把整份清單重畫，
+// 這時還在排隊的那一筆對應的新 <li> 是全新的、沒有鎖，可以再點一次造成重複計次。
+// 所以有 data-lock-key 的列（render 時設成「類型:id」，習慣是「習慣id|週期」）會把處理中狀態存在 pendingKeys，
+// 重畫後用 lockIfPending(li) 重新鎖上；操作結束（或 releasePending 提前釋放）時一併解開。
+const pendingKeys = new Set();
+const pendingRows = new Map(); // key → 重畫後被重新鎖上的 <li>
+
+function lockControls(row) {
+  row.classList.add("pending");
+  const controls = [...row.querySelectorAll("input, button, select, textarea")];
+  controls.forEach(c => { c.dataset.wasDisabled = c.disabled ? "1" : ""; c.disabled = true; });
+  return controls;
+}
+
+function unlockControls(row, controls) {
+  row.classList.remove("pending");
+  controls.forEach(c => { c.disabled = c.dataset.wasDisabled === "1"; delete c.dataset.wasDisabled; });
+}
+
+// render 完一列之後呼叫：這一列對應的操作還在處理中就重新鎖上
+function lockIfPending(li) {
+  const key = li.dataset.lockKey;
+  if (!key || !pendingKeys.has(key)) return;
+  const controls = lockControls(li);
+  if (!pendingRows.has(key)) pendingRows.set(key, []);
+  pendingRows.get(key).push({ li, controls });
+}
+
+// 回應已經拿到、準備重畫之前先呼叫：讓重畫出來的這一列不要被鎖著（自己的操作已完成）
+function releasePending(li) {
+  const key = li && li.dataset ? li.dataset.lockKey : null;
+  if (key) pendingKeys.delete(key);
+}
+
 async function withRowLock(el, fn, alsoLock = []) {
   const row = el.closest("li") || el;
   if (row.classList.contains("pending")) return;
+  const key = row.dataset.lockKey || null;
+  if (key) {
+    if (pendingKeys.has(key)) return;
+    pendingKeys.add(key);
+  }
   row.classList.add("pending");
   // alsoLock：同一畫面上會跟這個操作互相影響的其他控制項（例如清單裡的「清除已完成」）
   const controls = [row, ...alsoLock].flatMap(r => [...r.querySelectorAll("input, button, select, textarea")]
@@ -67,10 +107,14 @@ async function withRowLock(el, fn, alsoLock = []) {
   } finally {
     row.classList.remove("pending");
     controls.forEach(c => { c.disabled = c.dataset.wasDisabled === "1"; delete c.dataset.wasDisabled; });
+    if (key) {
+      pendingKeys.delete(key);
+      // 操作失敗沒有重畫時，之前被重新鎖上的新 <li> 也要解開
+      (pendingRows.get(key) || []).forEach(({ li, controls: cs }) => unlockControls(li, cs));
+      pendingRows.delete(key);
+    }
   }
 }
-
-
 
 // 組 HTML 字串（SVG 圖表等）時，使用者輸入的文字（銀行名稱、驗血單位…）一律先過這個
 function escapeHtml(s) {

@@ -348,6 +348,7 @@ function renderGoals() {
         li.classList.toggle("done", box.checked);
         try {
           applyData(await api("toggleGoal", { id: goal.id }));
+          releasePending(li);
           renderGoals();
           renderHeader();
           renderCalendar();
@@ -363,6 +364,7 @@ function renderGoals() {
       await withRowLock(li, async () => {
         try {
           applyData(await api("deleteGoal", { id: goal.id }));
+          releasePending(li);
           renderGoals();
           renderHeader();
           renderCalendar();
@@ -371,6 +373,8 @@ function renderGoals() {
         }
       });
     });
+    li.dataset.lockKey = `goal:${goal.id}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }
@@ -471,6 +475,7 @@ function renderDailyHabits() {
         li.classList.toggle("done", box.checked);
         try {
           applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target: habit.target || 1 }));
+          releasePending(li);
           renderDailyHabits();
         } catch (err) {
           box.checked = !box.checked;
@@ -485,12 +490,15 @@ function renderDailyHabits() {
       await withRowLock(li, async () => {
         try {
           applyData(await api("deleteHabit", { id: habit.id }));
+          releasePending(li);
           renderDailyHabits();
         } catch (err) {
           setStatus("刪除失敗：" + err.message, true);
         }
       });
     });
+    li.dataset.lockKey = `habit:${habit.id}|${periodKey}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }
@@ -591,6 +599,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
       await withRowLock(li, async () => {
         try {
           applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target }));
+          releasePending(li);
           renderPeriodHabits(frequency, listId, sectionId);
         } catch (err) {
           setStatus("更新失敗：" + err.message, true);
@@ -603,12 +612,15 @@ function renderPeriodHabits(frequency, listId, sectionId) {
       await withRowLock(li, async () => {
         try {
           applyData(await api("deleteHabit", { id: habit.id }));
+          releasePending(li);
           renderPeriodHabits(frequency, listId, sectionId);
         } catch (err) {
           setStatus("刪除失敗：" + err.message, true);
         }
       });
     });
+    li.dataset.lockKey = `habit:${habit.id}|${periodKey}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }
@@ -1227,6 +1239,7 @@ function renderShoppingList() {
         li.classList.toggle("done", box.checked);
         try {
           applyData(await api("toggleShoppingItem", { id: item.id }));
+          releasePending(li);
           renderShoppingList();
         } catch (err) {
           box.checked = !box.checked;
@@ -1240,12 +1253,15 @@ function renderShoppingList() {
       await withRowLock(li, async () => {
         try {
           applyData(await api("deleteShoppingItem", { id: item.id }));
+          releasePending(li);
           renderShoppingList();
         } catch (err) {
           setStatus("刪除失敗：" + err.message, true);
         }
       }, [document.getElementById("clearDoneBtn")]);
     });
+    li.dataset.lockKey = `item:${item.id}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }

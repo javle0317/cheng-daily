@@ -7,7 +7,7 @@
   const TARGET_WEIGHT = 90; // 目標體重（kg）
   const ACTUAL_AGE = 42; // 實際年齡（歲），身體年齡拿來比；生日過了要手動更新
 
-  const state = { readings: [], range: "all" };
+  const state = { readings: [], range: "all", version: 0 };
 
   function classifyBmi(v) {
     if (v < 18.5) return { level: "warning", text: "過輕" };
@@ -382,7 +382,10 @@
     renderCharts();
   });
 
-  function apply(data) {
+  // 寫入（新增/刪除）的回應 version+1；背景載入（登入後才讀其他分頁）拿到結果時如果 version 變了，
+  // 代表使用者在載入期間已經寫入過，載入的是更舊的資料，要丟掉，不然剛新增的紀錄會「消失」
+  function apply(data, fromLoader) {
+    if (!fromLoader) state.version++;
     state.readings = data || [];
   }
 
@@ -395,7 +398,10 @@
 
   window.healthLoaders = window.healthLoaders || [];
   window.healthLoaders.push({ tab: "body", load: async () => {
-    apply(await api("getInBodyData"));
+    const v = state.version;
+    const data = await api("getInBodyData");
+    if (state.version !== v) return;
+    apply(data, true);
     renderAll();
   } });
 })();

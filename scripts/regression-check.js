@@ -134,6 +134,13 @@ let threw = false;
 try { be.normalizeLabExtras_([{ name: "Y", value: "abc" }]); } catch (e) { threw = true; }
 check("驗血其他項目：無效數值丟錯、不寫入", threw);
 
+const throws = f => { try { f(); return false; } catch (e) { return true; } };
+check("numArg_：千分位 1,000 → 1000", be.numArg_("1,000", "金額") === 1000);
+check("numArg_：abc 丟錯（不是存成 0）", throws(() => be.numArg_("abc", "金額")));
+check("numArg_：必填空白丟錯；emptyValue 空白回傳預設", throws(() => be.numArg_("", "帳單全額")) && be.numArg_("", "最低", { emptyValue: 0 }) === 0);
+check("numArg_：整數、範圍檢查", throws(() => be.numArg_("1.5", "次數", { int: true })) && throws(() => be.numArg_("40", "星期", { max: 6 })) && throws(() => be.numArg_("-1", "金額", { min: 0 })));
+check("所有金額寫入入口都用 numArg_（Code.gs 不再有 parseFloat/parseInt 解析輸入）", !/parseFloat\(|parseInt\(/.test(read("apps-script/Code.gs").replace(/\/\/.*$/gm, "")));
+
 console.log("後端：傳輸與寫入鎖");
 const out = o => JSON.parse(o.text);
 check("GET 一律拒絕", out(be.doGet({ parameter: { action: "getData", password: "secret" } })).error === "請改用 POST");

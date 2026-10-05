@@ -69,7 +69,7 @@
 
   // 「其他項目」：報告上有、ITEMS 沒列的項目，存在 LabExtra（一個項目一列），
   // 每筆自帶報告上的參考範圍；分級就用那個範圍判斷（醫學意義不用我們懂，報告怎麼標就怎麼標）。
-  const state = { results: [], extras: [], chartKey: "glucose" };
+  const state = { results: [], extras: [], chartKey: "glucose", version: 0 };
 
   function classifyRange(v, low, high) {
     let over = 0;
@@ -596,7 +596,9 @@
     renderChart();
   });
 
-  function apply(data) {
+  // 寫入的回應 version+1；背景載入拿到結果時 version 變了就丟掉（理由見 health-body.js 的 apply）
+  function apply(data, fromLoader) {
+    if (!fromLoader) state.version++;
     state.results = (data && data.results) || [];
     state.extras = (data && data.extras) || [];
   }
@@ -631,7 +633,10 @@
 
   window.healthLoaders = window.healthLoaders || [];
   window.healthLoaders.push({ tab: "labs", load: async () => {
-    apply(await api("getLabData"));
+    const v = state.version;
+    const data = await api("getLabData");
+    if (state.version !== v) return;
+    apply(data, true);
     renderAll();
   } });
 })();

@@ -8,16 +8,24 @@ let state = {
   month: new Date().getMonth(),
   year: new Date().getFullYear(),
   listFilter: "all", // all / morning / evening
+  version: 0, // 寫入回應 +1；背景載入回來時 version 變了就丟掉（見 health-body.js 的 apply）
 };
 
-function applyBpData(readings) {
+function applyBpData(readings, fromLoader) {
+  if (!fromLoader) state.version++;
   state.readings = readings || [];
 }
 
 // 血壓、體重（health-body.js）、驗血（health-labs.js）三個分頁並行載入；某一個失敗不影響其他
 window.loadPageData = async function () {
   const loaders = [
-    { tab: "bp", load: async () => { applyBpData(await api("getBloodPressureData")); renderBpAll(); } },
+    { tab: "bp", load: async () => {
+      const v = state.version;
+      const data = await api("getBloodPressureData");
+      if (state.version !== v) return;
+      applyBpData(data, true);
+      renderBpAll();
+    } },
     ...(window.healthLoaders || []),
   ];
   let current = "bp";
