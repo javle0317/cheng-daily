@@ -101,7 +101,7 @@ function drawTimeChart(container, points, opts = {}) {
   }
   sorted.forEach((p, i) => {
     const fill = p.level ? LEVEL_VAR[p.level] : color;
-    svg += `<circle cx="${xScale(times[i])}" cy="${yScale(p.value)}" r="4.5" fill="${fill}" stroke="var(--card-bg)" stroke-width="1.5"><title>${fmtHealthDate(p.date)}：${roundTo(p.value, dec)}${opts.unit ? " " + opts.unit : ""}</title></circle>`;
+    svg += `<circle cx="${xScale(times[i])}" cy="${yScale(p.value)}" r="4.5" fill="${fill}" stroke="var(--card-bg)" stroke-width="1.5"><title>${fmtHealthDate(p.date)}：${roundTo(p.value, dec)}${opts.unit ? " " + escapeHtml(opts.unit) : ""}</title></circle>`;
   });
   svg += `</svg>`;
   container.innerHTML = svg;

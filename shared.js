@@ -72,6 +72,11 @@ async function withRowLock(el, fn, alsoLock = []) {
 
 
 
+// 組 HTML 字串（SVG 圖表等）時，使用者輸入的文字（銀行名稱、驗血單位…）一律先過這個
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // ====== API ======
 async function api(action, params = {}) {
   const password = localStorage.getItem(PASSWORD_KEY);
@@ -141,8 +146,8 @@ document.getElementById("lockForm").addEventListener("submit", (e) => {
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
   localStorage.removeItem(PASSWORD_KEY);
-  document.getElementById("passwordInput").value = "";
-  showLockScreen();
+  // 直接重新載入：記憶體裡的資料、畫面上的內容、開著的彈窗一次全部清掉
+  location.reload();
 });
 
 // ====== 確認/輸入 modal（取代原生 confirm()/prompt()，手機瀏覽器對話框關閉後

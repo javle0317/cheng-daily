@@ -22,6 +22,10 @@ window.loadPageData = async function () {
   ];
   const results = await Promise.allSettled(loaders.map(f => f()));
   const failed = results.filter(r => r.status === "rejected");
+  // 密碼錯誤或全部失敗：丟出去讓登入流程留在登入頁，不能讓人進到空畫面
+  const authFail = failed.find(f => f.reason && f.reason.message === "unauthorized");
+  if (authFail) throw authFail.reason;
+  if (failed.length === loaders.length) throw failed[0].reason;
   if (failed.length) {
     let msg = "部分資料載入失敗：" + failed.map(f => f.reason.message).join("；");
     if (msg.includes("unknown action")) msg += "（Apps Script 可能還沒重新部署成新版本）";

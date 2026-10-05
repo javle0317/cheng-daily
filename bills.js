@@ -254,7 +254,7 @@ function renderYearChart() {
     const path = s.points.map((p, i) => `${i === 0 ? "M" : "L"}${xScale(p.x)},${yScale(p.y)}`).join(" ");
     svg += `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
     s.points.forEach(p => {
-      svg += `<circle cx="${xScale(p.x)}" cy="${yScale(p.y)}" r="3.5" fill="${s.color}"><title>${s.label} ${p.x}月 $${formatAmount(p.y)}</title></circle>`;
+      svg += `<circle cx="${xScale(p.x)}" cy="${yScale(p.y)}" r="3.5" fill="${s.color}"><title>${escapeHtml(s.label)} ${p.x}月 $${formatAmount(p.y)}</title></circle>`;
     });
   });
 
@@ -262,7 +262,7 @@ function renderYearChart() {
 
   let legend = `<div class="bp-legend">`;
   series.forEach(s => {
-    legend += `<span class="bp-legend-item"><span class="bp-legend-dot" style="background:${s.color}"></span>${s.label}</span>`;
+    legend += `<span class="bp-legend-item"><span class="bp-legend-dot" style="background:${s.color}"></span>${escapeHtml(s.label)}</span>`;
   });
   legend += `</div>`;
 
@@ -273,7 +273,7 @@ function renderBankChartOptions() {
   const select = document.getElementById("billBankChartMonth");
   const months = [...new Set(state.bills.map(b => b.billingMonth))].sort().reverse();
   const current = select.value || state.bankChartMonth;
-  select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join("");
+  select.innerHTML = months.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
   if (months.includes(current)) {
     select.value = current;
   } else if (months.length) {
@@ -308,8 +308,8 @@ function renderBankChart() {
   sorted.forEach((b, i) => {
     const y = marginTop + i * (barH + gap);
     const w = Math.max((Number(b.fullAmount) / maxVal) * plotW, 2);
-    svg += `<text x="${marginLeft - 6}" y="${y + barH / 2}" class="bp-axis-label" text-anchor="end" dominant-baseline="middle">${b.bank}</text>`;
-    svg += `<rect x="${marginLeft}" y="${y}" width="${w}" height="${barH}" fill="var(--series-systolic)" rx="4"><title>${b.bank} $${formatAmount(b.fullAmount)}</title></rect>`;
+    svg += `<text x="${marginLeft - 6}" y="${y + barH / 2}" class="bp-axis-label" text-anchor="end" dominant-baseline="middle">${escapeHtml(b.bank)}</text>`;
+    svg += `<rect x="${marginLeft}" y="${y}" width="${w}" height="${barH}" fill="var(--series-systolic)" rx="4"><title>${escapeHtml(b.bank)} $${formatAmount(b.fullAmount)}</title></rect>`;
     svg += `<text x="${marginLeft + w + 6}" y="${y + barH / 2}" class="bp-axis-label" dominant-baseline="middle">$${formatAmount(b.fullAmount)}</text>`;
   });
   svg += `</svg>`;

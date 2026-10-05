@@ -265,7 +265,7 @@
       p.innerHTML = html;
       box.appendChild(p);
     };
-    const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const esc = escapeHtml;
 
     const head = document.createElement("div");
     head.className = "explain-head";
@@ -277,10 +277,10 @@
       const prev = hist[hist.length - 2];
       const first = hist[0];
       const a = compareHealth(item, prev, last);
-      addLine(`<b>與上次（${fmtHealthDate(prev.date)}）</b>：${roundTo(prev.value, item.dec)} → ${roundTo(last.value, item.dec)}　${a.icon} ${a.text}`);
+      addLine(`<b>與上次（${fmtHealthDate(prev.date)}）</b>：${roundTo(prev.value, item.dec)} → ${roundTo(last.value, item.dec)}　${a.icon} ${esc(a.text)}`);
       if (hist.length > 2) {
         const b = compareHealth(item, first, last);
-        addLine(`<b>整體（${fmtHealthDate(first.date)} 起）</b>：${roundTo(first.value, item.dec)} → ${roundTo(last.value, item.dec)}　${b.icon} ${b.text}`);
+        addLine(`<b>整體（${fmtHealthDate(first.date)} 起）</b>：${roundTo(first.value, item.dec)} → ${roundTo(last.value, item.dec)}　${b.icon} ${esc(b.text)}`);
       }
     } else {
       addLine("只有一筆紀錄，還看不出趨勢。");
