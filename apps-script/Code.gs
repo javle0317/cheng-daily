@@ -72,6 +72,25 @@ function handleRequest(e) {
       return respond({ ok: false, error: "unauthorized" });
     }
 
+    // 所有寫入動作（不是 get 開頭的）一律序列化：整段「讀列號→寫入」不被別的請求插進來，
+    // 才不會因為列號位移寫錯列、或兩邊同時新增造成重複。讀取不用鎖。
+    var lock = null;
+    if (String(p.action).indexOf("get") !== 0) {
+      lock = LockService.getScriptLock();
+      lock.waitLock(30000);
+    }
+    try {
+      return dispatch_(p);
+    } finally {
+      if (lock) lock.releaseLock();
+    }
+  } catch (err) {
+    return respond({ ok: false, error: String(err) });
+  }
+}
+
+function dispatch_(p) {
+  {
     switch (p.action) {
       case "getData":
         return respond({ ok: true, data: getData() });
@@ -160,8 +179,6 @@ function handleRequest(e) {
       default:
         return respond({ ok: false, error: "unknown action" });
     }
-  } catch (err) {
-    return respond({ ok: false, error: String(err) });
   }
 }
 
@@ -232,17 +249,20 @@ function sheetToObjects(sheet) {
   });
 }
 
-function getData() {
-  return {
-    goals: sheetToObjects(getSheet("Goals")),
-    events: sheetToObjects(getSheet("Events")),
-    habits: sheetToObjects(getSheet("Habits")),
-    habitLogs: sheetToObjects(getSheet("HabitLog")),
-    recurringEvents: sheetToObjects(getSheet("RecurringEvents")),
-    recurringExceptions: sheetToObjects(getSheet("RecurringExceptions")),
-    shoppingList: sheetToObjects(getSheet("ShoppingList")),
-    holidays: getHolidaysSafe_(),
-  };
+// keys 省略 = 全部（登入時整包讀）；寫入動作只傳自己動到的集合，不要每次都重讀七張表。
+// 前端 applyData 只覆蓋回傳裡有的欄位。
+var DATA_SHEETS_ = {
+  goals: "Goals", events: "Events", habits: "Habits", habitLogs: "HabitLog",
+  recurringEvents: "RecurringEvents", recurringExceptions: "RecurringExceptions", shoppingList: "ShoppingList",
+};
+
+function getData(keys) {
+  var out = {};
+  Object.keys(DATA_SHEETS_).forEach(function (k) {
+    if (!keys || keys.indexOf(k) >= 0) out[k] = sheetToObjects(getSheet(DATA_SHEETS_[k]));
+  });
+  if (!keys || keys.indexOf("holidays") >= 0) out.holidays = getHolidaysSafe_();
+  return out;
 }
 
 // 假日抓取失敗（例如 Calendar 權限還沒授權、或 Google 那邊暫時出狀況）不該讓
@@ -259,7 +279,7 @@ function getHolidaysSafe_() {
 function addGoal(date, text) {
   var sheet = getSheet("Goals");
   sheet.appendRow([Utilities.getUuid(), date, text, false, new Date()]);
-  return getData();
+  return getData(["goals"]);
 }
 
 function toggleGoal(id) {
@@ -271,7 +291,7 @@ function toggleGoal(id) {
       break;
     }
   }
-  return getData();
+  return getData(["goals"]);
 }
 
 function deleteGoal(id) {
@@ -283,7 +303,7 @@ function deleteGoal(id) {
       break;
     }
   }
-  return getData();
+  return getData(["goals"]);
 }
 
 function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
@@ -299,7 +319,7 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
     amount === undefined || amount === "" ? "" : parseFloat(amount),
     hideFromCalendar === "true" || hideFromCalendar === true,
   ]);
-  return getData();
+  return getData(["events"]);
 }
 
 function deleteEvent(id) {
@@ -311,7 +331,7 @@ function deleteEvent(id) {
       break;
     }
   }
-  return getData();
+  return getData(["events"]);
 }
 
 function setEventAmount(id, amount) {
@@ -325,7 +345,7 @@ function setEventAmount(id, amount) {
       break;
     }
   }
-  return getData();
+  return getData(["events"]);
 }
 
 function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate) {
@@ -342,7 +362,7 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     new Date(),
     endDate || "",
   ]);
-  return getData();
+  return getData(["recurringEvents"]);
 }
 
 // 事後補登/修改/清除（傳空字串）循環行程的截止日。截止日當天仍會出現，之後就不展開。
@@ -358,7 +378,7 @@ function setRecurringEndDate(id, endDate) {
       break;
     }
   }
-  return getData();
+  return getData(["recurringEvents"]);
 }
 
 function deleteRecurringEvent(id) {
@@ -370,13 +390,13 @@ function deleteRecurringEvent(id) {
       break;
     }
   }
-  return getData();
+  return getData(["recurringEvents"]);
 }
 
 function addRecurringException(recurringId, date) {
   var sheet = getSheet("RecurringExceptions");
   sheet.appendRow([Utilities.getUuid(), recurringId, date, new Date()]);
-  return getData();
+  return getData(["recurringExceptions"]);
 }
 
 function deleteRecurringException(id) {
@@ -388,7 +408,7 @@ function deleteRecurringException(id) {
       break;
     }
   }
-  return getData();
+  return getData(["recurringExceptions"]);
 }
 
 // 「清單」有兩個分類：shopping（購物）跟 idea（想法），同一張表用 category 欄位區分。
@@ -400,7 +420,7 @@ function normalizeListCategory_(c) {
 function addShoppingItem(item, category) {
   var sheet = getSheet("ShoppingList");
   sheet.appendRow([Utilities.getUuid(), item, false, new Date(), normalizeListCategory_(category)]);
-  return getData();
+  return getData(["shoppingList"]);
 }
 
 // 清除某個分類底下所有已勾選的項目
@@ -415,7 +435,7 @@ function clearDoneShoppingItems(category) {
     var done = values[i][2] === true || values[i][2] === "TRUE";
     if (done && rowCat === target) sheet.deleteRow(i + 1);
   }
-  return getData();
+  return getData(["shoppingList"]);
 }
 
 function toggleShoppingItem(id) {
@@ -427,7 +447,7 @@ function toggleShoppingItem(id) {
       break;
     }
   }
-  return getData();
+  return getData(["shoppingList"]);
 }
 
 function deleteShoppingItem(id) {
@@ -439,7 +459,7 @@ function deleteShoppingItem(id) {
       break;
     }
   }
-  return getData();
+  return getData(["shoppingList"]);
 }
 
 // 血壓頁面是獨立頁面、有自己專屬的 action，故意不回傳 getData()（不想讓主頁面
@@ -539,14 +559,14 @@ function upsertHealthRow_(sheetName, fields, p) {
   if (dateCol >= 0) {
     for (var i = 1; i < values.length; i++) {
       if (normalizeDateCell_(values[i][dateCol]) !== String(p.date)) continue;
+      // 整列在記憶體裡合併好，一次寫回（原本是一格一格 setValue，欄位多時很慢）
+      var row = values[i].slice();
       fields.forEach(function (f) {
         var col = headers.indexOf(f);
-        if (col < 0) return;
         var n = parseNumStrict_(p[f]);
-        if (n === null) return;
-        if (isNaN(n)) throw new Error(f + " 不是有效數字");
-        sheet.getRange(i + 1, col + 1).setValue(n);
+        if (col >= 0 && n !== null) row[col] = n;
       });
+      sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
       return;
     }
   }
@@ -805,7 +825,7 @@ function addHabit(name, frequency, workdaysOnly, target) {
     finalTarget,
     new Date(),
   ]);
-  return getData();
+  return getData(["habits"]);
 }
 
 // 編輯習慣：可改名稱、daily 的「只算工作日」、weekly/monthly 的目標次數。
@@ -824,7 +844,7 @@ function updateHabit(id, name, workdaysOnly, target) {
       break;
     }
   }
-  return getData();
+  return getData(["habits"]);
 }
 
 function deleteHabit(id) {
@@ -836,13 +856,14 @@ function deleteHabit(id) {
       break;
     }
   }
-  return getData();
+  return getData(["habits"]);
 }
 
 // 讀取現有列、決定要遞增/刪除還是新增一列、再寫回去——這整段「讀了再寫」如果
 // 同時有兩次呼叫重疊（連續點太快、網路延遲重試），兩邊都會在對方寫入前讀到
-// 「還沒有這一列」，結果各自新增一列造成重複資料。用 LockService 把整段包起來
-// 序列化，確保同一時間只有一個執行緒在動這個習慣。
+// 「還沒有這一列」，結果各自新增一列造成重複資料。handleRequest 對所有寫入動作
+// 都加了全域鎖（LockService），同一時間只會有一個寫入在跑，這裡不用再自己鎖
+// （LockService 的鎖不能重入，內層再鎖會卡住）。
 //
 // target=1（目前固定是所有 daily 習慣）是「存在就算打勾」的二元狀態，不是
 // 累計次數：沒有列就新增一列（count 固定存 1），有列就直接刪掉——而且是刪掉
@@ -853,9 +874,7 @@ function deleteHabit(id) {
 // 「目前做到第幾次」，不是單純有沒有。
 function toggleHabitLog(habitId, periodKey, target) {
   if (habitId === CHALLENGE_HABIT_ID) throw new Error("每日運動挑戰請用抽卡/完成打卡，不能直接勾選");
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  {
     var sheet = getSheet("HabitLog");
     var values = sheet.getDataRange().getValues();
     var maxTarget = parseInt(target, 10) || 1;
@@ -881,7 +900,7 @@ function toggleHabitLog(habitId, periodKey, target) {
       } else {
         sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
       }
-      return getData();
+      return getData(["habitLogs"]);
     }
 
     if (matchingRows.length > 0) {
@@ -889,13 +908,11 @@ function toggleHabitLog(habitId, periodKey, target) {
       var next = (Number(values[rowIndex][3]) || 0) + 1;
       if (next > maxTarget) next = 0;
       sheet.getRange(rowIndex + 1, 4).setValue(next);
-      return getData();
+      return getData(["habitLogs"]);
     }
 
     sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
-    return getData();
-  } finally {
-    lock.releaseLock();
+    return getData(["habitLogs"]);
   }
 }
 
@@ -971,14 +988,12 @@ function challengeCols_(sheet) {
 }
 
 function drawChallenge() {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  {
     var sheet = getSheet("HabitLog");
     var cols = challengeCols_(sheet);
     var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
     // 今天已經有列（例如另一個裝置先抽了）就直接回傳現況，不重抽
-    if (findChallengeRow_(sheet, today)) return getData();
+    if (findChallengeRow_(sheet, today)) return getData(["habitLogs"]);
 
     var width = sheet.getLastColumn();
     var row = [];
@@ -1007,16 +1022,12 @@ function drawChallenge() {
       // 朋友那邊已經抽成功、但我們寫入失敗：draw 不能重複呼叫，把結果放進錯誤訊息讓人可以手動補
       throw new Error("抽到「" + exercise + "」，但記錄失敗，請手動填到 HabitLog 的 exercise 欄");
     }
-    return getData();
-  } finally {
-    lock.releaseLock();
+    return getData(["habitLogs"]);
   }
 }
 
 function completeChallenge() {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  {
     var sheet = getSheet("HabitLog");
     var cols = challengeCols_(sheet);
     var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
@@ -1026,7 +1037,7 @@ function completeChallenge() {
     if (!exercise) throw new Error("今天的運動還沒抽到");
     var wasDone = Number(sheet.getRange(rowIndex, cols.count).getValue()) >= 1;
     var synced = sheet.getRange(rowIndex, cols.synced).getValue();
-    if (wasDone && (synced === true || synced === "TRUE")) return getData(); // 已同步，鎖死
+    if (wasDone && (synced === true || synced === "TRUE")) return getData(["habitLogs"]); // 已同步，鎖死
 
     sheet.getRange(rowIndex, cols.count).setValue(1);
     sheet.getRange(rowIndex, cols.synced).setValue("");
@@ -1038,9 +1049,7 @@ function completeChallenge() {
       throw err;
     }
     sheet.getRange(rowIndex, cols.synced).setValue(true);
-    return getData();
-  } finally {
-    lock.releaseLock();
+    return getData(["habitLogs"]);
   }
 }
 

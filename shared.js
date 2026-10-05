@@ -78,7 +78,7 @@ function escapeHtml(s) {
 }
 
 // ====== API ======
-async function api(action, params = {}) {
+async function apiRequest(action, params) {
   const password = localStorage.getItem(PASSWORD_KEY);
   const url = new URL(WEBAPP_URL);
   url.searchParams.set("action", action);
@@ -89,6 +89,17 @@ async function api(action, params = {}) {
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || "unknown error");
   return json.data;
+}
+
+// 寫入（不是 get 開頭的 action）一個接一個送：前一個回來才送下一個。
+// 這樣回應一定照操作順序到達，快速連點時舊回應不會蓋掉新畫面，也不會有兩個寫入同時在飛；
+// 讀取不排隊。後端另外有 LockService 擋住多個裝置同時寫。
+let writeChain = Promise.resolve();
+function api(action, params = {}) {
+  if (action.startsWith("get")) return apiRequest(action, params);
+  const run = writeChain.then(() => apiRequest(action, params));
+  writeChain = run.catch(() => {});
+  return run;
 }
 
 // ====== Auth flow ======

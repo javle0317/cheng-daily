@@ -178,15 +178,17 @@ function computeHabitStats(habit) {
 const openStreakHabitIds = new Set();
 
 // ====== API ======
+// 寫入動作只會回傳自己動到的集合（後端 getData(keys)），所以只覆蓋回傳裡有的欄位；
+// 登入時的 getData 是整包，每個欄位都有。
 function applyData(data) {
-  state.goals = data.goals || [];
-  state.events = data.events || [];
-  state.habits = data.habits || [];
-  state.habitLogs = data.habitLogs || [];
-  state.recurringEvents = data.recurringEvents || [];
-  state.recurringExceptions = data.recurringExceptions || [];
-  state.shoppingList = data.shoppingList || [];
-  state.holidayDates = new Set((data.holidays || []).map(h => h.date));
+  if (data.goals) state.goals = data.goals;
+  if (data.events) state.events = data.events;
+  if (data.habits) state.habits = data.habits;
+  if (data.habitLogs) state.habitLogs = data.habitLogs;
+  if (data.recurringEvents) state.recurringEvents = data.recurringEvents;
+  if (data.recurringExceptions) state.recurringExceptions = data.recurringExceptions;
+  if (data.shoppingList) state.shoppingList = data.shoppingList;
+  if (data.holidays) state.holidayDates = new Set(data.holidays.map(h => h.date));
 }
 
 // api() / showLockScreen / showLockLoading / showApp / tryUnlock / lockForm
