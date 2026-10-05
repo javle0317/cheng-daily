@@ -241,6 +241,7 @@
         await withRowLock(del, async () => {
           try {
             apply(await api("deleteInBodyReading", { id: r.id }));
+            releasePending(del);
             renderAll();
           } catch (err) {
             setStatus("刪除失敗：" + err.message, true);
@@ -248,6 +249,8 @@
         });
       });
       li.appendChild(del);
+      li.dataset.lockKey = `body:${r.id}`;
+      lockIfPending(li);
       ul.appendChild(li);
     });
     container.appendChild(ul);

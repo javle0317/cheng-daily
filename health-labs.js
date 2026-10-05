@@ -348,12 +348,15 @@
         await withRowLock(del, async () => {
           try {
             apply(await api("deleteLabDay", { date }));
+            releasePending(del);
             renderAll();
           } catch (err) {
             setStatus("刪除失敗：" + err.message, true);
           }
         });
       });
+      del.dataset.lockKey = `labday:${date}`; // 刪除鈕不在 <li> 裡，鎖直接綁在按鈕上
+      lockIfPending(del);
       head.append(h, del);
       block.appendChild(head);
 

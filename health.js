@@ -470,6 +470,7 @@ function renderList() {
         await withRowLock(delBtn, async () => {
           try {
             applyBpData(await api("deleteBloodPressureReading", { id: r.id }));
+            releasePending(delBtn);
             renderBpAll();
           } catch (err) {
             setStatus("刪除失敗：" + err.message, true);
@@ -481,6 +482,8 @@ function renderList() {
       li.appendChild(valueSpan);
       li.appendChild(pulseSpan);
       li.appendChild(delBtn);
+      li.dataset.lockKey = `bp:${r.id}`;
+      lockIfPending(li);
       ul.appendChild(li);
     });
     group.appendChild(ul);

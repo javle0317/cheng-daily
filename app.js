@@ -702,6 +702,7 @@ function renderEvents() {
         await withRowLock(amountBtn, async () => {
           try {
             applyData(await api("setEventAmount", { id: ev.id, amount: input.trim() }));
+            releasePending(amountBtn);
             renderEvents();
             renderPetExpenses();
           } catch (err) {
@@ -720,6 +721,7 @@ function renderEvents() {
         await withRowLock(delBtn, async () => {
           try {
             applyData(await api("deleteEvent", { id: ev.id }));
+            releasePending(delBtn);
             renderEvents();
             renderCalendar();
           } catch (err) {
@@ -738,6 +740,7 @@ function renderEvents() {
         await withRowLock(skipBtn, async () => {
           try {
             applyData(await api("addRecurringException", { recurringId: ev.ruleId, date: ev.date }));
+            releasePending(skipBtn);
             renderEvents();
             renderCalendar();
           } catch (err) {
@@ -749,6 +752,8 @@ function renderEvents() {
     }
 
     li.appendChild(metaRow);
+    li.dataset.lockKey = `event:${ev.id}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }
@@ -891,6 +896,7 @@ function renderRecurringList() {
       await withRowLock(delBtn, async () => {
         try {
           applyData(await api("deleteRecurringEvent", { id: rule.id }));
+            releasePending(delBtn);
           renderRecurringList();
           renderEvents();
           renderCalendar();
@@ -901,6 +907,8 @@ function renderRecurringList() {
     });
 
     li.appendChild(delBtn);
+    li.dataset.lockKey = `rule:${rule.id}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }
@@ -976,6 +984,7 @@ function renderPetExpenses() {
         await withRowLock(delBtn, async () => {
           try {
             applyData(await api("deleteEvent", { id: ev.id }));
+            releasePending(delBtn);
             renderPetExpenses();
             renderEvents();
             renderCalendar();
@@ -989,6 +998,8 @@ function renderPetExpenses() {
       li.appendChild(textSpan);
       li.appendChild(amountSpan);
       li.appendChild(delBtn);
+      li.dataset.lockKey = `event:${ev.id}`;
+      lockIfPending(li);
       ul.appendChild(li);
     });
     group.appendChild(ul);

@@ -141,6 +141,24 @@ check("numArg_：必填空白丟錯；emptyValue 空白回傳預設", throws(() 
 check("numArg_：整數、範圍檢查", throws(() => be.numArg_("1.5", "次數", { int: true })) && throws(() => be.numArg_("40", "星期", { max: 6 })) && throws(() => be.numArg_("-1", "金額", { min: 0 })));
 check("所有金額寫入入口都用 numArg_（Code.gs 不再有 parseFloat/parseInt 解析輸入）", !/parseFloat\(|parseInt\(/.test(read("apps-script/Code.gs").replace(/\/\/.*$/gm, "")));
 
+console.log("後端：欄位型別驗證（文字／日期／時間／列舉）");
+check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateArg_("2026-02-30", "x")) && be.dateArg_("2026-02-28", "x") === "2026-02-28");
+check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
+check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
+check("enumArg_：不在清單丟錯；空白可給預設", throws(() => be.enumArg_("x", "對象", ["me"])) && be.enumArg_("", "對象", ["me"], { emptyValue: "" }) === "");
+check("textArg_：必填、長度上限、trim", throws(() => be.textArg_("  ", "標題", { required: true })) && throws(() => be.textArg_("a".repeat(11), "標題", { max: 10 })) && be.textArg_("  hi ", "標題") === "hi");
+{
+  const rows = [];
+  const sheet = { getDataRange: () => ({ getValues: () => [["id"]] }), getLastRow: () => 1, getRange: (r, c, nr, nc) => ({ setNumberFormat() {}, setValues: v => rows.push(v[0]) }) };
+  gs.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sheet });
+  be.SpreadsheetApp.getActiveSpreadsheet = gs.SpreadsheetApp.getActiveSpreadsheet;
+  be.addEvent("2026-10-05", "08:30", "看牙醫", "備註", "me", "1,200", "false");
+  check("addEvent：欄位依型別寫入（金額 1,200 → 1200、owner/時間正確）", rows[0] && rows[0][1] === "2026-10-05" && rows[0][2] === "me" && rows[0][3] === "08:30" && rows[0][7] === 1200 && rows[0][8] === false, rows[0]);
+  check("addEvent：壞日期／壞金額／空標題都丟錯且不寫入",
+    (() => { const n = rows.length; return throws(() => be.addEvent("2026/10/05", "", "x", "", "me", "", "")) && throws(() => be.addEvent("2026-10-05", "", "x", "", "me", "abc", "")) && throws(() => be.addEvent("2026-10-05", "", " ", "", "me", "", "")) && rows.length === n; })());
+  check("addCreditCardBill：銀行必填、月份格式、金額 abc 丟錯", throws(() => be.addCreditCardBill("", "2026-10", "2026-10-20", "100", "")) && throws(() => be.addCreditCardBill("國泰", "2026-10-01", "2026-10-20", "100", "")) && throws(() => be.addCreditCardBill("國泰", "2026-10", "2026-10-20", "abc", "")));
+}
+
 console.log("後端：傳輸與寫入鎖");
 const out = o => JSON.parse(o.text);
 check("GET 一律拒絕", out(be.doGet({ parameter: { action: "getData", password: "secret" } })).error === "請改用 POST");

@@ -85,7 +85,8 @@ function lockIfPending(li) {
 
 // 回應已經拿到、準備重畫之前先呼叫：讓重畫出來的這一列不要被鎖著（自己的操作已完成）
 function releasePending(li) {
-  const key = li && li.dataset ? li.dataset.lockKey : null;
+  const row = li && li.closest ? (li.closest("li") || li) : li;
+  const key = row && row.dataset ? row.dataset.lockKey : null;
   if (key) pendingKeys.delete(key);
 }
 

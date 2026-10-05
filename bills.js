@@ -73,6 +73,7 @@ function buildPayBtn(b, paidVal) {
     await withRowLock(payBtn, async () => {
       try {
         applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: input.trim() }));
+        releasePending(payBtn);
         renderBillsAll();
       } catch (err) {
         setStatus("更新失敗：" + err.message, true);
@@ -120,6 +121,8 @@ function renderUnpaid() {
     }
 
     li.append(bankBadge, fullSpan, lowestSpan, dateSpan, buildPayBtn(b, null));
+    li.dataset.lockKey = `bill:${b.id}`;
+    lockIfPending(li);
     list.appendChild(li);
   });
 }
@@ -390,6 +393,7 @@ function renderList() {
         await withRowLock(delBtn, async () => {
           try {
             applyBillData(await api("deleteCreditCardBill", { id: b.id }));
+        releasePending(delBtn);
             renderBillsAll();
           } catch (err) {
             setStatus("刪除失敗：" + err.message, true);
@@ -406,6 +410,8 @@ function renderList() {
       li.appendChild(paidSpan);
       li.appendChild(dateSpan);
       li.appendChild(li2);
+      li.dataset.lockKey = `bill:${b.id}`;
+      lockIfPending(li);
       ul.appendChild(li);
     });
     group.appendChild(ul);

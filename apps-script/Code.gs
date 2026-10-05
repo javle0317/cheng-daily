@@ -285,7 +285,7 @@ function getHolidaysSafe_() {
 
 function addGoal(date, text) {
   var sheet = getSheet("Goals");
-  appendRowSafe_(sheet, [Utilities.getUuid(), date, text, false, new Date()]);
+  appendRowSafe_(sheet, [Utilities.getUuid(), dateArg_(date, "待辦"), textArg_(text, "待辦內容", { required: true, max: 500 }), false, new Date()]);
   return getData(["goals"]);
 }
 
@@ -317,14 +317,14 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
   var sheet = getSheet("Events");
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
-    date,
-    owner || "",
-    time,
-    title,
-    notes,
+    dateArg_(date, "事件"),
+    enumArg_(owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES), { emptyValue: "" }),
+    timeArg_(time, "事件"),
+    textArg_(title, "事件標題", { required: true, max: 200 }),
+    textArg_(notes, "備註", { max: 2000 }),
     new Date(),
     numArg_(amount, "金額", { emptyValue: "", min: 0 }),
-    hideFromCalendar === "true" || hideFromCalendar === true,
+    boolArg_(hideFromCalendar),
   ]);
   return getData(["events"]);
 }
@@ -360,15 +360,15 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
   var sheet = getSheet("RecurringEvents");
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
-    owner || "",
-    title,
-    time || "",
-    notes || "",
-    frequency,
+    enumArg_(owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES), { emptyValue: "" }),
+    textArg_(title, "行程標題", { required: true, max: 200 }),
+    timeArg_(time, "行程"),
+    textArg_(notes, "備註", { max: 2000 }),
+    enumArg_(frequency, "頻率", ["weekly", "monthly"]),
     numArg_(dayOfWeek, "星期", { emptyValue: "", int: true, min: 0, max: 6 }),
     numArg_(dayOfMonth, "日期", { emptyValue: "", int: true, min: 1, max: 31 }),
     new Date(),
-    endDate || "",
+    dateArg_(endDate, "截止日", { optional: true }),
   ]);
   return getData(["recurringEvents"]);
 }
@@ -403,7 +403,7 @@ function deleteRecurringEvent(id) {
 
 function addRecurringException(recurringId, date) {
   var sheet = getSheet("RecurringExceptions");
-  appendRowSafe_(sheet, [Utilities.getUuid(), recurringId, date, new Date()]);
+  appendRowSafe_(sheet, [Utilities.getUuid(), textArg_(recurringId, "循環行程", { required: true, max: 100 }), dateArg_(date, "跳過的"), new Date()]);
   return getData(["recurringExceptions"]);
 }
 
@@ -427,7 +427,7 @@ function normalizeListCategory_(c) {
 
 function addShoppingItem(item, category) {
   var sheet = getSheet("ShoppingList");
-  appendRowSafe_(sheet, [Utilities.getUuid(), item, false, new Date(), normalizeListCategory_(category)]);
+  appendRowSafe_(sheet, [Utilities.getUuid(), textArg_(item, "項目", { required: true, max: 5000 }), false, new Date(), normalizeListCategory_(category)]);
   return getData(["shoppingList"]);
 }
 
@@ -480,8 +480,8 @@ function addBloodPressureReading(date, period, systolic, diastolic, pulse) {
   var sheet = getSheet("BloodPressure");
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
-    date,
-    period,
+    dateArg_(date, "血壓"),
+    enumArg_(period, "時段", ["morning", "evening"]),
     numArg_(systolic, "收縮壓", { int: true, min: 30, max: 300 }),
     numArg_(diastolic, "舒張壓", { int: true, min: 20, max: 200 }),
     numArg_(pulse, "脈搏", { emptyValue: "", int: true, min: 20, max: 300 }),
@@ -520,6 +520,66 @@ function parseNumStrict_(v) {
   if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, "");
   var n = Number(t);
   return isFinite(n) ? n : NaN;
+}
+
+// ====== 欄位型別（輸入進來先驗證再寫入）======
+// 每個寫入 action 都要把使用者輸入「依欄位型別」過一遍，不能直接塞進 Sheet。型別一覽：
+//   數字   numArg_    金額、帳單金額、血壓/脈搏、體組成與驗血數值、目標次數、星期(0-6)、日期(1-31)
+//   文字   textArg_   待辦/事件/習慣/清單內容、備註、銀行名稱、驗血項目名稱與單位（另外有公式防護，見 appendRowSafe_）
+//   日期   dateArg_    yyyy-MM-dd（事件、待辦、帳單截止日、血壓日期、跳過日期、循環截止日）
+//   月份   monthArg_   yyyy-MM（帳單月份）
+//   時間   timeArg_    HH:mm，可空白（事件、循環行程）
+//   列舉   enumArg_    owner、frequency、血壓 period、清單 category
+//   布林   boolArg_    workdaysOnly、hideFromCalendar
+// 新增欄位時先決定它屬於哪一型，用對應的函式驗證（README「欄位型別」有對照表）。
+
+function textArg_(v, label, opts) {
+  opts = opts || {};
+  var t = v === undefined || v === null ? "" : String(v).trim();
+  if (t === "") {
+    if (opts.required) throw new Error(label + "不能空白");
+    return "";
+  }
+  var max = opts.max || 500;
+  if (t.length > max) throw new Error(label + "太長（最多 " + max + " 字）");
+  return t;
+}
+
+function dateArg_(v, label, opts) {
+  opts = opts || {};
+  var t = v === undefined || v === null ? "" : String(v).trim();
+  if (t === "" && opts.optional) return "";
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  var d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  if (!m || d.getFullYear() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1 || d.getDate() !== Number(m[3])) {
+    throw new Error(label + "日期格式錯誤（要 yyyy-MM-dd）");
+  }
+  return t;
+}
+
+function monthArg_(v, label) {
+  var t = v === undefined || v === null ? "" : String(v).trim();
+  var m = /^(\d{4})-(\d{2})$/.exec(t);
+  if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) throw new Error(label + "月份格式錯誤（要 yyyy-MM）");
+  return t;
+}
+
+function timeArg_(v, label) {
+  var t = v === undefined || v === null ? "" : String(v).trim();
+  if (t === "") return "";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(label + "時間格式錯誤（要 HH:mm）");
+  return t;
+}
+
+function enumArg_(v, label, allowed, opts) {
+  var t = v === undefined || v === null ? "" : String(v).trim();
+  if (t === "" && opts && opts.emptyValue !== undefined) return opts.emptyValue;
+  if (allowed.indexOf(t) < 0) throw new Error(label + "不是有效的選項");
+  return t;
+}
+
+function boolArg_(v) {
+  return v === true || v === "true" || v === "TRUE";
 }
 
 // 金額、次數、血壓等所有「使用者輸入的數字」寫入前都走這個：嚴格解析（允許千分位）、
@@ -658,14 +718,14 @@ function normalizeDateCell_(v) {
 function normalizeLabExtras_(extras) {
   var byName = {}, order = [];
   extras.forEach(function (x) {
-    var name = String(x.name || "").trim();
+    var name = textArg_(x.name, "項目名稱", { max: 100 });
     if (!name) return;
     var value = parseNumStrict_(x.value);
     var lowN = parseNumStrict_(x.refLow), highN = parseNumStrict_(x.refHigh);
     if (value === null || isNaN(value)) throw new Error("「" + name + "」的數值不是有效數字");
     if (isNaN(lowN) || isNaN(highN)) throw new Error("「" + name + "」的參考範圍不是有效數字");
     if (!(name in byName)) order.push(name);
-    byName[name] = { name: name, value: value, unit: String(x.unit || "").trim(), low: lowN === null ? "" : lowN, high: highN === null ? "" : highN };
+    byName[name] = { name: name, value: value, unit: textArg_(x.unit, "單位", { max: 30 }), low: lowN === null ? "" : lowN, high: highN === null ? "" : highN };
   });
   return { byName: byName, order: order };
 }
@@ -797,9 +857,9 @@ function addCreditCardBill(bank, billingMonth, date, fullAmount, lowestAmount) {
   var sheet = getSheet("CreditCardBills");
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
-    bank,
-    billingMonth,
-    date,
+    textArg_(bank, "銀行", { required: true, max: 20 }),
+    monthArg_(billingMonth, "帳單"),
+    dateArg_(date, "截止"),
     numArg_(fullAmount, "帳單全額", { min: 0 }),
     numArg_(lowestAmount, "最低應繳", { emptyValue: 0, min: 0 }),
     "", // paidAmount 先留空，收到帳單當下通常還沒繳
@@ -852,12 +912,13 @@ function deleteCreditCardBill(id) {
 
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
+  frequency = enumArg_(frequency, "頻率", ["daily", "weekly", "monthly"]);
   var finalTarget = frequency === "daily" ? 1 : numArg_(target, "目標次數", { emptyValue: 1, int: true, min: 1, max: 31 });
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
-    name,
+    textArg_(name, "習慣名稱", { required: true, max: 200 }),
     frequency,
-    workdaysOnly === "true" || workdaysOnly === true,
+    boolArg_(workdaysOnly),
     finalTarget,
     new Date(),
   ]);
@@ -869,13 +930,14 @@ function addHabit(name, frequency, workdaysOnly, target) {
 // 改了之前的紀錄就對不起來，要換頻率請刪掉重加。daily 的 target 固定 1。
 function updateHabit(id, name, workdaysOnly, target) {
   var sheet = getSheet("Habits");
+  var newName = textArg_(name, "習慣名稱", { required: true, max: 200 });
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
       var frequency = values[i][2];
       var finalTarget = frequency === "daily" ? 1 : numArg_(target, "目標次數", { emptyValue: 1, int: true, min: 1, max: 31 });
-      setTextSafe_(sheet.getRange(i + 1, 2), name);
-      sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? (workdaysOnly === "true" || workdaysOnly === true) : values[i][3]);
+      setTextSafe_(sheet.getRange(i + 1, 2), newName);
+      sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? boolArg_(workdaysOnly) : values[i][3]);
       sheet.getRange(i + 1, 5).setValue(finalTarget);
       break;
     }
@@ -910,6 +972,7 @@ function deleteHabit(id) {
 // 「目前做到第幾次」，不是單純有沒有。
 function toggleHabitLog(habitId, periodKey, target) {
   if (habitId === CHALLENGE_HABIT_ID) throw new Error("每日運動挑戰請用抽卡/完成打卡，不能直接勾選");
+  if (!/^\d{4}-\d{2}(-\d{2})?$/.test(String(periodKey))) throw new Error("週期格式錯誤");
   {
     var sheet = getSheet("HabitLog");
     var values = sheet.getDataRange().getValues();
