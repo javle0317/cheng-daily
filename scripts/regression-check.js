@@ -69,10 +69,13 @@ check("每日：前天漏做就斷", streakFor([0, -2, -3], false) === 1);
 }
 
 console.log("後端：數字解析、驗血項目驗證、公式防護");
-const calls = { formats: [], rows: [] };
+const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
   Utilities: { getUuid: () => "uuid", formatDate: () => "d" },
-  LockService: {}, PropertiesService: {}, ContentService: {}, CacheService: {}, CalendarApp: {}, SpreadsheetApp: {}, Logger: { log() {} },
+  LockService: { getScriptLock: () => ({ waitLock: () => { calls.locks++; }, releaseLock: () => { calls.unlocks++; } }) },
+  PropertiesService: { getScriptProperties: () => ({ getProperty: () => "secret" }) },
+  ContentService: { createTextOutput: t => ({ text: t, setMimeType() { return this; } }), MimeType: { JSON: 1 } },
+  CacheService: {}, CalendarApp: {}, SpreadsheetApp: {}, Logger: { log() {} },
 };
 const be = vm.createContext(Object.assign({ console, Date, JSON, Object, String, Number, isNaN, isFinite, Error }, gs));
 vm.runInContext(read("apps-script/Code.gs"), be, { filename: "Code.gs" });
@@ -96,6 +99,20 @@ check("驗血其他項目：同名去重（最後一筆為準）、千分位", n
 let threw = false;
 try { be.normalizeLabExtras_([{ name: "Y", value: "abc" }]); } catch (e) { threw = true; }
 check("驗血其他項目：無效數值丟錯、不寫入", threw);
+
+console.log("後端：傳輸與寫入鎖");
+const out = o => JSON.parse(o.text);
+check("GET 一律拒絕", out(be.doGet({ parameter: { action: "getData", password: "secret" } })).error === "請改用 POST");
+check("POST body 不是 JSON → bad request", out(be.doPost({ postData: { contents: "not json" } })).error === "bad request");
+check("POST 密碼錯 → unauthorized，且不取鎖", (() => { calls.locks = 0; const r = out(be.doPost({ postData: { contents: JSON.stringify({ action: "addGoal", password: "x" }) } })); return r.error === "unauthorized" && calls.locks === 0; })());
+check("寫入 action 會取鎖並釋放；get 不取鎖", (() => {
+  calls.locks = 0; calls.unlocks = 0;
+  out(be.doPost({ postData: { contents: JSON.stringify({ action: "nope", password: "secret" }) } }));
+  const afterWrite = [calls.locks, calls.unlocks];
+  calls.locks = 0; calls.unlocks = 0;
+  out(be.doPost({ postData: { contents: JSON.stringify({ action: "getNope", password: "secret" }) } }));
+  return afterWrite[0] === 1 && afterWrite[1] === 1 && calls.locks === 0;
+})());
 
 console.log(failed ? `\n${failed} 項失敗` : "\n全部通過");
 process.exit(failed ? 1 : 0);

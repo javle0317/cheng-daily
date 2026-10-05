@@ -7,7 +7,7 @@
 
 ### 1. 建立 Google Sheet
 
-新增一個 Google Sheet，建立六個分頁：
+新增一個 Google Sheet，依下面的清單建立所有分頁（共 13 個：Goals、Habits、HabitLog、Events、RecurringEvents、RecurringExceptions、BloodPressure、InBody、LabResults、LabExtra、CreditCardBills、ShoppingList，加上你自己用的其他分頁不影響）。每個分頁第一列貼上表頭（直接複製下面表格的欄位名稱，漏一欄會在寫入時報「缺少欄位」）：
 
 **Goals**（今日待辦，一次性手動輸入的項目）
 
@@ -54,8 +54,11 @@
 
 **Events**
 
-| id | date | owner | time | title | notes | createdAt |
-|----|------|-------|------|-------|-------|-----------|
+| id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar |
+|----|------|-------|------|-------|-------|-----------|--------|------------------|
+
+- `amount`：選填的花費金額（任何 owner 的事件都可以填，花費統計用）
+- `hideFromCalendar`：`TRUE` 代表這筆只是記帳（例如買貓砂），不出現在行事曆與每日 LINE 提醒；預設 `FALSE`
 
 `owner` 是 `me` / `wife` / `shared` / 寵物名字（見 `Code.gs` 的 `PET_NAMES`）其中一個，
 用來標記這筆是誰的（人的行程或寵物照護紀錄現在是同一張表）。網頁上顯示的名稱、
@@ -149,11 +152,6 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   帳單紀錄旁邊的 💰 按鈕只改這一個欄位，跟 Events 補登花費金額的按鈕是同一套
   寫法。剩餘未繳（`remain`）不存，前端用 `fullAmount - paidAmount` 即時算
 - 這張表也不會出現在主頁面的 `getData()` 回傳裡，理由跟 BloodPressure 一樣
-- `apps-script/Code.gs` 裡的 `migrateBloodPressureFromPressure2026()` 是一次性
-  搬移函式（把舊的 `pressure2026` 試算表資料搬過來），只需要在 Apps Script
-  編輯器手動執行一次，確認資料搬完後可以整段刪除——故意沒加結尾底線，因為
-  Apps Script 的「選取要執行的函式」下拉選單會隱藏底線結尾的函式，這支是要
-  手動選來執行的，不能被藏起來
 
 **ShoppingList**（「清單」，不綁日期、處理完就勾掉再清除；分購物/想法兩個分類）
 
@@ -190,7 +188,7 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 
 ### 4. 接上前端
 
-把上一步的網址貼到 [app.js](app.js) 最上面的 `WEBAPP_URL`，然後 commit + push。
+把上一步的網址貼到 [shared.js](shared.js) 最上面的 `WEBAPP_URL`（所有頁面共用），然後 commit + push。
 
 > 之後每次改 `Code.gs` 存檔，網頁不會自動吃到新版——要到「部署 → 管理部署作業 →
 > 編輯（鉛筆圖示）→ 版本選『新版本』→ 部署」，網址不變但會套用最新程式碼。
@@ -235,8 +233,49 @@ HTML 裡 `style.css` 和各個 `.js` 的網址都帶 `?v=時間戳`，避免改�
 
 前端不會做假的驗證邏輯（那種在瀏覽器看原始碼就能繞過）。所有讀寫都要帶密碼呼叫
 Apps Script，密碼比對在 Apps Script 這一端做，沒有正確密碼就完全拿不到資料。
-Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個人頁面或被搜尋到，
-但 GitHub Pages 產生的網址本身還是任何人拿到連結都能打開，密碼是實際擋人的那一關。
+GitHub Pages 產生的網址任何人拿到連結都能打開，密碼是實際擋人的那一關。
+Repo 目前是公開的（免費方案的 Pages 需要），所以**原始碼與 git 歷史裡不能放任何真實資料**
+（健康數值、帳單、密碼、網址以外的金鑰）：資料只存在 Google Sheet，程式碼只放邏輯。
+一次性搬移／匯入資料的函式跑完就整段刪掉，不要留在 `Code.gs` 裡 commit。
+
+## API 傳輸與寫入規則
+
+- **全部用 POST**：前端 `api()`（[shared.js](shared.js)）把 `{action, password, ...參數}` 轉成 JSON 字串放 body，
+  `Content-Type: text/plain`（避免瀏覽器的 CORS 預檢，Apps Script 不處理 OPTIONS）；後端 `doPost`
+  自己 `JSON.parse`。密碼與健康資料不會出現在網址／瀏覽器歷史。後端的 `doGet` 一律回「請改用 POST」，
+  所以寫入不能用 GET 觸發。
+- **後端寫入全域鎖**：`handleRequest` 對所有不是 `get` 開頭的 action 先取 `LockService` 腳本鎖（最多等 30 秒），
+  整段「讀列號 → 寫入」序列化，不會因為列號位移寫錯列。⚠️ 這個鎖**不能重入**，action 函式裡面不要再自己
+  `getScriptLock()`。
+- **寫入只回傳異動的集合**：主頁面的寫入 action 用 `getData(["goals"])` 這種形式只回傳自己動到的資料，前端
+  `applyData` 只覆蓋回傳裡有的欄位；登入時 `getData` 整包讀（清單 `shoppingList` 除外，開 📝 才載入）。
+- **前端寫入排隊**：`api()` 對寫入（不是 `get` 開頭）一個接一個送，回應一定照操作順序到達，快速連點不會
+  讓舊回應蓋掉新畫面。讀取不排隊。
+- **文字寫入防公式**：任何帶使用者文字的寫入一律走 `appendRowSafe_` / `setTextSafe_`（`=`、`+`、`-`、`@` 開頭的
+  字串會先把那格設成純文字），不要直接 `sheet.appendRow` / `range.setValue` 寫字串。
+- **數字一律嚴格解析**：後端 `parseNumStrict_`、前端 `parseStrictNumber`（允許千分位 `1,000`，`12abc` 算無效）；
+  不要用 `parseFloat`。
+- 每個 API 的耗時會記在瀏覽器 console 的 `apiTimings`，覺得慢時先看這個再決定要不要加快取。
+
+## 回歸檢查
+
+改動登入、日期切換、匯入或寫入流程之後：
+
+```bash
+node scripts/regression-check.js
+```
+
+會檢查數字解析、跳脫、習慣連續天數、公式防護、驗血項目驗證（純邏輯，不連網路）。畫面流程要在瀏覽器手動
+過一遍：
+
+1. **登入**：輸入錯誤密碼 → 留在登入頁並顯示錯誤、不進畫面；正確密碼 → 進入；按登出 → 回到登入頁，
+   重新登入前看不到上一個人的資料、沒有殘留彈窗。（健康頁、帳單頁、首頁都要試）
+2. **日期切換**：首頁日曆點另一天、按「今天」→ 待辦、事件、每日/每週/每月習慣都跟著換；在別天勾習慣，
+   重新整理後勾到的是那一天。
+3. **匯入**：健康頁驗血、體組成各貼兩份不同的報告 → 第二份不會殘留第一份的數值；貼 `"1,000"` 變 1000；
+   無效數字、重複項目會在訊息列出。
+4. **寫入衝突**：兩個分頁／裝置同時快速新增、勾選、刪除 → 沒有重複列、沒有勾錯列；輸入以 `=1+1` 開頭的
+   文字（待辦、清單、驗血其他項目名稱）→ Sheet 裡原樣顯示成文字，不是 2。
 
 ## 未來可以加的東西
 
@@ -248,4 +287,4 @@ Repo 本身建議設為 Private，這樣專案不會出現在你的 GitHub 個�
 可以直接做的：
 
 - 每週/每月習慣的連續統計（連續幾週/幾個月達標、歷史最長），目前只有每日習慣有 🔥
-- 靜態檔案快取問題：shared.js / app.js 等改版後瀏覽器可能還在用舊版，可以在 HTML 的 script/css 網址加版本參數（例如 `?v=日期`）
+

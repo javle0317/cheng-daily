@@ -56,17 +56,24 @@
 
 var PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡加名字就好
 
+// 密碼與資料一律放 POST body（JSON 字串，前端用 text/plain 送，避免瀏覽器先發預檢請求），
+// 不放網址：網址會留在瀏覽器歷史、代理伺服器與各種紀錄裡。GET 一律拒絕，寫入也不再能用 GET 觸發。
 function doGet(e) {
-  return handleRequest(e);
+  return respond({ ok: false, error: "請改用 POST" });
 }
 
 function doPost(e) {
-  return handleRequest(e);
+  var p;
+  try {
+    p = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return respond({ ok: false, error: "bad request" });
+  }
+  return handleRequest(p || {});
 }
 
-function handleRequest(e) {
+function handleRequest(p) {
   try {
-    var p = (e && e.parameter) || {};
     var stored = PropertiesService.getScriptProperties().getProperty("PASSWORD");
     if (!stored || p.password !== stored) {
       return respond({ ok: false, error: "unauthorized" });

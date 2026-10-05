@@ -80,13 +80,17 @@ function escapeHtml(s) {
 // ====== API ======
 async function apiRequest(action, params) {
   const password = localStorage.getItem(PASSWORD_KEY);
-  const url = new URL(WEBAPP_URL);
-  url.searchParams.set("action", action);
-  url.searchParams.set("password", password || "");
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  // 全部用 POST，密碼與資料放 body 不放網址。Content-Type 用 text/plain 是為了不觸發 CORS 預檢，
+  // Apps Script 不處理 OPTIONS；後端自己 JSON.parse(postData.contents)。值一律轉成字串，維持跟以前網址參數相同的型別。
+  const body = { action, password: password || "" };
+  Object.entries(params).forEach(([k, v]) => { body[k] = String(v); });
 
   const t0 = performance.now();
-  const res = await fetch(url.toString());
+  const res = await fetch(WEBAPP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(body),
+  });
   const json = await res.json();
   // 量測：每次 API 的耗時，開瀏覽器 console 看 apiTimings（要判斷哪裡慢、要不要加快取時用）
   (window.apiTimings ||= []).push({ action, ms: Math.round(performance.now() - t0) });
