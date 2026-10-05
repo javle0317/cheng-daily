@@ -68,6 +68,40 @@ check("每日：前天漏做就斷", streakFor([0, -2, -3], false) === 1);
   check("僅工作日、週日打開：週五、週四、週三都做 = 3", sun.computeStreak({ id: "h", target: 1, workdaysOnly: true }) === 3);
 }
 
+
+console.log("前端：每週／每月連續統計");
+{
+  // 固定「今天」= 2026-10-05（週一）。本週 key = 2026-10-05，上週 = 2026-09-28，以此類推
+  const mon = loadFrontend(["shared.js", "app.js"], "// ====== Boot ======", "2026-10-05T12:00:00");
+  const setLogs = (logs) => { mon.__logs = logs; vm.runInContext("state.habitLogs = __logs; state.holidayDates = new Set();", mon); };
+  const wk = (key, count) => ({ habitId: "w", periodKey: key, count });
+  const weekly = { id: "w", frequency: "weekly", target: 3 };
+  const weeks = ["2026-10-05", "2026-09-28", "2026-09-21", "2026-09-14", "2026-09-07", "2026-08-31"];
+  setLogs([wk(weeks[1], 3), wk(weeks[2], 3), wk(weeks[3], 3)]);
+  check("週：本週未達標不算斷，前三週達標 = 3", mon.computePeriodStreak(weekly) === 3);
+  setLogs([wk(weeks[0], 3), wk(weeks[1], 3)]);
+  check("週：本週達標也算進去 = 2", mon.computePeriodStreak(weekly) === 2);
+  setLogs([wk(weeks[1], 3), wk(weeks[2], 2), wk(weeks[3], 3)]);
+  check("週：中間漏一週就斷 = 1", mon.computePeriodStreak(weekly) === 1);
+  setLogs([wk(weeks[1], 3), wk(weeks[2], 2), wk(weeks[3], 3), wk(weeks[4], 3), wk(weeks[5], 3)]);
+  check("週：歷史最長可以大於目前（3 對 1）", mon.computePeriodStats(weekly).longest === 3 && mon.computePeriodStreak(weekly) === 1);
+  check("previousPeriodKey 週：跨月", mon.previousPeriodKey(weekly, "2026-10-05") === "2026-09-28");
+
+  const monthly = { id: "m", frequency: "monthly", target: 2 };
+  const mo = (key, count) => ({ habitId: "m", periodKey: key, count });
+  check("previousPeriodKey 月：1 月 → 前一年 12 月", mon.previousPeriodKey(monthly, "2026-01") === "2025-12");
+  check("previousPeriodKey 月：3 月 → 2 月", mon.previousPeriodKey(monthly, "2026-03") === "2026-02");
+  setLogs([mo("2026-09", 2), mo("2026-08", 2), mo("2026-07", 2)]);
+  check("月：本月未達標，前三個月達標 = 3", mon.computePeriodStreak(monthly) === 3);
+  setLogs([mo("2026-10", 2), mo("2026-09", 2), mo("2026-08", 1)]);
+  check("月：本月達標、上月達標、再前一月未達標 = 2", mon.computePeriodStreak(monthly) === 2);
+  setLogs([mo("2025-12", 2), mo("2026-01", 2), mo("2026-02", 2)]);
+  const st = mon.computePeriodStats(monthly);
+  check("月：歷史最長跨年 = 3、今年達標 2 個月", st.longest === 3 && st.extra === 2, st);
+  const hist = mon.getPeriodHistory(weekly, 6);
+  check("getPeriodHistory：6 期、最後一個是本期", hist.length === 6 && hist[5].current && hist[5].key === "2026-10-05" && hist[0].key === "2026-08-31", hist.map(h => h.key));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {

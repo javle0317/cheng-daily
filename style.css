@@ -127,6 +127,7 @@ body {
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -144,10 +145,13 @@ body {
   border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 a.ghost-btn {
-  display: inline-block;
   text-decoration: none;
   box-sizing: border-box;
 }
@@ -375,7 +379,7 @@ a.ghost-btn {
   pointer-events: none;
 }
 
-.calendar-nav h2 { margin: 0; }
+.calendar-nav h2 { margin: 0; white-space: nowrap; }
 
 .calendar-grid {
   display: grid;
@@ -860,3 +864,75 @@ a.ghost-btn {
 .explain-head { font-weight: 600; margin-bottom: 6px; }
 .explain-line { margin: 4px 0; color: var(--text); }
 .explain-line b { color: var(--text-dim); font-weight: 600; }
+
+
+/* 每週／每月目標：左邊打卡鈕、第二行本期圓點 + 最近 6 期長條 */
+.period-row { align-items: center; }
+.period-add-btn {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: none;
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.period-add-btn.is-done {
+  background: var(--status-good);
+  border-color: var(--status-good);
+  color: #fff;
+  font-size: 14px;
+}
+.period-meta {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 34px; /* 對齊上一行的名稱（打卡鈕寬 24 + 間距 10） */
+}
+.period-pips { display: flex; flex-wrap: wrap; gap: 5px; }
+.period-pips .pip {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-dim);
+  box-sizing: border-box;
+}
+.period-pips .pip.on { background: var(--accent); border-color: var(--accent); }
+.period-row.done .period-pips .pip.on { background: var(--status-good); border-color: var(--status-good); }
+.period-count-text { font-size: 12px; color: var(--text-dim); }
+.period-hist { display: flex; align-items: flex-end; gap: 4px; height: 22px; cursor: pointer; }
+.period-hist .hb {
+  position: relative;
+  width: 9px;
+  height: 22px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.period-hist .hb i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); opacity: 0.55; }
+.period-hist .hb.full i { background: var(--status-good); opacity: 1; }
+.period-hist .hb.cur { border: 1.5px solid var(--text-dim); }
+
+/* 窄螢幕（手機直立）：標題日期不折行、按鈕列掉到下一行平均分配、行事曆月份不被擠壞 */
+@media (max-width: 480px) {
+  /* .multi = 標題旁有好幾個按鈕的首頁；健康／帳單頁只有一個登出鈕，維持左右並排 */
+  .app-header.multi { flex-wrap: wrap; gap: 12px; align-items: stretch; }
+  .app-header.multi > div:first-child { flex: 1 1 100%; }
+  .app-header h1 { font-size: clamp(20px, 6vw, 24px); }
+  .app-header.multi h1 { white-space: nowrap; }
+  .app-header.multi .header-actions { flex: 1 1 100%; }
+  .app-header.multi .header-actions .ghost-btn { flex: 1; padding: 8px 6px; }
+  .calendar-nav-spacer { display: none; }
+  .calendar-nav-center { flex: 1; justify-content: center; }
+}

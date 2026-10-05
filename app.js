@@ -176,6 +176,79 @@ function computeHabitStats(habit) {
   return { longest, monthCount };
 }
 
+// ====== 每週／每月習慣的連續統計 ======
+// 一期 = 一週（key 是週一日期）或一個月（key 是 yyyy-MM）；達標 = 該期完成次數 >= target。
+// 規則跟每日一致：「這一期」還沒達標不算斷，從上一期開始往回數。
+function previousPeriodKey(habit, key) {
+  if (habit.frequency === "weekly") {
+    const d = new Date(key + "T00:00:00");
+    d.setDate(d.getDate() - 7);
+    return toDateStr(d);
+  }
+  const [y, m] = key.split("-").map(Number); // 月份用年/月算術，不用 Date 加減（避免 31 號溢位）
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+}
+
+function isPeriodDone(habit, key) {
+  return getHabitLogCount(habit.id, key) >= Number(habit.target || 1);
+}
+
+function computePeriodStreak(habit) {
+  let key = getPeriodKey(habit, toDateStr(new Date()));
+  if (!isPeriodDone(habit, key)) key = previousPeriodKey(habit, key);
+  let streak = 0;
+  for (let i = 0; i < 520 && isPeriodDone(habit, key); i++) {
+    streak++;
+    key = previousPeriodKey(habit, key);
+  }
+  return streak;
+}
+
+// 歷史最長連續期數，以及補充統計：週習慣 = 本月達標週數，月習慣 = 今年達標月數
+function computePeriodStats(habit) {
+  const nowKey = getPeriodKey(habit, toDateStr(new Date()));
+  const doneKeys = state.habitLogs
+    .filter(l => l.habitId === habit.id && Number(l.count) >= Number(habit.target || 1))
+    .map(l => String(l.periodKey));
+  const todayStr = toDateStr(new Date());
+  const extraPrefix = habit.frequency === "weekly" ? getMonthKey(todayStr) : todayStr.slice(0, 4);
+  const extra = doneKeys.filter(k => k.startsWith(extraPrefix)).length;
+  if (!doneKeys.length) return { longest: 0, extra };
+
+  const first = [...doneKeys].sort()[0];
+  let key = nowKey, run = 0, longest = 0;
+  for (let i = 0; i < 1200 && key >= first; i++) {
+    if (isPeriodDone(habit, key)) {
+      run++;
+      if (run > longest) longest = run;
+    } else if (key !== nowKey) {
+      run = 0;
+    }
+    key = previousPeriodKey(habit, key);
+  }
+  return { longest, extra };
+}
+
+// 最近 n 期（含這一期），由舊到新，給長條圖用
+function getPeriodHistory(habit, n = 6) {
+  const out = [];
+  let key = getPeriodKey(habit, toDateStr(new Date()));
+  const target = Number(habit.target || 1);
+  for (let i = 0; i < n; i++) {
+    out.unshift({ key, count: getHabitLogCount(habit.id, key), target, current: i === 0 });
+    key = previousPeriodKey(habit, key);
+  }
+  return out;
+}
+
+function periodStreakDetail(habit) {
+  const unit = habit.frequency === "weekly" ? "週" : "個月";
+  const stats = computePeriodStats(habit);
+  const extraText = habit.frequency === "weekly" ? `本月達標 ${stats.extra} 週` : `今年達標 ${stats.extra} 個月`;
+  const streak = computePeriodStreak(habit);
+  return { streak, show: streak > 0 || stats.longest > 0, detail: `目前連續 ${streak} ${unit} · 歷史最長 ${stats.longest} ${unit} · ${extraText}` };
+}
+
 const openStreakHabitIds = new Set();
 
 // ====== API ======
@@ -317,6 +390,24 @@ function updateHabitsCardVisibility() {
   card.classList.toggle("hidden", !anyVisible);
 }
 
+// 🔥 連續徽章：點一下展開／收合文字詳情（手機沒有 hover）；每日、每週、每月共用
+function appendStreakBadge(li, streakEl, habitId, streak, detail) {
+  streakEl.textContent = `🔥 ${streak}`;
+  streakEl.classList.add("streak-badge");
+  streakEl.title = detail; // 電腦版 hover 看得到
+  const pop = document.createElement("div");
+  pop.className = "streak-detail" + (openStreakHabitIds.has(habitId) ? "" : " hidden");
+  pop.textContent = detail;
+  streakEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (openStreakHabitIds.has(habitId)) openStreakHabitIds.delete(habitId);
+    else openStreakHabitIds.add(habitId);
+    pop.classList.toggle("hidden");
+  });
+  li.appendChild(pop);
+  return pop;
+}
+
 function renderDailyHabits() {
   const section = document.getElementById("dailyHabitSection");
   const list = document.getElementById("dailyHabitList");
@@ -359,20 +450,8 @@ function renderDailyHabits() {
     const stats = computeHabitStats(habit);
     const streakEl = li.querySelector(".item-time");
     if (streak > 0 || stats.longest > 0) {
-      streakEl.textContent = `🔥 ${streak}`;
-      streakEl.classList.add("streak-badge");
-      const detail = `目前連續 ${streak} 天 · 歷史最長 ${stats.longest} 天 · 本月完成 ${stats.monthCount} 次`;
-      streakEl.title = detail; // 電腦版 hover 看得到
-      const pop = document.createElement("div");
-      pop.className = "streak-detail" + (openStreakHabitIds.has(habit.id) ? "" : " hidden");
-      pop.textContent = detail;
-      streakEl.addEventListener("click", () => {
-        // 手機沒有 hover，點一下展開/收合
-        if (openStreakHabitIds.has(habit.id)) openStreakHabitIds.delete(habit.id);
-        else openStreakHabitIds.add(habit.id);
-        pop.classList.toggle("hidden");
-      });
-      li.appendChild(pop);
+      appendStreakBadge(li, streakEl, habit.id, streak,
+        `目前連續 ${streak} 天 · 歷史最長 ${stats.longest} 天 · 本月完成 ${stats.monthCount} 次`);
     }
     if (isChallenge) {
       li.querySelector(".delete-btn").remove(); // 刪掉這個習慣整個挑戰就沒了，不給刪
@@ -438,30 +517,77 @@ function renderPeriodHabits(frequency, listId, sectionId) {
 
   rows.forEach(({ habit, periodKey, count, target, done }) => {
     const li = document.createElement("li");
-    li.className = "item-row clickable" + (done ? " done" : "");
+    li.className = "item-row period-row" + (done ? " done" : "");
     li.innerHTML = `
+      <button class="period-add-btn" type="button"></button>
       <span class="item-text"></span>
       <span class="item-time"></span>
       <button class="event-shopping-btn habit-edit-btn" title="編輯" type="button">✏️</button>
       <button class="delete-btn" title="刪除">✕</button>
+      <div class="period-meta"></div>
     `;
     const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
     li.querySelector(".item-text").textContent = habitName;
-    li.querySelector(".habit-edit-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      openHabitEdit(habit);
+    li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
+
+    const unitLabel = frequency === "weekly" ? "本週" : "本月";
+    const addBtn = li.querySelector(".period-add-btn");
+    addBtn.textContent = done ? "✓" : "＋";
+    addBtn.classList.toggle("is-done", done);
+    addBtn.title = done ? `${unitLabel}已達標，再按一次歸零` : `${unitLabel}完成一次`;
+    addBtn.setAttribute("aria-label", addBtn.title);
+
+    // 第二行：本期圓點（做了幾次／目標幾次）+ 最近 6 期長條（最右邊是這一期）
+    const meta = li.querySelector(".period-meta");
+    if (target <= 10) {
+      const pips = document.createElement("div");
+      pips.className = "period-pips";
+      for (let i = 0; i < target; i++) {
+        const pip = document.createElement("span");
+        pip.className = "pip" + (i < count ? " on" : "");
+        pips.appendChild(pip);
+      }
+      pips.title = `${unitLabel} ${count}/${target}`;
+      meta.appendChild(pips);
+    } else {
+      const txt = document.createElement("span");
+      txt.className = "period-count-text";
+      txt.textContent = `${count}/${target}`;
+      meta.appendChild(txt);
+    }
+    const hist = document.createElement("div");
+    hist.className = "period-hist";
+    getPeriodHistory(habit, 6).forEach(p => {
+      const bar = document.createElement("span");
+      bar.className = "hb" + (p.current ? " cur" : "") + (p.count >= p.target ? " full" : "");
+      const fill = document.createElement("i");
+      fill.style.height = Math.min(100, (p.count / p.target) * 100) + "%";
+      bar.appendChild(fill);
+      bar.title = `${p.key}：${p.count}/${p.target}`;
+      hist.appendChild(bar);
     });
-    li.querySelector(".item-time").textContent = `${count}/${target}`;
+    meta.appendChild(hist);
+
+    const info = periodStreakDetail(habit);
+    const streakEl = li.querySelector(".item-time");
+    if (info.show) {
+      appendStreakBadge(li, streakEl, habit.id, info.streak, info.detail);
+      hist.addEventListener("click", () => { streakEl.click(); }); // 點長條區也能展開詳情
+    } else {
+      streakEl.remove();
+    }
+
     if (habitUrl) {
       const link = document.createElement("a");
       link.href = habitUrl;
       link.target = "_blank";
       link.rel = "noopener";
       link.textContent = "🔗";
-      link.addEventListener("click", (e) => e.stopPropagation());
       li.insertBefore(link, li.querySelector(".delete-btn"));
     }
-    li.addEventListener("click", async () => {
+    addBtn.addEventListener("click", async () => {
+      // 已達標再按會歸零（後端「超過 target 歸零」的行為），先確認避免誤觸
+      if (done && !(await showConfirm(`確定要把${unitLabel}的完成次數歸零嗎？`))) return;
       await withRowLock(li, async () => {
         try {
           applyData(await api("toggleHabitLog", { habitId: habit.id, periodKey, target }));
