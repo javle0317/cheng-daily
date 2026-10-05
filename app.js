@@ -213,6 +213,22 @@ function renderAll() {
   if (typeof updateEventFormValidity === "function") updateEventFormValidity();
 }
 
+// 換選取日期：所有跟「選取日期」有關的區塊（待辦、事件、習慣、表單日期）一起重畫，
+// 畫面顯示的日期跟之後勾選寫入的日期才會一致。新增跟日期有關的區塊時記得加在這裡。
+function selectDate(dateStr) {
+  state.selectedDate = dateStr;
+  renderHeader();
+  renderGoals();
+  renderEvents();
+  renderDailyHabits();
+  renderWeeklyHabits();
+  renderMonthlyHabits();
+  renderCalendar();
+  const dateInput = document.getElementById("eventDate");
+  if (dateInput) dateInput.value = state.selectedDate;
+  updateEventFormValidity();
+}
+
 function renderHeader() {
   const today = new Date();
   document.getElementById("todayDate").textContent = today.toLocaleDateString("zh-TW", {
@@ -663,14 +679,7 @@ function renderCalendar() {
     }
 
     cell.addEventListener("click", () => {
-      state.selectedDate = dateStr;
-      renderHeader();
-      renderGoals();
-      renderEvents();
-      renderCalendar();
-      const dateInput = document.getElementById("eventDate");
-      if (dateInput) dateInput.value = state.selectedDate;
-      updateEventFormValidity();
+      selectDate(dateStr);
       document.querySelector(".notes-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     grid.appendChild(cell);
@@ -1415,14 +1424,7 @@ document.getElementById("todayBtn").addEventListener("click", () => {
   const today = new Date();
   state.calendarMonth = today.getMonth();
   state.calendarYear = today.getFullYear();
-  state.selectedDate = toDateStr(today);
-  renderHeader();
-  renderGoals();
-  renderEvents();
-  renderCalendar();
-  const dateInput = document.getElementById("eventDate");
-  if (dateInput) dateInput.value = state.selectedDate;
-  updateEventFormValidity();
+  selectDate(toDateStr(today));
 });
 
 // ====== Boot ======

@@ -23,6 +23,18 @@ function toNum(v) {
   return Number.isNaN(n) ? null : n;
 }
 
+// 嚴格解析使用者／匯入的數字：允許千分位（"1,000" → 1000）與前後空白；
+// 空白、"12abc"、"1,0"、NaN 之類一律回傳 null（不要像 parseFloat 那樣偷偷截斷成 12 或 1）
+function parseStrictNumber(v) {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  let t = v.trim();
+  if (!t) return null;
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, "");
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 function roundTo(n, dec) {
   const f = Math.pow(10, dec);
   return Math.round(n * f) / f;

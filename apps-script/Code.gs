@@ -482,6 +482,24 @@ var INBODY_FIELDS = ["weight", "height", "bmi", "bodyFat", "fatMass", "skeletalM
 var LAB_FIELDS = ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt",
   "creatinine", "egfr", "uricAcid", "tsh", "ck", "bun", "sodium", "potassium"];
 
+// 嚴格解析數字：允許千分位 "1,000"，空白回傳 null，"12abc" 這種夾雜文字的回傳 NaN
+// （不用 parseFloat，它會把 "12abc" 截成 12、"1,000" 截成 1）
+function parseNumStrict_(v) {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "number") return isFinite(v) ? v : NaN;
+  var t = String(v).trim();
+  if (t === "") return null;
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, "");
+  var n = Number(t);
+  return isFinite(n) ? n : NaN;
+}
+
+// 把文字存進 Sheet 前先把那幾格設成純文字格式，開頭是 = + - @ 的內容才不會被當成公式執行
+function writeTextCells_(range, values) {
+  range.setNumberFormat("@");
+  range.setValues(values);
+}
+
 function appendHealthRow_(sheetName, fields, p) {
   var sheet = getSheet(sheetName);
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -494,10 +512,10 @@ function appendHealthRow_(sheetName, fields, p) {
     if (h === "date") return p.date;
     if (h === "createdAt") return new Date();
     if (fields.indexOf(h) >= 0) {
-      var v = p[h];
-      if (v === undefined || v === null || v === "") return "";
-      var n = parseFloat(v);
-      return isNaN(n) ? "" : n;
+      var n = parseNumStrict_(p[h]);
+      if (n === null) return "";
+      if (isNaN(n)) throw new Error(h + " 不是有效數字");
+      return n;
     }
     return "";
   });
@@ -514,16 +532,20 @@ function upsertHealthRow_(sheetName, fields, p) {
     if (headers.indexOf(f) < 0) throw new Error(sheetName + " 缺少欄位 " + f + "，請先在表頭補上");
   });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.date || ""))) throw new Error("日期格式錯誤");
+  fields.forEach(function (f) {
+    if (isNaN(parseNumStrict_(p[f]))) throw new Error(f + " 不是有效數字");
+  });
   var dateCol = headers.indexOf("date");
   if (dateCol >= 0) {
     for (var i = 1; i < values.length; i++) {
       if (normalizeDateCell_(values[i][dateCol]) !== String(p.date)) continue;
       fields.forEach(function (f) {
         var col = headers.indexOf(f);
-        var v = p[f];
-        if (col < 0 || v === undefined || v === null || v === "") return;
-        var n = parseFloat(v);
-        if (!isNaN(n)) sheet.getRange(i + 1, col + 1).setValue(n);
+        if (col < 0) return;
+        var n = parseNumStrict_(p[f]);
+        if (n === null) return;
+        if (isNaN(n)) throw new Error(f + " 不是有效數字");
+        sheet.getRange(i + 1, col + 1).setValue(n);
       });
       return;
     }
@@ -573,6 +595,22 @@ function normalizeDateCell_(v) {
   return String(v);
 }
 
+// 其他項目整批驗證、同名去重（以最後一筆為準）；驗證不過就丟錯，呼叫端要在寫入任何東西之前先呼叫
+function normalizeLabExtras_(extras) {
+  var byName = {}, order = [];
+  extras.forEach(function (x) {
+    var name = String(x.name || "").trim();
+    if (!name) return;
+    var value = parseNumStrict_(x.value);
+    var lowN = parseNumStrict_(x.refLow), highN = parseNumStrict_(x.refHigh);
+    if (value === null || isNaN(value)) throw new Error("「" + name + "」的數值不是有效數字");
+    if (isNaN(lowN) || isNaN(highN)) throw new Error("「" + name + "」的參考範圍不是有效數字");
+    if (!(name in byName)) order.push(name);
+    byName[name] = { name: name, value: value, unit: String(x.unit || "").trim(), low: lowN === null ? "" : lowN, high: highN === null ? "" : highN };
+  });
+  return { byName: byName, order: order };
+}
+
 // p.extra 是 JSON 字串：[{name, value, unit, refLow, refHigh}, ...]
 function addLabEntry(p) {
   var extras = [];
@@ -582,6 +620,9 @@ function addLabEntry(p) {
   var anyFixed = LAB_FIELDS.some(function (f) { return p[f] !== undefined && p[f] !== ""; });
   if (!anyFixed && !extras.length) throw new Error("至少要填一個項目");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.date || ""))) throw new Error("日期格式錯誤");
+
+  var normalized = normalizeLabExtras_(extras);
+  var byName = normalized.byName, order = normalized.order;
 
   if (anyFixed) upsertHealthRow_("LabResults", LAB_FIELDS, p);
 
@@ -593,19 +634,17 @@ function addLabEntry(p) {
     });
     var existing = sheet.getDataRange().getValues();
     var dateCol = headers.indexOf("date"), nameCol = headers.indexOf("name");
-    extras.forEach(function (x) {
-      var name = String(x.name || "").trim();
-      var value = parseFloat(x.value);
-      if (!name || isNaN(value)) return;
-      var lowN = parseFloat(x.refLow), highN = parseFloat(x.refHigh);
+    var textCols = [headers.indexOf("name") + 1, headers.indexOf("unit") + 1];
+    order.forEach(function (name) {
+      var x = byName[name];
       // 同一天同名稱的項目：更新那一列
       for (var i = 1; i < existing.length; i++) {
         if (normalizeDateCell_(existing[i][dateCol]) === String(p.date) && String(existing[i][nameCol]) === name) {
           headers.forEach(function (h, c) {
-            if (h === "value") sheet.getRange(i + 1, c + 1).setValue(value);
-            if (h === "unit") sheet.getRange(i + 1, c + 1).setValue(String(x.unit || "").trim());
-            if (h === "refLow") sheet.getRange(i + 1, c + 1).setValue(isNaN(lowN) ? "" : lowN);
-            if (h === "refHigh") sheet.getRange(i + 1, c + 1).setValue(isNaN(highN) ? "" : highN);
+            if (h === "value") sheet.getRange(i + 1, c + 1).setValue(x.value);
+            if (h === "unit") writeTextCells_(sheet.getRange(i + 1, c + 1), [[x.unit]]);
+            if (h === "refLow") sheet.getRange(i + 1, c + 1).setValue(x.low);
+            if (h === "refHigh") sheet.getRange(i + 1, c + 1).setValue(x.high);
           });
           return;
         }
@@ -613,15 +652,18 @@ function addLabEntry(p) {
       var row = headers.map(function (h) {
         if (h === "id") return Utilities.getUuid();
         if (h === "date") return p.date;
-        if (h === "name") return name;
-        if (h === "value") return value;
-        if (h === "unit") return String(x.unit || "").trim();
-        if (h === "refLow") return isNaN(lowN) ? "" : lowN;
-        if (h === "refHigh") return isNaN(highN) ? "" : highN;
+        if (h === "name") return x.name;
+        if (h === "value") return x.value;
+        if (h === "unit") return x.unit;
+        if (h === "refLow") return x.low;
+        if (h === "refHigh") return x.high;
         if (h === "createdAt") return new Date();
         return "";
       });
-      sheet.appendRow(row);
+      // 名稱、單位的欄位先設成純文字格式再寫入，避免 =、+、-、@ 開頭被當成公式
+      var target = sheet.getLastRow() + 1;
+      textCols.forEach(function (col) { if (col > 0) sheet.getRange(target, col).setNumberFormat("@"); });
+      sheet.getRange(target, 1, 1, row.length).setValues([row]);
     });
   }
   return getLabData();

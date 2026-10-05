@@ -304,18 +304,27 @@
     const keyToId = {};
     Object.entries(FIELD_MAP).forEach(([id, key]) => { keyToId[key] = id; });
     const unknown = Object.keys(data.values || {}).filter(k => !keyToId[k]);
-    if (data.date) document.getElementById("bodyDate").value = data.date;
+    const problems = [];
+    // 先清乾淨再填：第二份報告不能殘留第一份的數值（身高沒給就沿用上次的）
+    Object.keys(FIELD_MAP).forEach(id => { document.getElementById(id).value = ""; });
+    if (data.date) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(data.date))) document.getElementById("bodyDate").value = data.date;
+      else problems.push(`日期「${data.date}」格式不對（要 yyyy-MM-dd），沒有填入`);
+    }
     let filled = 0;
     Object.entries(keyToId).forEach(([key, id]) => {
-      const v = data.values && data.values[key];
-      if (v !== undefined && v !== null && v !== "") {
-        document.getElementById(id).value = v;
-        filled++;
-      }
+      const raw = data.values && data.values[key];
+      if (raw === undefined || raw === null || raw === "") return;
+      const n = parseStrictNumber(raw);
+      if (n === null) { problems.push(`${key}「${raw}」不是有效數字`); return; }
+      document.getElementById(id).value = n;
+      filled++;
     });
+    prefillForm();
     updateForm();
     const notes = [`已填入 ${filled} 個欄位，請核對後按「新增」`];
     if (unknown.length) notes.push(`有 ${unknown.length} 個不認得的欄位沒填入：${unknown.join("、")}`);
+    problems.forEach(t => notes.push("⚠️ " + t));
     if (data.date && state.readings.some(r => r.date === data.date)) notes.push("⚠️ 這一天已經有體組成紀錄，按「新增」會更新這天你有填的欄位（沒填的保留）");
     msg.textContent = notes.join("；");
   });
@@ -330,6 +339,13 @@
     Object.entries(FIELD_MAP).forEach(([id, key]) => {
       params[key] = document.getElementById(id).value;
     });
+    const bad = [];
+    Object.entries(FIELD_MAP).forEach(([id, key]) => {
+      if (params[key] === "") return;
+      const n = parseStrictNumber(params[key]);
+      if (n === null) bad.push(key); else params[key] = n;
+    });
+    if (bad.length) { setStatus("這些欄位不是有效數字：" + bad.join("、"), true); return; }
     const bmi = computeBmi();
     params.bmi = bmi === null ? "" : bmi;
     if (!params.date || !params.weight) return;

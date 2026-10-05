@@ -483,30 +483,45 @@
     }
     const known = new Set(ITEMS.map(i => i.key));
     const unknown = Object.keys(data.values || {}).filter(k => !known.has(k));
-    if (data.date) document.getElementById("labDate").value = data.date;
+    const problems = [];
+    // 先把表單清乾淨：第二份報告不能殘留第一份的數值
+    ITEMS.forEach(i => { document.getElementById("lab_" + i.key).value = ""; });
+    document.getElementById("labExtraRows").innerHTML = "";
+    if (data.date) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(data.date))) document.getElementById("labDate").value = data.date;
+      else problems.push(`日期「${data.date}」格式不對（要 yyyy-MM-dd），沒有填入`);
+    }
     let filled = 0;
     ITEMS.forEach(i => {
-      const v = data.values && data.values[i.key];
-      if (v !== undefined && v !== null && v !== "") {
-        document.getElementById("lab_" + i.key).value = v;
-        filled++;
-      }
+      const raw = data.values && data.values[i.key];
+      if (raw === undefined || raw === null || raw === "") return;
+      const n = parseStrictNumber(raw);
+      if (n === null) { problems.push(`${i.label}「${raw}」不是有效數字`); return; }
+      document.getElementById("lab_" + i.key).value = n;
+      filled++;
     });
-    document.getElementById("labExtraRows").innerHTML = "";
+    const seen = new Set();
     (data.extra || []).forEach(x => {
+      const name = String(x.name || "").trim();
+      const n = parseStrictNumber(x.value);
+      if (!name || n === null) { problems.push(`其他項目「${name || "（沒有名稱）"}」的數值「${x.value ?? ""}」無效，沒有填入`); return; }
+      if (seen.has(name)) { problems.push(`其他項目「${name}」重複出現，只保留第一筆`); return; }
+      seen.add(name);
       addExtraRow();
       const rows = document.querySelectorAll("#labExtraRows .lab-extra-row");
       const row = rows[rows.length - 1];
-      row.querySelector(".x-name").value = x.name || "";
-      row.querySelector(".x-value").value = x.value ?? "";
+      const low = parseStrictNumber(x.refLow), high = parseStrictNumber(x.refHigh);
+      row.querySelector(".x-name").value = name;
+      row.querySelector(".x-value").value = n;
       row.querySelector(".x-unit").value = x.unit || "";
-      row.querySelector(".x-low").value = x.refLow ?? "";
-      row.querySelector(".x-high").value = x.refHigh ?? "";
+      row.querySelector(".x-low").value = low ?? "";
+      row.querySelector(".x-high").value = high ?? "";
       filled++;
     });
     updateForm();
     const notes = [`已填入 ${filled} 個項目，請核對後按「新增」`];
     if (unknown.length) notes.push(`有 ${unknown.length} 個不認得的欄位沒填入：${unknown.join("、")}`);
+    problems.forEach(t => notes.push("⚠️ " + t));
     if (data.date && hasDay(data.date)) notes.push("⚠️ 這一天已經有驗血紀錄，按「新增」會更新這天你有填的項目（沒填的保留）");
     msg.textContent = notes.join("；");
   });
@@ -518,6 +533,27 @@
     const params = { date: document.getElementById("labDate").value };
     ITEMS.forEach(i => { params[i.key] = document.getElementById("lab_" + i.key).value; });
     const extras = collectExtras();
+    // 送出前檢查：數字格式、其他項目名稱不可重複（"1,000" 這類會先轉成 1000，其餘無效的直接擋下）
+    const bad = [];
+    ITEMS.forEach(i => {
+      const raw = params[i.key];
+      if (raw === "") return;
+      const n = parseStrictNumber(raw);
+      if (n === null) bad.push(i.label); else params[i.key] = n;
+    });
+    const names = new Set();
+    extras.forEach(x => {
+      const n = parseStrictNumber(x.value);
+      if (n === null) bad.push(x.name); else x.value = n;
+      ["refLow", "refHigh"].forEach(k => {
+        if (x[k] === "") return;
+        const r = parseStrictNumber(x[k]);
+        if (r === null) bad.push(x.name + "的參考範圍"); else x[k] = r;
+      });
+      if (names.has(x.name)) bad.push(`「${x.name}」重複`);
+      names.add(x.name);
+    });
+    if (bad.length) { setStatus("請修正這些項目：" + bad.join("、"), true); return; }
     params.extra = JSON.stringify(extras);
     if (!params.date || !(ITEMS.some(i => params[i.key] !== "") || extras.length)) return;
     // 同一天已經有紀錄：只更新這次有填的項目，沒填的保留（可用來修正或補漏）
