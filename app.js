@@ -1597,5 +1597,19 @@ document.getElementById("todayBtn").addEventListener("click", () => {
   selectDate(toDateStr(today));
 });
 
+// 頂端「今日待辦完成 x / y」：點一下回到今天並捲到待辦卡片（待辦卡片在頁面中段，第一屏看不到）
+function jumpToGoals() {
+  const today = toDateStr(new Date());
+  if (state.selectedDate !== today) selectDate(today);
+  const card = document.querySelector(".goals-card");
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("flash");
+  setTimeout(() => card.classList.remove("flash"), 1200);
+}
+document.getElementById("progressLine").addEventListener("click", jumpToGoals);
+document.getElementById("progressLine").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jumpToGoals(); }
+});
+
 // ====== Boot ======
 initAuth();

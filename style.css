@@ -187,7 +187,7 @@ a.ghost-btn {
   gap: 8px;
 }
 
-#selectedDateLabel, #selectedDateLabel2 {
+#selectedDateLabel, #selectedDateLabel2, #selectedDateLabel3 {
   font-size: 13px;
   font-weight: 400;
   color: var(--text-dim);
@@ -947,3 +947,7 @@ a.ghost-btn {
   .calendar-nav-spacer { display: none; }
   .calendar-nav-center { flex: 1; justify-content: center; }
 }
+
+/* 首頁頂端「今日待辦完成 x / y」：點一下跳到待辦卡片 */
+.progress-link { cursor: pointer; width: fit-content; text-decoration: underline dotted; text-underline-offset: 3px; }
+.goals-card.flash { outline: 2px solid var(--accent); outline-offset: 2px; transition: outline-color 0.3s; }

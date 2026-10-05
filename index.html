@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261005210626">
+<link rel="stylesheet" href="style.css?v=20261005211234">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
     <header class="app-header multi">
       <div>
         <h1 id="todayDate"></h1>
-        <p id="progressLine" class="progress-line"></p>
+        <p id="progressLine" class="progress-line progress-link" role="button" tabindex="0" title="跳到今日待辦"></p>
       </div>
       <div class="header-actions">
         <button id="shoppingBtn" class="ghost-btn" title="清單">📝</button>
@@ -75,6 +75,15 @@
         <ul id="eventList" class="item-list"></ul>
       </section>
 
+      <section class="card goals-card">
+        <h2>今日待辦 <span id="selectedDateLabel3"></span></h2>
+        <form id="goalForm" class="inline-form">
+          <input id="goalInput" type="text" placeholder="新增一個待辦…" required>
+          <button type="submit">新增</button>
+        </form>
+        <ul id="goalList" class="item-list"></ul>
+      </section>
+
       <section id="petExpenseCard" class="card pet-expense-card">
         <div class="calendar-nav">
           <button id="petExpensePrev" class="ghost-btn">‹</button>
@@ -90,14 +99,7 @@
         <div id="petExpenseList"></div>
       </section>
 
-      <section class="card goals-card">
-        <h2>今日待辦 <span id="selectedDateLabel3"></span></h2>
-        <form id="goalForm" class="inline-form">
-          <input id="goalInput" type="text" placeholder="新增一個待辦…" required>
-          <button type="submit">新增</button>
-        </form>
-        <ul id="goalList" class="item-list"></ul>
-      </section>
+
 
       <!-- ====== 新增/管理區（依使用頻率排：記事、花費常用；循環行程、習慣不常用） ====== -->
 
@@ -283,7 +285,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261005210626"></script>
-  <script src="app.js?v=20261005210626"></script>
+  <script src="shared.js?v=20261005211234"></script>
+  <script src="app.js?v=20261005211234"></script>
 </body>
 </html>
