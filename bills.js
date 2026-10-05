@@ -67,12 +67,15 @@ function buildPayBtn(b, paidVal) {
   payBtn.addEventListener("click", async () => {
     const input = await showPrompt("已繳金額（留空清除）：", paidVal === null ? "" : String(paidVal));
     if (input === null) return;
-    if (input.trim() !== "" && Number(input) === Number(b.fullAmount)) {
+    // 跟後端同一套嚴格解析：1,000 要先轉成 1000 才能跟帳單全額比，也才不會漏掉「繳清後鎖定」的確認
+    const paid = input.trim() === "" ? null : parseStrictNumber(input);
+    if (input.trim() !== "" && paid === null) { setStatus(`已繳金額「${input.trim()}」不是有效數字`, true); return; }
+    if (paid !== null && paid === Number(b.fullAmount)) {
       if (!(await showConfirm("已繳金額等於帳單全額，登記後就視為繳清、不能再修改，確定嗎？"))) return;
     }
     await withRowLock(payBtn, async () => {
       try {
-        applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: input.trim() }));
+        applyBillData(await api("setCreditCardBillPaid", { id: b.id, paidAmount: paid === null ? "" : paid }));
         releasePending(payBtn);
         renderBillsAll();
       } catch (err) {

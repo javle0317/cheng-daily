@@ -460,6 +460,17 @@ a.ghost-btn {
   z-index: 100;
 }
 
+/* 錯誤提示：紅色、可多行、比成功提示停留更久（見 shared.js 的 setStatus） */
+.toast.toast-error {
+  background: var(--danger);
+  color: #fff;
+  border-radius: 14px;
+  max-width: calc(100vw - 32px);
+  width: max-content;
+  text-align: center;
+  line-height: 1.4;
+}
+
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);

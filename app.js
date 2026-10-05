@@ -699,9 +699,11 @@ function renderEvents() {
       amountBtn.addEventListener("click", async () => {
         const input = await showPrompt("花費金額（留空清除）：", ev.amount || "");
         if (input === null) return;
+        const amount = input.trim() === "" ? "" : parseStrictNumber(input);
+        if (amount === null) { setStatus(`花費金額「${input.trim()}」不是有效數字`, true); return; }
         await withRowLock(amountBtn, async () => {
           try {
-            applyData(await api("setEventAmount", { id: ev.id, amount: input.trim() }));
+            applyData(await api("setEventAmount", { id: ev.id, amount }));
             releasePending(amountBtn);
             renderEvents();
             renderPetExpenses();

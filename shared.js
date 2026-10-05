@@ -17,18 +17,22 @@ function setStatus(msg, isError) {
   const el = document.getElementById("statusLine");
   el.textContent = msg || "";
   el.style.color = isError ? "var(--danger)" : "var(--text-dim)";
+  // 狀態列在頁面最底下，錯誤寫在那裡使用者根本看不到（只覺得按了新增沒反應），
+  // 所以錯誤一律同時用頂部的紅色提示顯示，停留久一點
+  if (isError && msg) showToast(msg, { error: true });
 }
 
 let toastTimer = null;
-function showToast(msg) {
+function showToast(msg, opts = {}) {
   const el = document.getElementById("toast");
   el.textContent = msg;
+  el.classList.toggle("toast-error", !!opts.error);
   el.classList.remove("hidden");
   requestAnimationFrame(() => el.classList.add("show"));
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.classList.remove("show");
-  }, 1800);
+  }, opts.error ? 5000 : 1800);
 }
 
 function setFormBusy(form, busy) {
@@ -115,6 +119,18 @@ async function withRowLock(el, fn, alsoLock = []) {
       pendingRows.delete(key);
     }
   }
+}
+
+// 嚴格解析使用者／匯入的數字：允許千分位（"1,000" → 1000）與前後空白；
+// 空白、"12abc"、"1,0"、NaN 之類一律回傳 null（不要像 parseFloat 那樣偷偷截斷成 12 或 1）
+function parseStrictNumber(v) {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  let t = v.trim();
+  if (!t) return null;
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, "");
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 }
 
 // 組 HTML 字串（SVG 圖表等）時，使用者輸入的文字（銀行名稱、驗血單位…）一律先過這個
