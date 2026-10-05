@@ -242,6 +242,17 @@
     }
     if (cf && ct && ct.level === "good") return { icon: "✅", text: "維持在正常範圍" };
     if (from.value === to.value) return { icon: "➖", text: "沒有變化" };
+    // 有「正常」區間時，一律用「離正常區間多遠」比：原本 lower 類只看大小，
+    // 已經低於正常下限（如血糖 60）卻繼續下降，會被誤判成「變好」
+    const goodBand = item.bandList().find(b => b.level === "good");
+    if (goodBand) {
+      const dist = v => v < goodBand.from ? goodBand.from - v : v > goodBand.to ? v - goodBand.to : 0;
+      const df = dist(from.value), dt = dist(to.value);
+      if (df === dt) return { icon: "➖", text: from.value < to.value ? "上升（離正常範圍的距離沒變）" : "下降（離正常範圍的距離沒變）" };
+      return dt < df
+        ? { icon: "✅", text: "往好的方向（燈號沒變，數值更接近正常範圍）" }
+        : { icon: "⚠️", text: "往壞的方向（燈號沒變，數值離正常範圍更遠）" };
+    }
     let improved;
     if (item.better === "lower") improved = to.value < from.value;
     else if (item.better === "higher") improved = to.value > from.value;
@@ -619,8 +630,8 @@
   });
 
   window.healthLoaders = window.healthLoaders || [];
-  window.healthLoaders.push(async () => {
+  window.healthLoaders.push({ tab: "labs", load: async () => {
     apply(await api("getLabData"));
     renderAll();
-  });
+  } });
 })();

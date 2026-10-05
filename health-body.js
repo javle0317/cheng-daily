@@ -394,8 +394,8 @@
   }
 
   window.healthLoaders = window.healthLoaders || [];
-  window.healthLoaders.push(async () => {
+  window.healthLoaders.push({ tab: "body", load: async () => {
     apply(await api("getInBodyData"));
     renderAll();
-  });
+  } });
 })();

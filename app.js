@@ -21,6 +21,7 @@ let state = {
   recurringEvents: [],
   recurringExceptions: [],
   shoppingList: [],
+  shoppingLoaded: false,
   holidayDates: new Set(),
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
@@ -123,7 +124,7 @@ function computeStreak(habit) {
   let streak = 0;
   const cursor = new Date();
   const workdaysOnly = habit.workdaysOnly === true || habit.workdaysOnly === "TRUE";
-  let isToday = true;
+  const todayStr = toDateStr(cursor);
   for (let i = 0; i < 365; i++) {
     const dateStr = toDateStr(cursor);
     if (workdaysOnly && !isWorkday(dateStr)) {
@@ -132,12 +133,12 @@ function computeStreak(habit) {
     }
     const done = getHabitLogCount(habit.id, dateStr) >= Number(habit.target || 1);
     if (!done) {
-      // 今天還沒做不算斷連續，從昨天開始往回算
-      if (isToday) { isToday = false; cursor.setDate(cursor.getDate() - 1); continue; }
+      // 只有「今天」還沒做不算斷連續，從前一天開始往回算；其他任何一天沒做就是斷了
+      // （僅工作日的習慣在週末/假日打開時，今天本身會被跳過，不能把前一個工作日的漏做也當成寬限）
+      if (dateStr === todayStr) { cursor.setDate(cursor.getDate() - 1); continue; }
       break;
     }
     streak++;
-    isToday = false;
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
@@ -187,14 +188,15 @@ function applyData(data) {
   if (data.habitLogs) state.habitLogs = data.habitLogs;
   if (data.recurringEvents) state.recurringEvents = data.recurringEvents;
   if (data.recurringExceptions) state.recurringExceptions = data.recurringExceptions;
-  if (data.shoppingList) state.shoppingList = data.shoppingList;
+  if (data.shoppingList) { state.shoppingList = data.shoppingList; state.shoppingLoaded = true; }
   if (data.holidays) state.holidayDates = new Set(data.holidays.map(h => h.date));
 }
 
 // api() / showLockScreen / showLockLoading / showApp / tryUnlock / lockForm
 // 與 logoutBtn 監聽都在 shared.js，這裡只提供 shared.js 需要呼叫的進入點。
 window.loadPageData = async function () {
-  applyData(await api("getData"));
+  // 清單（購物/想法）要打開 📝 才看得到，登入時先不讀，打開時再載入
+  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,recurringEvents,recurringExceptions,holidays" }));
   renderAll();
 };
 
@@ -1143,9 +1145,20 @@ document.getElementById("clearDoneBtn").addEventListener("click", async (e) => {
 
 // showConfirm / showPrompt 在 shared.js
 
-function openShoppingModal() {
+async function openShoppingModal() {
   setListCategory(listCategory);
   document.getElementById("shoppingModal").classList.remove("hidden");
+  if (state.shoppingLoaded) return;
+  const list = document.getElementById("shoppingList");
+  list.innerHTML = `<li class="empty-hint">載入中…</li>`;
+  try {
+    const data = await api("getData", { keys: "shoppingList" });
+    // 載入期間如果已經有寫入回應帶回完整清單，就用那份，不要拿比較舊的蓋掉
+    if (!state.shoppingLoaded) applyData(data);
+    renderShoppingList();
+  } catch (err) {
+    list.innerHTML = `<li class="empty-hint">載入失敗：${escapeHtml(err.message)}</li>`;
+  }
 }
 
 function closeShoppingModal() {

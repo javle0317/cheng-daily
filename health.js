@@ -17,21 +17,43 @@ function applyBpData(readings) {
 // 血壓、體重（health-body.js）、驗血（health-labs.js）三個分頁並行載入；某一個失敗不影響其他
 window.loadPageData = async function () {
   const loaders = [
-    async () => { applyBpData(await api("getBloodPressureData")); renderBpAll(); },
+    { tab: "bp", load: async () => { applyBpData(await api("getBloodPressureData")); renderBpAll(); } },
     ...(window.healthLoaders || []),
   ];
-  const results = await Promise.allSettled(loaders.map(f => f()));
-  const failed = results.filter(r => r.status === "rejected");
-  // 密碼錯誤或全部失敗：丟出去讓登入流程留在登入頁，不能讓人進到空畫面
-  const authFail = failed.find(f => f.reason && f.reason.message === "unauthorized");
-  if (authFail) throw authFail.reason;
-  if (failed.length === loaders.length) throw failed[0].reason;
-  if (failed.length) {
+  let current = "bp";
+  try {
+    const saved = localStorage.getItem("healthTab");
+    if (["bp", "body", "labs"].includes(saved)) current = saved;
+  } catch (e) { /* ignore */ }
+  const fail = (rs) => {
+    const failed = rs.filter(r => r.status === "rejected");
+    if (!failed.length) return;
     let msg = "部分資料載入失敗：" + failed.map(f => f.reason.message).join("；");
     if (msg.includes("unknown action")) msg += "（Apps Script 可能還沒重新部署成新版本）";
-    // 登入成功後 shared.js 會把狀態列蓋成「已連上 Google Sheet」，所以延後顯示，並用彈窗確保看得到
-    setTimeout(() => { setStatus(msg, true); showConfirm(msg); }, 500);
+    setStatus(msg, true);
+    showConfirm(msg);
+  };
+  // 先等「正在看的分頁」載完就進畫面，其他分頁在背景繼續載（切過去時多半已經好了）。
+  // 驗證失敗（密碼錯）要丟出去讓登入流程留在登入頁。
+  const first = loaders.filter(l => l.tab === current);
+  const rest = loaders.filter(l => l.tab !== current);
+  // 其他分頁同時在背景開始載，只是不等它們
+  const restPromise = Promise.allSettled(rest.map(l => l.load()));
+  const firstResults = await Promise.allSettled(first.map(l => l.load()));
+  const authFail = firstResults.find(r => r.status === "rejected" && r.reason && r.reason.message === "unauthorized");
+  if (authFail) throw authFail.reason;
+  // 正在看的分頁失敗：等其他分頁的結果，全部都失敗才當成登入失敗（可能是斷線）
+  if (firstResults.every(r => r.status === "rejected")) {
+    const rs = await restPromise;
+    if (rs.every(r => r.status === "rejected")) throw firstResults[0].reason;
   }
+  restPromise.then((rs) => {
+    const auth = rs.find(r => r.status === "rejected" && r.reason && r.reason.message === "unauthorized");
+    if (auth) { localStorage.removeItem("dailyhub_password"); location.reload(); return; }
+    // 登入成功後 shared.js 會把狀態列蓋成「已連上 Google Sheet」，所以延後一下再顯示失敗訊息
+    setTimeout(() => fail([...firstResults, ...rs]), 500);
+  });
+  // 當前分頁整個失敗但密碼是對的：仍進畫面（其他分頁可用），錯誤由上面的提示顯示
 };
 
 // ====== 分頁切換（血壓 / 體重 / 驗血）======

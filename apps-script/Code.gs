@@ -93,7 +93,7 @@ function dispatch_(p) {
   {
     switch (p.action) {
       case "getData":
-        return respond({ ok: true, data: getData() });
+        return respond({ ok: true, data: getData(p.keys ? String(p.keys).split(",") : undefined) });
       case "addGoal":
         return respond({ ok: true, data: addGoal(p.date, p.text) });
       case "toggleGoal":
@@ -278,7 +278,7 @@ function getHolidaysSafe_() {
 
 function addGoal(date, text) {
   var sheet = getSheet("Goals");
-  sheet.appendRow([Utilities.getUuid(), date, text, false, new Date()]);
+  appendRowSafe_(sheet, [Utilities.getUuid(), date, text, false, new Date()]);
   return getData(["goals"]);
 }
 
@@ -308,7 +308,7 @@ function deleteGoal(id) {
 
 function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
   var sheet = getSheet("Events");
-  sheet.appendRow([
+  appendRowSafe_(sheet, [
     Utilities.getUuid(),
     date,
     owner || "",
@@ -350,7 +350,7 @@ function setEventAmount(id, amount) {
 
 function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate) {
   var sheet = getSheet("RecurringEvents");
-  sheet.appendRow([
+  appendRowSafe_(sheet, [
     Utilities.getUuid(),
     owner || "",
     title,
@@ -395,7 +395,7 @@ function deleteRecurringEvent(id) {
 
 function addRecurringException(recurringId, date) {
   var sheet = getSheet("RecurringExceptions");
-  sheet.appendRow([Utilities.getUuid(), recurringId, date, new Date()]);
+  appendRowSafe_(sheet, [Utilities.getUuid(), recurringId, date, new Date()]);
   return getData(["recurringExceptions"]);
 }
 
@@ -419,7 +419,7 @@ function normalizeListCategory_(c) {
 
 function addShoppingItem(item, category) {
   var sheet = getSheet("ShoppingList");
-  sheet.appendRow([Utilities.getUuid(), item, false, new Date(), normalizeListCategory_(category)]);
+  appendRowSafe_(sheet, [Utilities.getUuid(), item, false, new Date(), normalizeListCategory_(category)]);
   return getData(["shoppingList"]);
 }
 
@@ -470,7 +470,7 @@ function getBloodPressureData() {
 
 function addBloodPressureReading(date, period, systolic, diastolic, pulse) {
   var sheet = getSheet("BloodPressure");
-  sheet.appendRow([
+  appendRowSafe_(sheet, [
     Utilities.getUuid(),
     date,
     period,
@@ -514,10 +514,24 @@ function parseNumStrict_(v) {
   return isFinite(n) ? n : NaN;
 }
 
-// 把文字存進 Sheet 前先把那幾格設成純文字格式，開頭是 = + - @ 的內容才不會被當成公式執行
-function writeTextCells_(range, values) {
-  range.setNumberFormat("@");
-  range.setValues(values);
+// 使用者輸入的文字存進 Sheet 前的公式防護：開頭是 = + - @（或 Tab/換行）的字串會被 Sheets
+// 當成公式執行，所以這幾格先設成純文字格式再寫入。所有帶使用者文字的寫入都走這兩個函式，
+// 不要直接用 sheet.appendRow / range.setValue 寫字串。
+function needsTextGuard_(v) {
+  return typeof v === "string" && /^[=+\-@\t\r]/.test(v);
+}
+
+function appendRowSafe_(sheet, row) {
+  var r = sheet.getLastRow() + 1;
+  row.forEach(function (v, i) {
+    if (needsTextGuard_(v)) sheet.getRange(r, i + 1).setNumberFormat("@");
+  });
+  sheet.getRange(r, 1, 1, row.length).setValues([row]);
+}
+
+function setTextSafe_(range, v) {
+  if (needsTextGuard_(v)) range.setNumberFormat("@");
+  range.setValue(v);
 }
 
 function appendHealthRow_(sheetName, fields, p) {
@@ -539,7 +553,7 @@ function appendHealthRow_(sheetName, fields, p) {
     }
     return "";
   });
-  sheet.appendRow(row);
+  appendRowSafe_(sheet, row);
 }
 
 // 同一天已經有紀錄時：只更新這次有填的欄位（其他欄位保留），沒有紀錄才新增一列。
@@ -654,7 +668,6 @@ function addLabEntry(p) {
     });
     var existing = sheet.getDataRange().getValues();
     var dateCol = headers.indexOf("date"), nameCol = headers.indexOf("name");
-    var textCols = [headers.indexOf("name") + 1, headers.indexOf("unit") + 1];
     order.forEach(function (name) {
       var x = byName[name];
       // 同一天同名稱的項目：更新那一列
@@ -662,7 +675,7 @@ function addLabEntry(p) {
         if (normalizeDateCell_(existing[i][dateCol]) === String(p.date) && String(existing[i][nameCol]) === name) {
           headers.forEach(function (h, c) {
             if (h === "value") sheet.getRange(i + 1, c + 1).setValue(x.value);
-            if (h === "unit") writeTextCells_(sheet.getRange(i + 1, c + 1), [[x.unit]]);
+            if (h === "unit") setTextSafe_(sheet.getRange(i + 1, c + 1), x.unit);
             if (h === "refLow") sheet.getRange(i + 1, c + 1).setValue(x.low);
             if (h === "refHigh") sheet.getRange(i + 1, c + 1).setValue(x.high);
           });
@@ -680,10 +693,7 @@ function addLabEntry(p) {
         if (h === "createdAt") return new Date();
         return "";
       });
-      // 名稱、單位的欄位先設成純文字格式再寫入，避免 =、+、-、@ 開頭被當成公式
-      var target = sheet.getLastRow() + 1;
-      textCols.forEach(function (col) { if (col > 0) sheet.getRange(target, col).setNumberFormat("@"); });
-      sheet.getRange(target, 1, 1, row.length).setValues([row]);
+      appendRowSafe_(sheet, row);
     });
   }
   return getLabData();
@@ -760,7 +770,7 @@ function getCreditCardBills() {
 
 function addCreditCardBill(bank, billingMonth, date, fullAmount, lowestAmount) {
   var sheet = getSheet("CreditCardBills");
-  sheet.appendRow([
+  appendRowSafe_(sheet, [
     Utilities.getUuid(),
     bank,
     billingMonth,
@@ -817,7 +827,7 @@ function deleteCreditCardBill(id) {
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
   var finalTarget = frequency === "daily" ? 1 : (parseInt(target, 10) || 1);
-  sheet.appendRow([
+  appendRowSafe_(sheet, [
     Utilities.getUuid(),
     name,
     frequency,
@@ -838,7 +848,7 @@ function updateHabit(id, name, workdaysOnly, target) {
     if (values[i][0] === id) {
       var frequency = values[i][2];
       var finalTarget = frequency === "daily" ? 1 : (parseInt(target, 10) || 1);
-      sheet.getRange(i + 1, 2).setValue(name);
+      setTextSafe_(sheet.getRange(i + 1, 2), name);
       sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? (workdaysOnly === "true" || workdaysOnly === true) : values[i][3]);
       sheet.getRange(i + 1, 5).setValue(finalTarget);
       break;
@@ -898,7 +908,7 @@ function toggleHabitLog(habitId, periodKey, target) {
           sheet.deleteRow(matchingRows[j] + 1);
         }
       } else {
-        sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
+        appendRowSafe_(sheet, [Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
       }
       return getData(["habitLogs"]);
     }
@@ -911,7 +921,7 @@ function toggleHabitLog(habitId, periodKey, target) {
       return getData(["habitLogs"]);
     }
 
-    sheet.appendRow([Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
+    appendRowSafe_(sheet, [Utilities.getUuid(), habitId, periodKey, 1, new Date()]);
     return getData(["habitLogs"]);
   }
 }
@@ -1004,7 +1014,7 @@ function drawChallenge() {
     row[cols.count - 1] = 0;
     var createdAtCol = sheet.getRange(1, 1, 1, width).getValues()[0].indexOf("createdAt");
     if (createdAtCol >= 0) row[createdAtCol] = new Date();
-    sheet.appendRow(row);
+    appendRowSafe_(sheet, row);
     var rowIndex = sheet.getLastRow();
 
     var exercise;
@@ -1017,7 +1027,7 @@ function drawChallenge() {
       throw err;
     }
     try {
-      sheet.getRange(rowIndex, cols.exercise).setValue(exercise);
+      setTextSafe_(sheet.getRange(rowIndex, cols.exercise), exercise);
     } catch (err) {
       // 朋友那邊已經抽成功、但我們寫入失敗：draw 不能重複呼叫，把結果放進錯誤訊息讓人可以手動補
       throw new Error("抽到「" + exercise + "」，但記錄失敗，請手動填到 HabitLog 的 exercise 欄");

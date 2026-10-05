@@ -85,8 +85,11 @@ async function apiRequest(action, params) {
   url.searchParams.set("password", password || "");
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
+  const t0 = performance.now();
   const res = await fetch(url.toString());
   const json = await res.json();
+  // 量測：每次 API 的耗時，開瀏覽器 console 看 apiTimings（要判斷哪裡慢、要不要加快取時用）
+  (window.apiTimings ||= []).push({ action, ms: Math.round(performance.now() - t0) });
   if (!json.ok) throw new Error(json.error || "unknown error");
   return json.data;
 }
