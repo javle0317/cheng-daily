@@ -25,6 +25,8 @@
  *   LabExtra        欄位: id | date | name | value | unit | refLow | refHigh | createdAt
  *                         （驗血「其他項目」：報告上有、LabResults 沒列的項目，一個項目一列，自帶報告參考範圍）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
+ *   Copybook        欄位: id | lang | title | author | text | createdAt
+ *                         （練字字帖的內容庫：lang 是 zh/en；text 全文，換行 = 一行；practice.html 從這裡隨機取材）
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -172,6 +174,10 @@ function dispatch_(p) {
         return respond({ ok: true, data: addLabEntry(p) });
       case "deleteLabDay":
         return respond({ ok: true, data: deleteLabDay(p.date) });
+      case "getCopybook":
+        return respond({ ok: true, data: getCopybook() });
+      case "importCopybookEntries":
+        return respond({ ok: true, data: importCopybookEntries(p.entries) });
       case "getCreditCardBills":
         return respond({ ok: true, data: getCreditCardBills() });
       case "addCreditCardBill":
@@ -845,6 +851,57 @@ function mergeDuplicateHealthRows() {
   del.forEach(function (idx) { extra.deleteRow(idx + 1); });
   report.push("LabExtra 移除 " + del.length + " 筆重複");
   return report.join("、");
+}
+
+// ====== 練字字帖內容庫（practice.html）======
+// 一篇 = 一列：lang（zh/en）、篇名、作者、全文。全部回傳 { entries }，量很小，前端自己隨機挑。
+// 新增／修改內容直接在 Sheet 的 Copybook 分頁改；網頁只負責讀，以及第一次「匯入內建範例」（importCopybookEntries）。
+function getCopybook() {
+  return { entries: sheetToObjects(getSheet("Copybook")) };
+}
+
+function copybookEntry_(e) {
+  e = e || {};
+  return {
+    lang: enumArg_(e.lang, "語言", ["zh", "en"]),
+    title: textArg_(e.title, "篇名", { required: true, max: 100 }),
+    author: textArg_(e.author, "作者", { max: 50 }),
+    text: textArg_(String(e.text === undefined || e.text === null ? "" : e.text).replace(/\r\n?/g, "\n"), "內容", { required: true, max: 8000 }),
+  };
+}
+
+function copybookKey_(lang, title) {
+  return lang + "|" + title;
+}
+
+function existingCopybookKeys_(sheet) {
+  var keys = {};
+  sheetToObjects(sheet).forEach(function (r) { keys[copybookKey_(r.lang, r.title)] = true; });
+  return keys;
+}
+
+// 批次匯入（entries 是 JSON 陣列字串）：整批先驗證，有一筆不合格就全部不寫；
+// 同語言同篇名已存在的略過，所以可以重複執行。
+function importCopybookEntries(entriesJson) {
+  var list;
+  try { list = JSON.parse(entriesJson); } catch (e) { throw new Error("匯入內容不是有效的 JSON"); }
+  if (!Array.isArray(list) || !list.length) throw new Error("匯入內容是空的");
+  if (list.length > 200) throw new Error("一次最多匯入 200 篇");
+  var entries = list.map(copybookEntry_);
+  var sheet = getSheet("Copybook");
+  var keys = existingCopybookKeys_(sheet);
+  var added = 0, skipped = 0;
+  entries.forEach(function (entry) {
+    var key = copybookKey_(entry.lang, entry.title);
+    if (keys[key]) { skipped++; return; }
+    keys[key] = true;
+    appendRowSafe_(sheet, [Utilities.getUuid(), entry.lang, entry.title, entry.author, entry.text, new Date()]);
+    added++;
+  });
+  var out = getCopybook();
+  out.added = added;
+  out.skipped = skipped;
+  return out;
 }
 
 // 信用卡帳單是獨立頁面，有自己專屬的 action，故意不回傳 getData()，理由跟

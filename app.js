@@ -387,6 +387,10 @@ function isTruthy(v) {
 // （完成後回傳給朋友的挑戰站，見 setupChallengeRow）。id 要跟 apps-script/Code.gs 的 CHALLENGE_HABIT_ID 一致。
 const CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 
+// 練字習慣：列上多「中」「英」兩顆按鈕，開 practice.html 產生可列印的描紅字帖（內容在 Sheet 的 Copybook 分頁）。
+// 勾選、編輯、刪除都照一般每日習慣。這個 id 是 Habits 分頁裡那一列的 id。
+const PRACTICE_HABIT_ID = "d6007d80-d570-4b49-a989-8af89401c395";
+
 function updateHabitsCardVisibility() {
   const card = document.getElementById("habitsCard");
   const anyVisible = ["dailyHabitSection", "weeklyHabitSection", "monthlyHabitSection"]
@@ -456,6 +460,19 @@ function renderDailyHabits() {
     if (streak > 0 || stats.longest > 0) {
       appendStreakBadge(li, streakEl, habit.id, streak,
         `目前連續 ${streak} 天 · 歷史最長 ${stats.longest} 天 · 本月完成 ${stats.monthCount} 次`);
+    }
+    if (habit.id === PRACTICE_HABIT_ID) {
+      const editBtn = li.querySelector(".habit-edit-btn");
+      [["中", "zh", "產生中文描紅字帖"], ["英", "en", "產生英文描紅字帖"]].forEach(([label, lang, title]) => {
+        const a = document.createElement("a");
+        a.className = "practice-link";
+        a.href = `practice.html?lang=${lang}`;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.title = title;
+        a.textContent = label;
+        li.insertBefore(a, editBtn);
+      });
     }
     if (isChallenge) {
       li.querySelector(".delete-btn").remove(); // 刪掉這個習慣整個挑戰就沒了，不給刪

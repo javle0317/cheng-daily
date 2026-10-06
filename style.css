@@ -951,3 +951,51 @@ a.ghost-btn {
 /* 首頁頂端「今日待辦完成 x / y」：點一下跳到待辦卡片 */
 .progress-link { cursor: pointer; width: fit-content; text-decoration: underline dotted; text-underline-offset: 3px; }
 .goals-card.flash { outline: 2px solid var(--accent); outline-offset: 2px; transition: outline-color 0.3s; }
+
+/* ====== 練字字帖頁 ====== */
+.practice-main { display: flex; flex-direction: column; gap: 16px; }
+.practice-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.practice-tabs { display: flex; gap: 6px; margin-right: 6px; }
+.practice-lang.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.practice-options label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); }
+.practice-options label.checkbox-label { flex-direction: row; align-items: center; }
+.practice-info { font-size: 13px; color: var(--text); margin: 4px 0; }
+.practice-tip { font-size: 12px; color: var(--text-dim); margin: 4px 0 10px; }
+.practice-manage { margin-top: 8px; }
+.practice-manage summary { cursor: pointer; font-size: 13px; color: var(--text-dim); }
+.practice-manage textarea { width: 100%; margin: 8px 0; }
+.sheet-host { display: flex; justify-content: center; }
+.sheet-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+}
+
+@media print {
+  html, body { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
+  .no-print, .toast, .modal-overlay, .lock-screen, .measure-svg { display: none !important; }
+  .app { max-width: none; padding: 0; margin: 0; }
+  .practice-main { display: block; gap: 0; }
+  /* 紙張是 A4（297×210 / 210×297 mm），容器比紙張小一點點並裁切，避免四捨五入多出 1px 而多印一張空白頁 */
+  .sheet-host { display: block; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+  body.print-landscape .sheet-host { width: 297mm; height: 209.5mm; }
+  body.print-portrait .sheet-host { width: 210mm; height: 296.5mm; }
+  .sheet-svg { width: 100% !important; height: 100% !important; max-width: none; box-shadow: none; }
+}
+
+/* 練字習慣列上的「中」「英」小按鈕 */
+.practice-link {
+  flex: none;
+  min-width: 26px;
+  text-align: center;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.4;
+}
