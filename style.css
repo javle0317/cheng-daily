@@ -1151,7 +1151,8 @@ input[type="checkbox"]:checked {
 /* 直排的表單不能換行：column 加上 wrap 會讓某個項目被撐出一大片空白（驗血表單中間那一大塊空白就是這樣來的） */
 .entry-form-rows { flex-wrap: nowrap; }
 .toast { z-index: 400; } /* 提示要蓋在彈窗之上，不然彈窗裡的錯誤訊息看不到 */
-.health-toolbar { display: flex; justify-content: flex-end; }
+.health-toolbar { display: block; }
+.health-toolbar .add-primary { display: block; width: 100%; padding: 12px 18px; font-size: 15px; }
 .add-primary { padding: 10px 18px; border: none; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-weight: 500; letter-spacing: 0.04em; cursor: pointer; }
 .form-modal { max-width: 440px; }
 .form-modal .entry-form { margin-bottom: 0; }
