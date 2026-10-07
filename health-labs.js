@@ -583,6 +583,7 @@
       document.querySelectorAll("#labForm details").forEach(d => { d.open = false; });
       document.getElementById("labDate").value = "";
       renderAll();
+      closeFormModal("labFormModal");
       showToast("已新增驗血紀錄");
       warnIfDuplicated(params.date);
     } catch (err) {

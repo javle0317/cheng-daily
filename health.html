@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261007142933">
+<link rel="stylesheet" href="style.css?v=20261007144253">
 </head>
 <body>
 
@@ -45,32 +45,17 @@
     </header>
 
     <nav class="health-tabs">
-      <button type="button" class="health-tab-btn active" data-tab="bp">🩸 血壓</button>
-      <button type="button" class="health-tab-btn" data-tab="body">⚖️ 體組成</button>
-      <button type="button" class="health-tab-btn" data-tab="labs">🧪 驗血</button>
+      <button type="button" class="health-tab-btn active" data-tab="bp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5s-6 6.3-6 10.4a6 6 0 0 0 12 0C18 9.8 12 3.5 12 3.5z"/></svg>血壓</button>
+      <button type="button" class="health-tab-btn" data-tab="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 10a4 4 0 0 1 7 0M12 10l1.8-2"/></svg>體組成</button>
+      <button type="button" class="health-tab-btn" data-tab="labs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 3.5h5M10.5 3.5v6L5.5 18a1.8 1.8 0 0 0 1.600 2.5h9.8A1.8 1.8 0 0 0 18.5 18l-5-8.5v-6"/><path d="M8.5 14.5h7"/></svg>驗血</button>
     </nav>
 
     <main class="grid dense">
-      <section class="card new-bp-card" data-tab="bp">
-        <h2>新增血壓紀錄</h2>
-        <form id="bpForm" class="entry-form entry-form-rows">
-          <div class="form-row">
-            <select id="bpDate" required></select>
-            <select id="bpPeriod">
-              <option value="morning">起床</option>
-              <option value="evening">睡前</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <input id="bpSystolic" type="number" min="0" placeholder="收縮壓" required>
-            <input id="bpDiastolic" type="number" min="0" placeholder="舒張壓" required>
-            <input id="bpPulse" type="number" min="0" placeholder="脈搏" required>
-          </div>
-          <div class="form-row">
-            <button id="bpSubmitBtn" type="submit" disabled>新增</button>
-          </div>
-        </form>
-      </section>
+      <div class="health-toolbar" data-tab="bp"><button id="openBpForm" type="button" class="add-primary">＋ 記一筆血壓</button></div>
+
+      <div class="health-toolbar hidden" data-tab="body"><button id="openBodyForm" type="button" class="add-primary">＋ 記錄體組成</button></div>
+
+      <div class="health-toolbar hidden" data-tab="labs"><button id="openLabForm" type="button" class="add-primary">＋ 新增驗血</button></div>
 
       <section class="card bp-chart-card" data-tab="bp">
         <div class="calendar-nav">
@@ -112,9 +97,97 @@
 
 
       <!-- ====== 體組成（體脂計，Sheet 分頁名稱 InBody）====== -->
-      <section class="card health-form-card hidden" data-tab="body">
+      <section class="card health-main-card hidden" data-tab="body">
+        <div class="bp-list-header">
+          <h2>體重與體組成 <button type="button" id="bodyInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
+          <select id="bodyRange">
+            <option value="all">全部</option>
+            <option value="1y">近 1 年</option>
+            <option value="3m">近 3 個月</option>
+          </select>
+        </div>
+        <div id="bodyInfoBox" class="info-box hidden">BMI 依國健署成人標準（24 過重、27 輕度肥胖、30 中度、35 重度）；體脂率 25% 以上為肥胖是國健署標準，10–20% 標準、20–25% 偏高是一般體脂計慣用分法；腰臀比 0.9 以上依 WHO 男性腹部肥胖標準；內臟脂肪等級與身體年齡是體脂計廠商的算法，每個品牌分界不同，請以你的體脂計報告標示為準。僅供參考。</div>
+        <p id="bodyLatestMeta" class="progress-line"></p>
+        <div id="bodyStatsRow" class="bp-stats-row"></div>
+        <div id="bodyProgress" class="body-progress"></div>
+        <h3 class="sub-heading">體重（kg）</h3>
+        <div id="bodyWeightChart"></div>
+        <h3 class="sub-heading">體脂率（%）</h3>
+        <div id="bodyFatChart"></div>
+        <h3 class="sub-heading">骨骼肌量（kg）</h3>
+        <div id="bodyMuscleChart"></div>
+        <h3 class="sub-heading">內臟脂肪</h3>
+        <div id="bodyVisceralChart"></div>
+      </section>
+
+      <section class="card health-list-card hidden" data-tab="body">
+        <h2>體組成紀錄</h2>
+        <div id="bodyList"></div>
+      </section>
+
+      <!-- ====== 驗血 ====== -->
+      <section class="card health-main-card hidden" data-tab="labs">
+        <h2>各項目最近一次 <button type="button" id="labInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
+        <div id="labInfoBox" class="info-box hidden">參考範圍採你驗血報告上的標示；分級（🟢正常 🟡注意 🟠偏高 🔴嚴重）：血糖與 HbA1c 依 ADA、血脂（總膽固醇、三酸甘油酯、HDL、LDL）依台灣血脂指引、eGFR 依 KDIGO；AST/ALT、肌酸酐、BUN、尿酸、TSH、CK、鈉、鉀的「注意/偏高」分界是依報告參考範圍推估，不是正式指引。LDL 的目標值預設 130（一般成人），有高血壓、糖尿病或腎臟病等風險時醫師的目標常更低（如 115、100、70），請在下方「LDL 目標」選成醫師設定的值（只記在這台裝置）。單次數值不能做診斷，僅供參考。</div>
+        <label class="inline-field">LDL 目標
+          <select id="labLdlTarget">
+            <option value="130">&lt;130（一般成人）</option>
+            <option value="115">&lt;115（中度風險）</option>
+            <option value="100">&lt;100（高風險）</option>
+            <option value="70">&lt;70（極高風險）</option>
+          </select>
+        </label>
+        <div id="labLatest" class="lab-latest"></div>
+        <div class="bp-list-header">
+          <h3 class="sub-heading">趨勢</h3>
+          <select id="labChartItem"></select>
+        </div>
+        <div id="labChart"></div>
+        <div id="labExplain" class="lab-explain"></div>
+      </section>
+
+      <section class="card health-list-card hidden" data-tab="labs">
+        <h2>驗血紀錄</h2>
+        <div id="labList"></div>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="bpFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增血壓紀錄</h2>
+        <button id="bpFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="bpForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <select id="bpDate" required></select>
+            <select id="bpPeriod">
+              <option value="morning">起床</option>
+              <option value="evening">睡前</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <input id="bpSystolic" type="number" min="0" placeholder="收縮壓" required>
+            <input id="bpDiastolic" type="number" min="0" placeholder="舒張壓" required>
+            <input id="bpPulse" type="number" min="0" placeholder="脈搏" required>
+          </div>
+          <div class="form-row">
+            <button id="bpSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+    </div>
+  </div>
+
+  <div id="bodyFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
         <h2>新增體組成紀錄</h2>
-        <form id="bodyForm" class="entry-form entry-form-rows">
+        <button id="bodyFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="bodyForm" class="entry-form entry-form-rows">
           <div class="form-row">
             <input id="bodyDate" type="date" required>
             <input id="bodyWeight" type="number" step="any" min="0" inputmode="decimal" placeholder="體重 kg（必填）" required>
@@ -156,40 +229,16 @@
             <button id="bodySubmitBtn" type="submit" disabled>新增</button>
           </div>
         </form>
-      </section>
+    </div>
+  </div>
 
-      <section class="card health-main-card hidden" data-tab="body">
-        <div class="bp-list-header">
-          <h2>體重與體組成 <button type="button" id="bodyInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
-          <select id="bodyRange">
-            <option value="all">全部</option>
-            <option value="1y">近 1 年</option>
-            <option value="3m">近 3 個月</option>
-          </select>
-        </div>
-        <div id="bodyInfoBox" class="info-box hidden">BMI 依國健署成人標準（24 過重、27 輕度肥胖、30 中度、35 重度）；體脂率 25% 以上為肥胖是國健署標準，10–20% 標準、20–25% 偏高是一般體脂計慣用分法；腰臀比 0.9 以上依 WHO 男性腹部肥胖標準；內臟脂肪等級與身體年齡是體脂計廠商的算法，每個品牌分界不同，請以你的體脂計報告標示為準。僅供參考。</div>
-        <p id="bodyLatestMeta" class="progress-line"></p>
-        <div id="bodyStatsRow" class="bp-stats-row"></div>
-        <div id="bodyProgress" class="body-progress"></div>
-        <h3 class="sub-heading">體重（kg）</h3>
-        <div id="bodyWeightChart"></div>
-        <h3 class="sub-heading">體脂率（%）</h3>
-        <div id="bodyFatChart"></div>
-        <h3 class="sub-heading">骨骼肌量（kg）</h3>
-        <div id="bodyMuscleChart"></div>
-        <h3 class="sub-heading">內臟脂肪</h3>
-        <div id="bodyVisceralChart"></div>
-      </section>
-
-      <section class="card health-list-card hidden" data-tab="body">
-        <h2>體組成紀錄</h2>
-        <div id="bodyList"></div>
-      </section>
-
-      <!-- ====== 驗血 ====== -->
-      <section class="card health-form-card hidden" data-tab="labs">
+  <div id="labFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
         <h2>新增驗血紀錄</h2>
-        <form id="labForm" class="entry-form entry-form-rows">
+        <button id="labFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="labForm" class="entry-form entry-form-rows">
           <div class="form-row">
             <input id="labDate" type="date" required>
           </div>
@@ -209,35 +258,7 @@
             <button id="labSubmitBtn" type="submit" disabled>新增</button>
           </div>
         </form>
-      </section>
-
-      <section class="card health-main-card hidden" data-tab="labs">
-        <h2>各項目最近一次 <button type="button" id="labInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
-        <div id="labInfoBox" class="info-box hidden">參考範圍採你驗血報告上的標示；分級（🟢正常 🟡注意 🟠偏高 🔴嚴重）：血糖與 HbA1c 依 ADA、血脂（總膽固醇、三酸甘油酯、HDL、LDL）依台灣血脂指引、eGFR 依 KDIGO；AST/ALT、肌酸酐、BUN、尿酸、TSH、CK、鈉、鉀的「注意/偏高」分界是依報告參考範圍推估，不是正式指引。LDL 的目標值預設 130（一般成人），有高血壓、糖尿病或腎臟病等風險時醫師的目標常更低（如 115、100、70），請在下方「LDL 目標」選成醫師設定的值（只記在這台裝置）。單次數值不能做診斷，僅供參考。</div>
-        <label class="inline-field">LDL 目標
-          <select id="labLdlTarget">
-            <option value="130">&lt;130（一般成人）</option>
-            <option value="115">&lt;115（中度風險）</option>
-            <option value="100">&lt;100（高風險）</option>
-            <option value="70">&lt;70（極高風險）</option>
-          </select>
-        </label>
-        <div id="labLatest" class="lab-latest"></div>
-        <div class="bp-list-header">
-          <h3 class="sub-heading">趨勢</h3>
-          <select id="labChartItem"></select>
-        </div>
-        <div id="labChart"></div>
-        <div id="labExplain" class="lab-explain"></div>
-      </section>
-
-      <section class="card health-list-card hidden" data-tab="labs">
-        <h2>驗血紀錄</h2>
-        <div id="labList"></div>
-      </section>
-    </main>
-
-    <p id="statusLine" class="status-line"></p>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
@@ -253,11 +274,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007142933"></script>
-  <script src="health-charts.js?v=20261007142933"></script>
-  <script src="health.js?v=20261007142933"></script>
-  <script src="health-body.js?v=20261007142933"></script>
-  <script src="health-labs.js?v=20261007142933"></script>
+  <script src="shared.js?v=20261007144253"></script>
+  <script src="health-charts.js?v=20261007144253"></script>
+  <script src="health.js?v=20261007144253"></script>
+  <script src="health-body.js?v=20261007144253"></script>
+  <script src="health-labs.js?v=20261007144253"></script>
   <script>initAuth();</script>
 </body>
 </html>

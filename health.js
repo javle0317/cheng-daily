@@ -64,6 +64,20 @@ window.loadPageData = async function () {
   // 當前分頁整個失敗但密碼是對的：仍進畫面（其他分頁可用），錯誤由上面的提示顯示
 };
 
+// ====== 新增表單的彈窗（血壓、體組成、驗血各一個，表單本身的欄位 id 與送出邏輯不變）======
+// 約定同首頁：多欄位的輸入用彈窗，進頁面先看資料與圖表。錯誤用 Toast（層級在彈窗之上），成功才關閉。
+function openFormModal(id) { document.getElementById(id).classList.remove("hidden"); }
+function closeFormModal(id) { document.getElementById(id).classList.add("hidden"); }
+[["bpFormModal", "bpFormClose", "openBpForm"], ["bodyFormModal", "bodyFormClose", "openBodyForm"], ["labFormModal", "labFormClose", "openLabForm"]].forEach(([modal, closeBtn, openBtn]) => {
+  document.getElementById(closeBtn).addEventListener("click", () => closeFormModal(modal));
+  document.getElementById(modal).addEventListener("click", (e) => { if (e.target.id === modal) closeFormModal(modal); });
+  document.getElementById(openBtn).addEventListener("click", () => openFormModal(modal));
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !document.getElementById("dialogModal").classList.contains("hidden")) return;
+  ["bpFormModal", "bodyFormModal", "labFormModal"].forEach(id => { if (!document.getElementById(id).classList.contains("hidden")) closeFormModal(id); });
+});
+
 // ====== 分頁切換（血壓 / 體重 / 驗血）======
 const HEALTH_TAB_KEY = "healthTab";
 
@@ -325,7 +339,7 @@ function renderChart() {
   }
 
   const W = 640, H = 260;
-  const marginLeft = 34, marginRight = 58, marginTop = 10, marginBottom = 24;
+  const marginLeft = 34, marginRight = 92, marginTop = 10, marginBottom = 24; // 右邊留給分級色帶的文字標籤
   const plotW = W - marginLeft - marginRight;
   const plotH = H - marginTop - marginBottom;
   const yMin = 40, yMax = 200;
@@ -527,6 +541,7 @@ document.getElementById("bpForm").addEventListener("submit", async (e) => {
     document.getElementById("bpDiastolic").value = "";
     document.getElementById("bpPulse").value = "";
     renderBpAll();
+    closeFormModal("bpFormModal");
     showToast("已新增血壓紀錄");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);

@@ -19,9 +19,9 @@
   --pop: #c4533b;
   --ok: #1f5a44;
   --font-serif: "Noto Serif TC", "Songti TC", "STSong", "Noto Serif CJK TC", serif;
-  --series-systolic: #2a78d6;
-  --series-diastolic: #eb6834;
-  --series-pulse: #1baf7a;
+  --series-systolic: #2b5fa8;
+  --series-diastolic: #c4533b;
+  --series-pulse: #1f7a5c;
   --status-good: #0ca30c;
   --status-warning: #fab219;
   --status-serious: #ec835a;
@@ -46,9 +46,9 @@
     --brass-text: #d4a94e;
     --pop: #e27a62;
     --ok: #5bb394;
-    --series-systolic: #3987e5;
-    --series-diastolic: #d95926;
-    --series-pulse: #199e70;
+    --series-systolic: #7c9be0;
+    --series-diastolic: #e27a62;
+    --series-pulse: #5bb394;
     --status-good: #0ca30c;
     --status-warning: #fab219;
     --status-serious: #ec835a;
@@ -1146,3 +1146,23 @@ input[type="checkbox"]:checked {
 .modal-overlay { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 .modal-card { max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 @media print { .app { padding: 0; } }
+
+/* ====== 健康頁：新增表單改成彈窗、版面整理 ====== */
+/* 直排的表單不能換行：column 加上 wrap 會讓某個項目被撐出一大片空白（驗血表單中間那一大塊空白就是這樣來的） */
+.entry-form-rows { flex-wrap: nowrap; }
+.toast { z-index: 400; } /* 提示要蓋在彈窗之上，不然彈窗裡的錯誤訊息看不到 */
+.health-toolbar { display: flex; justify-content: flex-end; }
+.add-primary { padding: 10px 18px; border: none; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-weight: 500; letter-spacing: 0.04em; cursor: pointer; }
+.form-modal { max-width: 440px; }
+.form-modal .entry-form { margin-bottom: 0; }
+#bpSystolic, #bpDiastolic, #bpPulse { flex: 1 1 80px; min-width: 0; }
+.health-tab-btn svg { width: 16px; height: 16px; vertical-align: -2px; margin-right: 4px; }
+
+/* 數據方塊：兩欄整齊排、數字用宋體 */
+.bp-stats-row { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 560px) { .bp-stats-row { grid-template-columns: repeat(4, 1fr); } }
+.bp-stat-tile { background: color-mix(in srgb, var(--bg) 70%, var(--card-bg)); }
+.bp-stat-value { font-family: var(--font-serif); font-size: 20px; font-weight: 500; }
+.bp-band-label { font-size: 13px; }
+.inline-field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.inline-field select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 14px; }
