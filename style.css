@@ -969,7 +969,7 @@ a.ghost-btn {
 .progress-link { cursor: pointer; width: fit-content; text-decoration: underline dotted; text-underline-offset: 3px; }
 .goals-card.flash { outline: 2px solid var(--accent); outline-offset: 2px; transition: outline-color 0.3s; }
 
-/* 練字習慣列上的「中」「英」小按鈕 */
+/* 練字（「字」）、語言練習（「語」）習慣列上連到 cheng-lingo 的小連結 */
 .practice-link {
   flex: none;
   min-width: 26px;
