@@ -6,6 +6,11 @@ const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbw-_yrxEFqaCI8WIKAPK
 
 const PASSWORD_KEY = "dailyhub_password";
 
+// 前端需要的後端最低版本（Code.gs 的 BACKEND_VERSION）。後端比這個舊 = Dean 還沒把新版 Code.gs 部署成新版本，
+// 會跳一次提醒，不用等到畫面出現怪現象才發現。改了後端行為、前端依賴時，兩邊一起加版本。
+const BACKEND_MIN_VERSION = "2026-10-07.2";
+let backendWarned = false;
+
 function toDateStr(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -155,6 +160,11 @@ async function apiRequest(action, params) {
   const json = await res.json();
   // 量測：每次 API 的耗時，開瀏覽器 console 看 apiTimings（要判斷哪裡慢、要不要加快取時用）
   (window.apiTimings ||= []).push({ action, ms: Math.round(performance.now() - t0) });
+  window.backendVersion = json.v || "";
+  if (json.ok && !backendWarned && (!json.v || json.v < BACKEND_MIN_VERSION)) {
+    backendWarned = true;
+    showToast(`⚠️ 後端程式（Apps Script）不是最新版：目前 ${json.v || "舊版"}，需要 ${BACKEND_MIN_VERSION}。請貼上最新的 Code.gs，並用「管理部署作業 → 編輯 → 新版本」重新部署。`, { error: true });
+  }
   if (!json.ok) throw new Error(json.error || "unknown error");
   return json.data;
 }

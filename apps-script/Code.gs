@@ -205,7 +205,12 @@ function dispatch_(p) {
   }
 }
 
+// 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
+// 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
+var BACKEND_VERSION = "2026-10-07.2";
+
 function respond(obj) {
+  obj.v = BACKEND_VERSION;
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
     ContentService.MimeType.JSON
   );

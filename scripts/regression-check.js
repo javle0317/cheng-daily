@@ -348,6 +348,7 @@ console.log("後端：讀取時間欄位");
 
 console.log("後端：傳輸與寫入鎖");
 const out = o => JSON.parse(o.text);
+check("每個回應都帶後端版本，且跟前端要求的最低版本一致", out(be.doGet({})).v === be.BACKEND_VERSION && read("shared.js").includes(`BACKEND_MIN_VERSION = "${be.BACKEND_VERSION}"`));
 check("GET 一律拒絕", out(be.doGet({ parameter: { action: "getData", password: "secret" } })).error === "請改用 POST");
 check("POST body 不是 JSON → bad request", out(be.doPost({ postData: { contents: "not json" } })).error === "bad request");
 check("POST 密碼錯 → unauthorized，且不取鎖", (() => { calls.locks = 0; const r = out(be.doPost({ postData: { contents: JSON.stringify({ action: "addGoal", password: "x" }) } })); return r.error === "unauthorized" && calls.locks === 0; })());
