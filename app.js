@@ -581,7 +581,7 @@ function renderDailyHabits() {
       link.textContent = "🔗";
       li.insertBefore(link, li.querySelector(".delete-btn"));
     }
-    if (!isChallenge && !isLang) li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
+    if (!isChallenge) li.querySelector('input[type="checkbox"]').addEventListener("change", async () => {
       await withRowLock(li, async () => {
         const box = li.querySelector('input[type="checkbox"]');
         li.classList.toggle("done", box.checked);

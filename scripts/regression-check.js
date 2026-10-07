@@ -104,6 +104,23 @@ console.log("前端：每週／每月連續統計");
   check("getPeriodHistory：6 期、最後一個是本期", hist.length === 6 && hist[5].current && hist[5].key === "2026-10-05" && hist[0].key === "2026-08-31", hist.map(h => h.key));
 }
 
+console.log("前端：每種習慣列都能渲染（刪掉變數卻漏改用法會讓登入後整頁讀不出來，畫面顯示成「密碼錯誤」）");
+{
+  const ids = vm.runInContext("[CHALLENGE_HABIT_ID, PRACTICE_HABIT_ID, LANG_HABIT_ID]", app);
+  app.__habits = [
+    { id: "plain", name: "一般每日", frequency: "daily", workdaysOnly: false, target: 1 },
+    { id: "link", name: "有連結 https://example.com", frequency: "daily", workdaysOnly: false, target: 1 },
+    ...ids.map((id, i) => ({ id, name: "特殊習慣" + i, frequency: "daily", workdaysOnly: false, target: 1 })),
+    { id: "wk", name: "每週", frequency: "weekly", workdaysOnly: false, target: 3 },
+    { id: "mo", name: "每月", frequency: "monthly", workdaysOnly: false, target: 1 },
+  ];
+  let err = null;
+  try {
+    vm.runInContext("state.habits = __habits; state.habitLogs = []; state.holidayDates = new Set(); state.selectedDate = toDateStr(new Date()); renderDailyHabits(); renderPeriodHabits();", app);
+  } catch (e) { err = String(e); }
+  check("日常、週、月習慣（含運動挑戰／練字／語言練習）渲染不丟錯", err === null, err);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
