@@ -275,7 +275,7 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 
 ## 練字字帖
 
-字帖已搬到 cheng-lingo（`copybook.html`，內容在該專案的 `data/copybook.json`，另有日文五十音）。首頁「練字」習慣列的「字帖」連結直接連過去（中文、英文、日文在字帖頁內切換）。
+字帖已搬到 cheng-lingo（`copybook.html`，內容在該專案的 `data/copybook.json`，另有日文五十音）。首頁「練字」習慣列的「字」連結直接連過去（中文、英文、日文在字帖頁內切換）。
 舊的 Sheet `Copybook` 分頁已經沒有程式在讀，可以自行刪除或留著當備份。
 
 ## 視覺主題與主畫面（App）
