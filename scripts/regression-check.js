@@ -151,6 +151,10 @@ check("pickLangEntry_：全完成 → 第一個", pick({ en: { cardId: "a", done
 check("formatLangTitle_：語言標籤＋正面", be.formatLangTitle_({ lang: "ja", front: "あ行" }) === "日文・あ行");
 check("formatLangTitle_：長文截斷、換行壓成空白", be.formatLangTitle_({ lang: "en", front: "a\n\nb" + "x".repeat(60) }).length <= 44 && !/\n/.test(be.formatLangTitle_({ lang: "en", front: "a\nb" })));
 check("formatLangTitle_：沒有 front 只顯示語言", be.formatLangTitle_({ lang: "en", front: "" }) === "英文");
+const st = { en: { cardId: "e2", lang: "en", front: "x", done: false }, ja: { cardId: "j2", lang: "ja", front: "y", done: true } };
+check("resolveLangEntry_：cardId 相符就用它", be.resolveLangEntry_(st, "e2", "英文・x").cardId === "e2");
+check("resolveLangEntry_：在 lingo 換卡 → 依標題語言找到新卡", be.resolveLangEntry_(st, "j1", "日文・あ行").cardId === "j2");
+check("resolveLangEntry_：找不到 → null", be.resolveLangEntry_({}, "j1", "日文・あ行") === null);
 check("toggleHabitLog：語言練習不能直接勾選", throws(() => be.toggleHabitLog(be.LANG_HABIT_ID, "2026-10-07", 1)));
 check("前後端 LANG_HABIT_ID 一致", vm.runInContext("LANG_HABIT_ID", app) === be.LANG_HABIT_ID);
 check("langPracticeUrl：?card= 並編碼", vm.runInContext('langPracticeUrl("a b")', app) === "https://javle0317.github.io/cheng-lingo/?card=a%20b");

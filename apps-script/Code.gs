@@ -214,7 +214,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-07.4";
+var BACKEND_VERSION = "2026-10-07.5";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1303,6 +1303,19 @@ function pickLangEntry_(state) {
   return list.filter(function (e) { return !e.done; })[0] || list[0];
 }
 
+// 找出「我們這一列」對應 lingo 今天的哪一筆：先用 cardId；找不到代表使用者在 lingo 按了「換一張」，
+// 改用標題的語言標籤（英文・／日文・）找同語言那筆，之後會把 cardId 與標題更新成新的卡。
+function resolveLangEntry_(state, cardId, title) {
+  state = state || {};
+  var list = Object.keys(state).map(function (k) { return state[k]; });
+  var hit = list.filter(function (e) { return e.cardId === cardId; })[0];
+  if (hit) return hit;
+  var lang = Object.keys(LANG_LABELS_).filter(function (k) {
+    return String(title || "").indexOf(LANG_LABELS_[k] + "・") === 0 || String(title) === LANG_LABELS_[k];
+  })[0];
+  return (lang && state[lang]) || null;
+}
+
 function formatLangTitle_(entry) {
   var label = LANG_LABELS_[entry.lang] || "語言";
   var front = String(entry.front || "").replace(/\s+/g, " ").trim();
@@ -1362,9 +1375,14 @@ function syncLanguageCard() {
   if (Number(sheet.getRange(rowIndex, cols.count).getValue()) >= 1) return getData(["habitLogs"]);
   var cardId = String(sheet.getRange(rowIndex, cols.cardId).getValue());
   if (!cardId) return getData(["habitLogs"]);
-  var state = callLangApi_({ action: "getToday", date: today });
-  var done = Object.keys(state || {}).some(function (k) { return state[k].cardId === cardId && state[k].done; });
-  if (done) sheet.getRange(rowIndex, cols.count).setValue(1);
+  var title = String(sheet.getRange(rowIndex, cols.exercise).getValue());
+  var entry = resolveLangEntry_(callLangApi_({ action: "getToday", date: today }), cardId, title);
+  if (!entry) return getData(["habitLogs"]);
+  if (entry.cardId !== cardId) { // 在 lingo 換過卡：跟著換
+    setTextSafe_(sheet.getRange(rowIndex, cols.exercise), formatLangTitle_(entry));
+    sheet.getRange(rowIndex, cols.cardId).setNumberFormat("@").setValue(String(entry.cardId));
+  }
+  if (entry.done) sheet.getRange(rowIndex, cols.count).setValue(1);
   return getData(["habitLogs"]);
 }
 
