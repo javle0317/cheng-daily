@@ -37,7 +37,7 @@ function buildLevelBadge(level, text) {
 }
 
 // points: [{ date: "yyyy-MM-dd", value: number, level?: "good"|... }]
-// opts: { bands?: [{from,to,level,label}], decimals?: number, color?: string, yPad?: number }
+// opts: { bands?: [{from,to,level,label}], decimals?: number, color?: string, yPad?: number, highlightLast?: boolean }
 function drawTimeChart(container, points, opts = {}) {
   container.innerHTML = "";
   if (!points.length) {
@@ -101,7 +101,8 @@ function drawTimeChart(container, points, opts = {}) {
   }
   sorted.forEach((p, i) => {
     const fill = p.level ? LEVEL_VAR[p.level] : color;
-    svg += `<circle cx="${xScale(times[i])}" cy="${yScale(p.value)}" r="4.5" fill="${fill}" stroke="var(--card-bg)" stroke-width="1.5"><title>${fmtHealthDate(p.date)}：${roundTo(p.value, dec)}${opts.unit ? " " + escapeHtml(opts.unit) : ""}</title></circle>`;
+    const isLast = opts.highlightLast && i === sorted.length - 1;
+    svg += `<circle cx="${xScale(times[i])}" cy="${yScale(p.value)}" r="${isLast ? 6.5 : 4}" fill="${fill}" stroke="${isLast ? color : "var(--card-bg)"}" stroke-width="${isLast ? 2.5 : 1.5}"><title>${fmtHealthDate(p.date)}：${roundTo(p.value, dec)}${opts.unit ? " " + escapeHtml(opts.unit) : ""}</title></circle>`;
   });
   svg += `</svg>`;
   container.innerHTML = svg;

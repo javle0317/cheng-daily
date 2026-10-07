@@ -208,7 +208,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-08.1";
+var BACKEND_VERSION = "2026-10-08.2";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -753,6 +753,7 @@ function appendHealthRow_(sheetName, fields, p) {
 
 // 同一天已經有紀錄時：只更新這次有填的欄位（其他欄位保留），沒有紀錄才新增一列。
 // 用來修正舊資料、或補上同一天漏填的項目；不會把沒填的欄位清掉。
+// 回傳 true = 這次是新增一列、false = 更新了既有的那天（呼叫端靠這個決定要不要打卡）。
 function upsertHealthRow_(sheetName, fields, p) {
   var sheet = getSheet(sheetName);
   var values = sheet.getDataRange().getValues();
@@ -776,10 +777,11 @@ function upsertHealthRow_(sheetName, fields, p) {
         if (col >= 0 && n !== null) row[col] = n;
       });
       sheet.getRange(i + 1, 1, 1, row.length).setValues([row]);
-      return;
+      return false;
     }
   }
   appendHealthRow_(sheetName, fields, p);
+  return true;
 }
 
 function deleteRowById_(sheetName, id) {
@@ -797,10 +799,47 @@ function getInBodyData() {
   return sheetToObjects(getSheet("InBody"));
 }
 
+// 週活動習慣：登記體組成就幫它打卡（只有後端用到這個 id，前端不需要特別處理）。
+var BODY_HABIT_ID = "b11a50b5-d7b5-44a5-b00e-674c2e832491";
+
 function addInBodyReading(p) {
   if (!p.weight) throw new Error("請填體重");
-  upsertHealthRow_("InBody", INBODY_FIELDS, p);
+  var created = upsertHealthRow_("InBody", INBODY_FIELDS, p);
+  // 只有「新的一天」才打卡：同一天補填、修改不重複計次。打卡失敗不能讓登記本身失敗
+  if (created) {
+    try { markHabitProgress_(BODY_HABIT_ID, p.date); } catch (e) { Logger.log("週活動打卡失敗：" + e.message); }
+  }
   return getInBodyData();
+}
+
+// 依習慣的頻率算出 dateStr 所屬的 periodKey（規則同 app.js 的 getPeriodKey：週一日期／yyyy-MM／當天）
+function periodKeyFor_(frequency, dateStr) {
+  if (frequency === "monthly") return dateStr.slice(0, 7);
+  if (frequency !== "weekly") return dateStr;
+  var d = new Date(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)));
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // 退回到週一
+  return Utilities.formatDate(d, TIME_ZONE, "yyyy-MM-dd");
+}
+
+// 幫某個習慣在 dateStr 所屬的週期「做一次」：target=1 是存在就算打勾；
+// target>1 則累計到目標為止，達標後再呼叫不會歸零（不同於手動點擊的循環邏輯）。
+// 習慣被刪掉了就什麼都不做。呼叫端已持有全域鎖，這裡不再鎖。
+function markHabitProgress_(habitId, dateStr) {
+  var habit = sheetToObjects(getSheet("Habits")).filter(function (h) { return h.id === habitId; })[0];
+  if (!habit) return;
+  var key = periodKeyFor_(habit.frequency, dateStr);
+  var target = Number(habit.target) || 1;
+  var sheet = getSheet("HabitLog");
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    var rowKey = values[i][2];
+    if (Object.prototype.toString.call(rowKey) === "[object Date]") rowKey = Utilities.formatDate(rowKey, TIME_ZONE, "yyyy-MM-dd");
+    if (values[i][1] !== habitId || String(rowKey) !== key) continue;
+    var count = Number(values[i][3]) || 0;
+    if (count < target) sheet.getRange(i + 1, 4).setValue(target === 1 ? 1 : count + 1);
+    return;
+  }
+  appendRowSafe_(sheet, [Utilities.getUuid(), habitId, key, 1, new Date()]);
 }
 
 function deleteInBodyReading(id) {

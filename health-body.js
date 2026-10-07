@@ -147,32 +147,78 @@
       .map(p => (classify ? { ...p, level: classify(p.value).level } : p));
   }
 
+  // 趨勢圖：一張圖 + 下拉切換項目（跟驗血同一種做法）。顏色依意義分組：
+  // 體重類藍、脂肪類紅、肌肉與代謝類綠；有分級的項目疊上色帶，點的顏色也跟著分級。
+  const CHART_BLUE = "var(--series-systolic)";
+  const CHART_RED = "var(--series-diastolic)";
+  const CHART_GREEN = "var(--series-pulse)";
+  const CHART_ITEMS = [
+    { key: "weight", label: "體重", unit: "kg", dec: 1, color: CHART_BLUE },
+    { key: "bodyFat", label: "體脂率", unit: "%", dec: 1, color: CHART_RED, classify: classifyBodyFat, bands: [
+      { from: 0, to: 10, level: "warning", label: "偏低" },
+      { from: 10, to: 20, level: "good", label: "標準" },
+      { from: 20, to: 25, level: "warning", label: "偏高" },
+      { from: 25, to: 100, level: "serious", label: "肥胖" },
+    ] },
+    { key: "fatMass", label: "體脂重量", unit: "kg", dec: 1, color: CHART_RED },
+    { key: "skeletalMuscle", label: "骨骼肌量", unit: "kg", dec: 1, color: CHART_GREEN },
+    { key: "muscleMass", label: "全身肌肉量", unit: "kg", dec: 1, color: CHART_GREEN },
+    { key: "bodyWater", label: "體水分", unit: "kg", dec: 1, color: CHART_GREEN },
+    { key: "protein", label: "蛋白質", unit: "kg", dec: 1, color: CHART_GREEN },
+    { key: "bmr", label: "基礎代謝率", unit: "kcal", dec: 0, color: CHART_GREEN },
+    { key: "visceralFat", label: "內臟脂肪", unit: "", dec: 0, color: CHART_RED, classify: classifyVisceral, bands: [
+      { from: 0, to: 10, level: "good", label: "標準" },
+      { from: 10, to: 15, level: "warning", label: "偏高" },
+      { from: 15, to: 60, level: "serious", label: "高" },
+    ] },
+    { key: "bmi", label: "BMI", unit: "", dec: 1, color: CHART_BLUE, classify: classifyBmi },
+    { key: "whr", label: "腰臀比", unit: "", dec: 2, color: CHART_BLUE, classify: classifyWhr },
+    { key: "bodyAge", label: "身體年齡", unit: "歲", dec: 0, color: CHART_BLUE },
+  ];
+
+  function chartKey() {
+    const select = document.getElementById("bodyChartItem");
+    return select.value || state.chartKey || CHART_ITEMS[0].key;
+  }
+
+  function renderChartOptions() {
+    const select = document.getElementById("bodyChartItem");
+    if (select.options.length) return;
+    CHART_ITEMS.forEach(i => {
+      const opt = document.createElement("option");
+      opt.value = i.key;
+      opt.textContent = i.label;
+      select.appendChild(opt);
+    });
+    let saved = null;
+    try { saved = localStorage.getItem("bodyChartKey"); } catch (e) { /* 沒有就用預設 */ }
+    select.value = CHART_ITEMS.some(i => i.key === saved) ? saved : CHART_ITEMS[0].key;
+  }
+
+  // 圖表上方一行摘要：最新值、跟上一筆的差、這段期間的範圍
+  function chartSummary(item, points) {
+    if (!points.length) return "";
+    const unit = item.unit ? " " + item.unit : "";
+    const fmt = v => roundTo(v, item.dec).toFixed(item.dec);
+    const last = points[points.length - 1];
+    const parts = [`最新 ${fmt(last.value)}${unit}（${fmtHealthDate(last.date)}）`];
+    if (points.length > 1) {
+      const diff = roundTo(last.value - points[points.length - 2].value, item.dec);
+      parts.push(`較上一筆 ${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${fmt(Math.abs(diff))}`);
+      const vals = points.map(p => p.value);
+      parts.push(`範圍 ${fmt(Math.min(...vals))}–${fmt(Math.max(...vals))}`);
+    }
+    return parts.join("　");
+  }
+
   function renderCharts() {
-    drawTimeChart(document.getElementById("bodyWeightChart"), pointsFor("weight"), { unit: "kg", decimals: 1 });
-    drawTimeChart(document.getElementById("bodyFatChart"), pointsFor("bodyFat", classifyBodyFat), {
-      unit: "%",
-      decimals: 1,
-      color: "var(--series-diastolic)",
-      bands: [
-        { from: 0, to: 10, level: "warning", label: "偏低" },
-        { from: 10, to: 20, level: "good", label: "標準" },
-        { from: 20, to: 25, level: "warning", label: "偏高" },
-        { from: 25, to: 100, level: "serious", label: "肥胖" },
-      ],
-    });
-    drawTimeChart(document.getElementById("bodyMuscleChart"), pointsFor("skeletalMuscle"), {
-      unit: "kg",
-      decimals: 1,
-      color: "var(--series-pulse)",
-    });
-    drawTimeChart(document.getElementById("bodyVisceralChart"), pointsFor("visceralFat", classifyVisceral), {
-      decimals: 0,
-      color: "var(--series-diastolic)",
-      bands: [
-        { from: 0, to: 10, level: "good", label: "標準" },
-        { from: 10, to: 15, level: "warning", label: "偏高" },
-        { from: 15, to: 60, level: "serious", label: "高" },
-      ],
+    renderChartOptions();
+    const item = CHART_ITEMS.find(i => i.key === chartKey()) || CHART_ITEMS[0];
+    state.chartKey = item.key;
+    const points = pointsFor(item.key, item.classify);
+    document.getElementById("bodyChartMeta").textContent = chartSummary(item, points);
+    drawTimeChart(document.getElementById("bodyChart"), points, {
+      unit: item.unit, decimals: item.dec, color: item.color, bands: item.bands, highlightLast: true,
     });
   }
 
@@ -383,6 +429,11 @@
 
   document.getElementById("bodyRange").addEventListener("change", (e) => {
     state.range = e.target.value;
+    renderCharts();
+  });
+
+  document.getElementById("bodyChartItem").addEventListener("change", (e) => {
+    try { localStorage.setItem("bodyChartKey", e.target.value); } catch (err) { /* 存不了就只對本次有效 */ }
     renderCharts();
   });
 

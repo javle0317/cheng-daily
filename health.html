@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261008000927">
+<link rel="stylesheet" href="style.css?v=20261008002215">
 </head>
 <body>
 
@@ -110,14 +110,12 @@
         <p id="bodyLatestMeta" class="progress-line"></p>
         <div id="bodyStatsRow" class="bp-stats-row"></div>
         <div id="bodyProgress" class="body-progress"></div>
-        <h3 class="sub-heading">體重（kg）</h3>
-        <div id="bodyWeightChart"></div>
-        <h3 class="sub-heading">體脂率（%）</h3>
-        <div id="bodyFatChart"></div>
-        <h3 class="sub-heading">骨骼肌量（kg）</h3>
-        <div id="bodyMuscleChart"></div>
-        <h3 class="sub-heading">內臟脂肪</h3>
-        <div id="bodyVisceralChart"></div>
+        <div class="bp-list-header">
+          <h3 class="sub-heading">趨勢</h3>
+          <select id="bodyChartItem"></select>
+        </div>
+        <p id="bodyChartMeta" class="progress-line"></p>
+        <div id="bodyChart"></div>
       </section>
 
       <section class="card health-list-card hidden" data-tab="body">
@@ -274,11 +272,11 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261008000927"></script>
-  <script src="health-charts.js?v=20261008000927"></script>
-  <script src="health.js?v=20261008000927"></script>
-  <script src="health-body.js?v=20261008000927"></script>
-  <script src="health-labs.js?v=20261008000927"></script>
+  <script src="shared.js?v=20261008002215"></script>
+  <script src="health-charts.js?v=20261008002215"></script>
+  <script src="health.js?v=20261008002215"></script>
+  <script src="health-body.js?v=20261008002215"></script>
+  <script src="health-labs.js?v=20261008002215"></script>
   <script>initAuth();</script>
 </body>
 </html>

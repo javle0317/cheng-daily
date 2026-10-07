@@ -8,7 +8,7 @@ const PASSWORD_KEY = "dailyhub_password";
 
 // 前端需要的後端最低版本（Code.gs 的 BACKEND_VERSION）。後端比這個舊 = Dean 還沒把新版 Code.gs 部署成新版本，
 // 會跳一次提醒，不用等到畫面出現怪現象才發現。改了後端行為、前端依賴時，兩邊一起加版本。
-const BACKEND_MIN_VERSION = "2026-10-08.1";
+const BACKEND_MIN_VERSION = "2026-10-08.2";
 let backendWarned = false;
 
 function toDateStr(d) {

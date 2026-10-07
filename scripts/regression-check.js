@@ -334,5 +334,40 @@ check("寫入 action 會取鎖並釋放；get 不取鎖", (() => {
   return afterWrite[0] === 1 && afterWrite[1] === 1 && calls.locks === 0;
 })());
 
+console.log("後端：登記體組成自動幫週活動習慣打卡");
+{
+  const realUtilities = be.Utilities, realGetSheet = be.getSheet, realToObjects = be.sheetToObjects;
+  const pad = n => String(n).padStart(2, "0");
+  be.Utilities = { getUuid: () => "uuid", formatDate: d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` };
+  const run = (habit, logs, date) => {
+    const sheet = {
+      getDataRange: () => ({ getValues: () => [["id", "habitId", "periodKey", "count", "createdAt"], ...logs] }),
+      getLastRow: () => logs.length + 1,
+      getRange: (r, c) => ({ setValue: v => { logs[r - 2][c - 1] = v; }, setNumberFormat() {}, setValues: v => { logs.push(v[0]); } }),
+    };
+    be.getSheet = () => sheet;
+    be.sheetToObjects = () => (habit ? [habit] : []);
+    be.markHabitProgress_("H", date);
+    return logs;
+  };
+  const weekly = n => ({ id: "H", frequency: "weekly", target: n });
+  check("週期鍵：週三 → 該週週一；週日 → 同一週的週一；跨月", be.periodKeyFor_("weekly", "2026-10-07") === "2026-10-05" && be.periodKeyFor_("weekly", "2026-10-11") === "2026-10-05" && be.periodKeyFor_("weekly", "2026-11-01") === "2026-10-26");
+  check("週期鍵：monthly → yyyy-MM；daily → 當天", be.periodKeyFor_("monthly", "2026-10-07") === "2026-10" && be.periodKeyFor_("daily", "2026-10-07") === "2026-10-07");
+  let logs = run(weekly(1), [], "2026-10-07");
+  check("週目標 1：新增一列 count=1，週期是週一", logs.length === 1 && logs[0][1] === "H" && logs[0][2] === "2026-10-05" && logs[0][3] === 1, logs);
+  logs = run(weekly(1), logs, "2026-10-09");
+  check("同一週再登記：不重複新增、不歸零", logs.length === 1 && logs[0][3] === 1, logs);
+  logs = run(weekly(3), [], "2026-10-07");
+  logs = run(weekly(3), logs, "2026-10-08");
+  logs = run(weekly(3), logs, "2026-10-09");
+  logs = run(weekly(3), logs, "2026-10-10");
+  check("週目標 3：累計到 3 為止，之後不再增加也不歸零", logs.length === 1 && logs[0][3] === 3, logs);
+  logs = run(weekly(3), logs, "2026-10-14");
+  check("下一週：另開一列", logs.length === 2 && logs[1][2] === "2026-10-12" && logs[1][3] === 1, logs);
+  logs = run(null, [], "2026-10-07");
+  check("習慣已被刪除：什麼都不寫", logs.length === 0);
+  be.Utilities = realUtilities; be.getSheet = realGetSheet; be.sheetToObjects = realToObjects;
+}
+
 console.log(failed ? `\n${failed} 項失敗` : "\n全部通過");
 process.exit(failed ? 1 : 0);
