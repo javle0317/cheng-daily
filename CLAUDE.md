@@ -10,8 +10,8 @@
 - 本機預覽：`python3 -m http.server 8791`（`.claude/launch.json`）。
 
 ## 與 cheng-lingo 的關係
-姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。計畫中：
-- 習慣列新增語言練習：抽卡、顯示今天的卡、「去練習 →」連到 lingo，並同步完成狀態。仿運動挑戰（`drawChallenge`、`setupChallengeRow`）。
+姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。
+- 已做（待部署驗證）：單一「語言練習」習慣（`LANG_HABIT_ID`）。`drawLanguageCard` 抽卡（不帶 lang，由 lingo 隨機挑語言）、`syncLanguageCard` 向 lingo 查完成並寫 count；`setupLanguageRow` 顯示卡片、「去練習 →」、🔄；不能手動勾選。HabitLog 需有 `exercise`、`cardId` 欄。之後要拆英/日各一個習慣時，`drawCard` 多傳 `lang` 即可。
 - daily 的 Apps Script 以指令碼屬性 `LANG_URL` / `LANG_TOKEN` 呼叫 lingo 後端（lingo 端屬性叫 `LINGO_TOKEN`，兩邊同一串）。
 - 字帖（`practice*.js`、`data/copybook-seed.json`）之後搬到 lingo，並加日文。
 - 食譜留在這個專案（`recipes.html/js` + Sheet 分頁），尚未開始。
