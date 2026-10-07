@@ -1017,7 +1017,11 @@ a.ghost-btn {
 .modal-form { gap: 10px; }
 .modal-form .mf { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); min-width: 0; }
 .modal-form .form-row .mf { flex: 1 1 120px; }
-.modal-form .mf > input[type="text"], .modal-form .mf > input[type="date"], .modal-form .mf > input[type="number"], .modal-form .mf > select { width: 100%; }
+.modal-form .mf > input, .modal-form .mf > select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+/* iPhone Safari 的日期欄位有自己的固有寬度（空白時尤其明顯），會撐出欄位、蓋到旁邊的欄位：
+   拿掉原生外觀、固定最小高度，讓它乖乖照欄位寬度排版 */
+.modal-form .mf > input[type="date"] { -webkit-appearance: none; appearance: none; min-height: 42px; text-align: left; display: block; }
+.modal-form .mf > input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .modal-form .time-range { margin-top: 2px; }
 .modal-actions { align-items: center; margin-top: 4px; }
 .modal-actions .spacer { flex: 1; }
