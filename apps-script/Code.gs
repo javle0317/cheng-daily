@@ -252,7 +252,7 @@ function sheetToObjects(sheet) {
     headers.forEach(function (h, i) {
       var v = row[i];
       if (Object.prototype.toString.call(v) === "[object Date]") {
-        if (h === "time") {
+        if (h === "time" || h === "endTime") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
         } else if (h === "date" || h === "periodKey" || h === "endDate") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，

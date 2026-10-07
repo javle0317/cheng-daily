@@ -337,6 +337,15 @@ console.log("後端：編輯事件／循環行程（依表頭寫回）");
   be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => ({}) });
 }
 
+console.log("後端：讀取時間欄位");
+{
+  // Sheet 會把 "15:30" 這種字串存成「時間」型別，讀回來是 1899-12-30 的 Date；time 與 endTime 都要轉回 HH:mm
+  const timeCell = new Date("1899-12-30T15:30:00+08:00");
+  const sh = { getDataRange: () => ({ getValues: () => [["id", "time", "endTime", "title"], ["e1", timeCell, timeCell, "日文課"]] }) };
+  const rows = be.sheetToObjects(sh);
+  check("sheetToObjects：time、endTime 的時間型別格子都轉回 HH:mm（不是 1899-12-30 15:30:00）", rows[0].time === "15:30" && rows[0].endTime === "15:30", rows[0]);
+}
+
 console.log("後端：傳輸與寫入鎖");
 const out = o => JSON.parse(o.text);
 check("GET 一律拒絕", out(be.doGet({ parameter: { action: "getData", password: "secret" } })).error === "請改用 POST");
