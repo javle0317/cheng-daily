@@ -320,6 +320,18 @@ console.log("視覺主題：色票對比（WCAG）");
   });
 }
 
+console.log("後端：新分頁自動建立（ensureSheet）與既有分頁防護（getSheet）");
+{
+  const made = []; let frozen = 0; const store = {};
+  const mkSheet = (name) => ({ name, getRange: () => ({ setValues: v => made.push({ name, headers: v[0] }) }), setFrozenRows: n => { frozen = n; } });
+  be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: n => store[n] || null, insertSheet: n => (store[n] = mkSheet(n)) });
+  const sh = be.ensureSheet("Recipes", ["id", "name"]);
+  check("ensureSheet：沒有這個分頁 → 建立、寫入表頭、凍結第一列", sh.name === "Recipes" && made.length === 1 && made[0].headers.join() === "id,name" && frozen === 1, made);
+  be.ensureSheet("Recipes", ["id", "name", "extra"]);
+  check("ensureSheet：分頁已存在 → 不動（不重寫表頭、不補欄位）", made.length === 1);
+  check("getSheet：既有分頁缺少時仍然丟錯（不會自動建立）", throws(() => be.getSheet("Events")) && !store.Events);
+}
+
 console.log("後端：傳輸與寫入鎖");
 const out = o => JSON.parse(o.text);
 check("每個回應都帶後端版本，且跟前端要求的最低版本一致", out(be.doGet({})).v === be.BACKEND_VERSION && read("shared.js").includes(`BACKEND_MIN_VERSION = "${be.BACKEND_VERSION}"`));

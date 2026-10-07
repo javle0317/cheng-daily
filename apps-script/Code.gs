@@ -245,6 +245,20 @@ function getSheet(name) {
   return sheet;
 }
 
+// 「新」分頁專用：找不到就自己建立、寫入表頭、凍結第一列；已經存在的分頁完全不動（不補欄位、不改表頭）。
+// 既有的分頁（Events、Habits、HabitLog…）繼續用 getSheet：缺分頁或缺欄位就丟錯，不要悄悄用對不上的表寫入、把資料寫錯位置。
+// 新增功能要有自己的分頁時用這個，這樣 Dean 不用手動建分頁與表頭（cheng-lingo 的 sheet_ 是同樣的做法）。
+function ensureSheet(name, headers) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
 function sheetToObjects(sheet) {
   var values = sheet.getDataRange().getValues();
   var headers = values.shift();
