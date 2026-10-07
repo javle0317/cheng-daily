@@ -1000,6 +1000,10 @@ a.ghost-btn {
   line-height: 1.4;
 }
 
-/* 行事曆卡片底下的 Google 行事曆同步狀態 */
-.cal-sync-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 12px; color: var(--text-dim); }
-.cal-sync-btn { padding: 4px 10px; font-size: 12px; }
+/* 行事曆卡片右下角的 Google 行事曆同步：平常只有一個很小的 ☁️，失敗才多一行紅字 */
+.cal-sync-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; min-height: 22px; }
+.cal-sync-icon { background: none; border: none; padding: 2px 4px; font-size: 14px; line-height: 1; cursor: pointer; opacity: 0.55; }
+.cal-sync-icon:hover { opacity: 1; }
+.cal-sync-alert { font-size: 12px; color: var(--danger); }
+.cal-sync-title { margin: 0 0 8px; font-size: 16px; }
+.cal-sync-preview { max-height: 40vh; overflow: auto; white-space: pre-wrap; font-size: 12px; background: var(--bg); border-radius: 8px; padding: 10px; margin: 8px 0 0; color: var(--text); }

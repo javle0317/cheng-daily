@@ -243,15 +243,23 @@ function showConfirm(message) {
   return openDialog(message);
 }
 
+// 只有「知道了」的訊息視窗（沒有取消鈕）：用在純通知，不需要使用者做選擇的地方
+function showAlert(message) {
+  dialogIsPrompt = false;
+  return openDialog(message, "", { alertOnly: true });
+}
+
 function showPrompt(message, defaultValue = "") {
   dialogIsPrompt = true;
   return openDialog(message, defaultValue);
 }
 
-function openDialog(message, defaultValue = "") {
+function openDialog(message, defaultValue = "", opts = {}) {
   return new Promise(resolve => {
     dialogResolve = resolve;
     document.getElementById("dialogMessage").textContent = message;
+    document.getElementById("dialogCancelBtn").classList.toggle("hidden", !!opts.alertOnly);
+    document.getElementById("dialogOkBtn").textContent = opts.alertOnly ? "知道了" : "確定";
     const input = document.getElementById("dialogInput");
     input.classList.toggle("hidden", !dialogIsPrompt);
     input.value = defaultValue;

@@ -275,45 +275,71 @@ window.loadPageData = async function () {
 };
 
 // ====== Google 行事曆同步狀態（單向 App → Google，對帳邏輯在 Code.gs）======
+// 平常只在行事曆卡片右下角放一個很小的 ☁️；點開才有狀態與「預覽／立即同步」。
+// 只有同步失敗時才多一行紅字提醒，其他時候不打擾。
 let calSyncTimer = null;
+let calSyncStatus = null;
+
+function calSyncSummary(s) {
+  if (s.dirty) return "☁️ 等待同步到 Google 行事曆（約 5 分鐘內會自動同步）。";
+  if (s.lastError) return "⚠️ 同步失敗：" + s.lastError + "\n\n排程會自動重試，也可以按「立即同步」。";
+  if (!s.lastSyncAt) return "☁️ 還沒同步過，可以先按「預覽」看會同步哪些事件。";
+  const d = new Date(s.lastSyncAt);
+  const same = toDateStr(d) === toDateStr(new Date());
+  const hm = d.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `☁️ 已同步到 Google 行事曆（${same ? "" : `${d.getMonth() + 1}/${d.getDate()} `}${hm}）。事件新增或刪除後，約 5 分鐘內會自動同步。`;
+}
+
 async function refreshCalSync() {
   clearTimeout(calSyncTimer);
-  const line = document.getElementById("calSyncLine");
+  const icon = document.getElementById("calSyncIcon");
+  const alertEl = document.getElementById("calSyncAlert");
   try {
     const s = await api("getCalendarSyncStatus");
-    if (!s.enabled) { line.classList.add("hidden"); return; }
-    let text;
-    if (s.dirty) text = "☁️ 等待同步到 Google 行事曆（約 5 分鐘內）";
-    else if (s.lastError) text = "⚠️ Google 行事曆同步失敗：" + s.lastError;
-    else if (s.lastSyncAt) {
-      const d = new Date(s.lastSyncAt);
-      const same = toDateStr(d) === toDateStr(new Date());
-      const hm = d.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
-      text = `☁️ 已同步到 Google 行事曆（${same ? "" : `${d.getMonth() + 1}/${d.getDate()} `}${hm}）`;
-    } else text = "☁️ 還沒同步過，可以先按「預覽」看會同步哪些事件";
-    document.getElementById("calSyncText").textContent = text;
-    line.classList.remove("hidden");
+    calSyncStatus = s;
+    if (!s.enabled) { icon.classList.add("hidden"); alertEl.classList.add("hidden"); return; }
+    icon.classList.remove("hidden");
+    icon.textContent = s.lastError ? "⚠️" : "☁️";
+    icon.title = calSyncSummary(s).replace(/\n+/g, " ");
+    alertEl.classList.toggle("hidden", !s.lastError);
+    alertEl.textContent = s.lastError ? "Google 行事曆同步失敗，點右邊圖示查看" : "";
+    document.getElementById("calSyncText").textContent = calSyncSummary(s);
     if (s.dirty) calSyncTimer = setTimeout(refreshCalSync, 60000); // 等排程跑完，一分鐘後再看一次
   } catch (err) {
-    line.classList.add("hidden"); // 後端還沒更新或讀不到，就不顯示，不打擾
+    icon.classList.add("hidden"); // 後端還沒更新或讀不到，就不顯示，不打擾
+    alertEl.classList.add("hidden");
   }
 }
 
 const CAL_SYNC_ACTIONS = new Set(["addEvent", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"]);
 window.addEventListener("api-write", (e) => { if (CAL_SYNC_ACTIONS.has(e.detail.action)) refreshCalSync(); });
 
+function openCalSyncModal() {
+  document.getElementById("calSyncPreview").classList.add("hidden");
+  if (calSyncStatus) document.getElementById("calSyncText").textContent = calSyncSummary(calSyncStatus);
+  document.getElementById("calSyncModal").classList.remove("hidden");
+  refreshCalSync();
+}
+function closeCalSyncModal() { document.getElementById("calSyncModal").classList.add("hidden"); }
+
+document.getElementById("calSyncIcon").addEventListener("click", openCalSyncModal);
+document.getElementById("calSyncCloseBtn").addEventListener("click", closeCalSyncModal);
+document.getElementById("calSyncModal").addEventListener("click", (e) => { if (e.target.id === "calSyncModal") closeCalSyncModal(); });
+
 document.getElementById("calSyncBtn").addEventListener("click", async (e) => {
   await withRowLock(e.currentTarget, async () => {
     try {
       const r = await api("syncCalendarNow");
+      document.getElementById("calSyncPreview").classList.add("hidden");
       showToast(`已同步：新增 ${r.created}、更新 ${r.updated}、刪除 ${r.deleted}`);
     } catch (err) {
       setStatus("同步失敗：" + err.message, true);
     }
-    refreshCalSync();
+    await refreshCalSync();
   }, [document.getElementById("calPreviewBtn")]);
 });
 
+// 預覽直接顯示在同一個視窗裡（不是另外跳一個要你按確定／取消的對話框）
 document.getElementById("calPreviewBtn").addEventListener("click", async (e) => {
   await withRowLock(e.currentTarget, async () => {
     try {
@@ -322,7 +348,9 @@ document.getElementById("calPreviewBtn").addEventListener("click", async (e) => 
       [["新增", r.preview.create], ["更新", r.preview.update], ["刪除", r.preview.del]].forEach(([label, list]) => {
         if (list.length) lines.push(`\n${label}（前 ${list.length} 筆）：\n` + list.join("\n"));
       });
-      await showConfirm(lines.join("\n"));
+      const pre = document.getElementById("calSyncPreview");
+      pre.textContent = lines.join("\n");
+      pre.classList.remove("hidden");
     } catch (err) {
       setStatus("預覽失敗：" + err.message, true);
     }

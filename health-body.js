@@ -366,7 +366,7 @@
       renderAll();
       showToast("已新增體組成紀錄");
       if (state.readings.filter(r => r.date === params.date).length > 1) {
-        showConfirm(`⚠️ ${fmtHealthDate(params.date)} 出現了不只一筆體組成紀錄。\n後端（Apps Script）可能還是舊版，請重新部署新版本；已經存在的重複列請直接到 Sheet 的 InBody 分頁手動合併（保留一列、刪掉其他）。`);
+        showAlert(`⚠️ ${fmtHealthDate(params.date)} 出現了不只一筆體組成紀錄。\n後端（Apps Script）可能還是舊版，請重新部署新版本；已經存在的重複列請直接到 Sheet 的 InBody 分頁手動合併（保留一列、刪掉其他）。`);
       }
     } catch (err) {
       setStatus("新增失敗：" + err.message, true);

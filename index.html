@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261007105950">
+<link rel="stylesheet" href="style.css?v=20261007111112">
 </head>
 <body>
 
@@ -68,11 +68,10 @@
           <button class="ghost-btn calendar-nav-spacer" aria-hidden="true" tabindex="-1">今天</button>
         </div>
         <div id="calendarGrid" class="calendar-grid"></div>
-        <p id="calSyncLine" class="cal-sync-line hidden">
-          <span id="calSyncText"></span>
-          <button id="calSyncBtn" type="button" class="ghost-btn cal-sync-btn">立即同步</button>
-          <button id="calPreviewBtn" type="button" class="ghost-btn cal-sync-btn">預覽</button>
-        </p>
+        <div class="cal-sync-row">
+          <span id="calSyncAlert" class="cal-sync-alert hidden"></span>
+          <button id="calSyncIcon" type="button" class="cal-sync-icon hidden" title="Google 行事曆同步" aria-label="Google 行事曆同步">☁️</button>
+        </div>
       </section>
 
       <section class="card today-events-card">
@@ -279,6 +278,19 @@
     </div>
   </div>
 
+  <div id="calSyncModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <h3 class="cal-sync-title">Google 行事曆同步</h3>
+      <p id="calSyncText"></p>
+      <pre id="calSyncPreview" class="cal-sync-preview hidden"></pre>
+      <div class="dialog-actions">
+        <button id="calPreviewBtn" class="ghost-btn" type="button">預覽</button>
+        <button id="calSyncBtn" class="ghost-btn" type="button">立即同步</button>
+        <button id="calSyncCloseBtn" type="button">關閉</button>
+      </div>
+    </div>
+  </div>
+
   <div id="dialogModal" class="modal-overlay hidden">
     <div class="modal-card dialog-card">
       <p id="dialogMessage"></p>
@@ -290,7 +302,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007105950"></script>
-  <script src="app.js?v=20261007105950"></script>
+  <script src="shared.js?v=20261007111112"></script>
+  <script src="app.js?v=20261007111112"></script>
 </body>
 </html>

@@ -39,7 +39,7 @@ window.loadPageData = async function () {
     let msg = "部分資料載入失敗：" + failed.map(f => f.reason.message).join("；");
     if (msg.includes("unknown action")) msg += "（Apps Script 可能還沒重新部署成新版本）";
     setStatus(msg, true);
-    showConfirm(msg);
+    showAlert(msg);
   };
   // 先等「正在看的分頁」載完就進畫面，其他分頁在背景繼續載（切過去時多半已經好了）。
   // 驗證失敗（密碼錯）要丟出去讓登入流程留在登入頁。
