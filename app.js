@@ -474,7 +474,7 @@ const CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 const LANG_HABIT_ID = "6322a232-5caa-4714-bd37-cfb41306d6ec";
 const LINGO_URL = "https://javle0317.github.io/cheng-lingo/";
 
-// 練字習慣：列上多「中」「英」兩顆按鈕，開 practice.html 產生可列印的描紅字帖（內容在 Sheet 的 Copybook 分頁）。
+// 練字習慣：列上多「中」「英」兩顆按鈕，連到 cheng-lingo 的字帖頁（copybook.html）產生可列印的描紅字帖。
 // 勾選、編輯、刪除都照一般每日習慣。這個 id 是 Habits 分頁裡那一列的 id。
 const PRACTICE_HABIT_ID = "d6007d80-d570-4b49-a989-8af89401c395";
 
@@ -556,7 +556,7 @@ function renderDailyHabits() {
       [["中", "zh", "產生中文描紅字帖"], ["英", "en", "產生英文描紅字帖"]].forEach(([label, lang, title]) => {
         const a = document.createElement("a");
         a.className = "practice-link";
-        a.href = `practice.html?lang=${lang}`;
+        a.href = `${LINGO_URL}copybook.html?lang=${lang}`;
         a.target = "_blank";
         a.rel = "noopener";
         a.title = title;

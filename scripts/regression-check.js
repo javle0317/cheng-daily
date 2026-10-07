@@ -159,58 +159,6 @@ check("toggleHabitLog：語言練習不能直接勾選", throws(() => be.toggleH
 check("前後端 LANG_HABIT_ID 一致", vm.runInContext("LANG_HABIT_ID", app) === be.LANG_HABIT_ID);
 check("langPracticeUrl：?card= 並編碼", vm.runInContext('langPracticeUrl("a b")', app) === "https://javle0317.github.io/cheng-lingo/?card=a%20b");
 
-console.log("練字字帖：版面計算（practice-layout.js）");
-{
-  const L = vm.createContext({ console, Math, Array, String, Number, Set, Object });
-  vm.runInContext(read("practice-layout.js"), L, { filename: "practice-layout.js" });
-  const E = (id, text, title = id) => ({ id, title, author: "", text });
-  check("zhClauses：依標點與換行切句，空白去掉、標點不留", JSON.stringify(L.zhClauses("床前明月光，疑是地上霜。\n舉頭 望明月，低頭思故鄉。")) === JSON.stringify(["床前明月光", "疑是地上霜", "舉頭望明月", "低頭思故鄉"]));
-  let r = L.packZhColumns({ entries: [E("a", "床前明月光，疑是地上霜。舉頭望明月，低頭思故鄉。")], rows: 14, maxCols: 15 });
-  check("packZh：五言絕句每欄 14 字 → 兩句一欄（10 字）× 2 欄，不會是 15 + 5", r.columns.length === 2 && r.columns.every(c => c.chars.length === 10), r.columns.map(c => c.chars.join("")));
-  r = L.packZhColumns({ entries: [E("a", "白日依山盡，黃河入海流。欲窮千里目，更上一層樓。")], rows: 20, maxCols: 15 });
-  check("packZh：每欄 20 字時一首五絕剛好一欄（對照使用者的字帖）", r.columns.length === 1 && r.columns[0].chars.length === 20);
-  r = L.packZhColumns({ entries: [E("a", "朝辭白帝彩雲間，千里江陵一日還。兩岸猿聲啼不住，輕舟已過萬重山。")], rows: 14, maxCols: 15 });
-  check("packZh：七言絕句兩句一欄 14 字 × 2 欄", r.columns.length === 2 && r.columns.every(c => c.chars.length === 14));
-  r = L.packZhColumns({ entries: [E("a", "一二三四五六七八九十甲乙丙丁戊己庚辛壬癸")], rows: 8, maxCols: 10 });
-  check("packZh：超過一欄的長句才拆（20 字、每欄 8 → 3 欄）", r.columns.length === 3 && r.columns[2].chars.length === 4);
-  r = L.packZhColumns({ entries: [E("a", "甲甲甲甲甲，乙乙乙乙乙。丙丙丙丙丙，丁丁丁丁丁。")], rows: 5, maxCols: 3 });
-  check("packZh：第一篇排不完時，欄數用完就停，next 指到下一個沒排的子句", r.columns.length === 3 && r.next && r.next.id === "a" && r.next.clauseIndex === 3 && r.used.length === 1, r);
-  r = L.packZhColumns({ entries: [E("a", "甲甲甲，乙乙乙。"), E("b", "丙丙丙丙丙丙，丁丁丁丁丁丁。戊戊戊戊戊戊，己己己己己己。"), E("c", "庚庚庚，辛辛辛。")], rows: 6, maxCols: 3 });
-  check("packZh：第二篇起整篇排不進剩下的欄數就跳過（不切到一半），改排後面放得下的", r.used.map(u => u.id).join() === "a,c" && r.columns.length === 2 && r.next === null, r);
-  r = L.packZhColumns({ entries: [E("a", "甲甲甲，乙乙乙。丙丙丙，丁丁丁。")], startClause: 2, rows: 8, maxCols: 5 });
-  check("packZh：startClause 從指定子句接著排", r.columns[0].chars.join("") === "丙丙丙丁丁丁", r.columns);
-  r = L.packZhColumns({ entries: [E("a", "甲甲甲，乙乙乙。"), E("b", "丙丙丙，丁丁丁。")], rows: 14, maxCols: 5 });
-  check("packZh：不同篇不接在同一欄、每篇第一欄有 first 標記", r.columns.length === 2 && r.columns.every(c => c.first) && r.used.length === 2);
-  check("zhEntryColumns：跟實際排版欄數一致（五絕 2、七律 4、20 字句每欄 8 = 3）", L.zhEntryColumns(["床前明月光", "疑是地上霜", "舉頭望明月", "低頭思故鄉"], 14) === 2 && L.zhEntryColumns(Array(8).fill("七七七七七七七"), 14) === 4 && L.zhEntryColumns(["一".repeat(20)], 8) === 3);
-  const g = L.zhGeometry();
-  check("zhGeometry：每欄 14 字 → 格高 12.7mm、字 10.4mm、欄距 17.8mm、一頁 15 欄（≈ 7 首絕句 = 一週）", g.cell === 12.7 && g.fontSize === 10.41 && g.pitch === 17.8 && g.sheetCols === 15, g);
-  check("zhLabel：取「・」前面、最多 7 字", L.zhLabel("水調歌頭・明月幾時有") === "水調歌頭" && L.zhLabel("黃鶴樓送孟浩然之廣陵") === "黃鶴樓送孟浩然…");
-
-  const measure = (t) => t.length * 2; // 一個字元 2mm
-  let w = L.wrapEnLines({ entries: [E("a", "aaa bbb ccc ddd eee")], maxLines: 10, maxWidth: 16, measure });
-  check("wrapEn：依單字換行（每行最多 8 字元）", JSON.stringify(w.lines.map(l => l.text)) === JSON.stringify(["aaa bbb", "ccc ddd", "eee"]), w.lines);
-  w = L.wrapEnLines({ entries: [E("a", "aaa bbb ccc ddd eee")], maxLines: 2, maxWidth: 16, measure });
-  check("wrapEn：行數用完就停，next 指到下一個單字", w.lines.length === 2 && w.next && w.next.wordIndex === 4, w);
-  w = L.wrapEnLines({ entries: [E("a", "one two three four five six")], startWord: 3, maxLines: 5, maxWidth: 200, measure });
-  check("wrapEn：startWord 從指定單字接著排", w.lines[0].text === "four five six");
-  w = L.wrapEnLines({ entries: [E("a", "one two\nthree four")], maxLines: 5, maxWidth: 200, measure });
-  check("wrapEn：段落（換行）另起一行", w.lines.length === 2 && w.lines[1].text === "three four");
-  w = L.wrapEnLines({ entries: [E("a", "aaa bbb"), E("b", "ccc ddd eee fff ggg hhh iii jjj kkk"), E("c", "lll")], maxLines: 3, maxWidth: 16, measure });
-  check("wrapEn：第二篇起整篇排不進剩下行數就跳過", w.used.map(u => u.id).join() === "a,c" && w.lines.length === 2 && w.next === null, w);
-  const entries = ["a", "b", "c", "d"].map(id => E(id, "x"));
-  const order = L.pickOrder(entries, ["a", "b"], () => 0);
-  check("pickOrder：沒用過的排前面、最近用過的排後面", order.slice(0, 2).every(e => ["c", "d"].includes(e.id)) && order.slice(2).every(e => ["a", "b"].includes(e.id)), order.map(e => e.id));
-
-  const svgZh = L.renderZhSvg({ columns: [{ chars: ["床", "前"], entryId: "a", first: true }, { chars: ["明"], entryId: "a", first: false }], titles: { a: "靜夜思<b>" } });
-  check("renderZhSvg：沒有格線（只有淡淡的欄線、沒有 rect 格子）、字有畫出來、標題只在第一欄且有跳脫", !svgZh.includes("<rect") && !svgZh.includes("stroke-dasharray") && svgZh.includes(">床<") && (svgZh.match(/靜夜思&lt;b&gt;/g) || []).length === 1 && svgZh.includes('width="297mm"'));
-  const svgEn = L.renderEnSvg({ lines: [{ text: "Hello & bye" }], header: "A <b>" });
-  check("renderEnSvg：只有灰色文字、沒有任何四線格；文字有跳脫", svgEn.includes("Hello &amp; bye") && svgEn.includes("A &lt;b&gt;") && !svgEn.includes("stroke-dasharray") && svgEn.includes('height="297mm"'));
-  const ge = L.enGeometry();
-  check("enGeometry：行距 12mm → 一頁 21 行、字 6mm", ge.lines === 21 && ge.fontSize === 6, ge);
-}
-const seed = JSON.parse(read("data/copybook-seed.json"));
-check("內建範例：每篇都有 lang/title/text，zh 與 en 都有，且沒有重複標題", seed.length > 30 && seed.every(e => ["zh", "en"].includes(e.lang) && e.title && e.text) && new Set(seed.map(e => e.lang + e.title)).size === seed.length);
-
 console.log("後端：欄位型別驗證（文字／日期／時間／列舉）");
 check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateArg_("2026-02-30", "x")) && be.dateArg_("2026-02-28", "x") === "2026-02-28");
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
@@ -228,22 +176,6 @@ check("textArg_：必填、長度上限、trim", throws(() => be.textArg_("  ", 
     (() => { const n = rows.length; return throws(() => be.addEvent("2026/10/05", "", "x", "", "me", "", "")) && throws(() => be.addEvent("2026-10-05", "", "x", "", "me", "abc", "")) && throws(() => be.addEvent("2026-10-05", "", " ", "", "me", "", "")) && rows.length === n; })());
   check("addEvent：結束時間要有開始時間、要晚於開始時間；有效的會寫入（列的最後一欄）", throws(() => be.addEvent("2026-10-05", "", "x", "", "me", "", "", "10:00")) && throws(() => be.addEvent("2026-10-05", "10:00", "x", "", "me", "", "", "09:00")) && throws(() => be.addEvent("2026-10-05", "10:00", "x", "", "me", "", "", "10:00")) && (be.addEvent("2026-10-05", "10:00", "有結束", "", "me", "", "", "11:30"), rows[rows.length - 1][9] === "11:30"), rows[rows.length - 1]);
   check("addCreditCardBill：銀行必填、月份格式、金額 abc 丟錯", throws(() => be.addCreditCardBill("", "2026-10", "2026-10-20", "100", "")) && throws(() => be.addCreditCardBill("國泰", "2026-10-01", "2026-10-20", "100", "")) && throws(() => be.addCreditCardBill("國泰", "2026-10", "2026-10-20", "abc", "")));
-}
-
-console.log("後端：練字內容庫");
-{
-  const rows2 = [];
-  const existing = [["id", "lang", "title", "author", "text", "createdAt"]];
-  const sheet2 = { getDataRange: () => ({ getValues: () => existing.map(r => r.slice()) }), getLastRow: () => existing.length, getRange: () => ({ setNumberFormat() {}, setValues: v => { rows2.push(v[0]); existing.push(v[0]); } }) };
-  be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sheet2 });
-  const res1 = be.importCopybookEntries(JSON.stringify([{ lang: "zh", title: "靜夜思", author: "李白", text: "床前明月光\r\n疑是地上霜" }]));
-  check("importCopybookEntries：寫入一列，換行統一成 \\n", res1.added === 1 && rows2[0][1] === "zh" && rows2[0][4] === "床前明月光\n疑是地上霜", rows2[0]);
-  const before = rows2.length;
-  const res = be.importCopybookEntries(JSON.stringify([{ lang: "zh", title: "靜夜思", text: "x" }, { lang: "zh", title: "春曉", text: "春眠不覺曉" }]));
-  check("importCopybookEntries：重複的略過、新的加入（可重複執行）", res.added === 1 && res.skipped === 1 && rows2.length === before + 1, res);
-  check("importCopybookEntries：壞語言、空篇名、空內容、過長都丟錯", throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "fr", title: "a", text: "x" }]))) && throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "en", title: " ", text: "x" }]))) && throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "en", title: "a", text: " " }]))) && throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "en", title: "a", text: "x".repeat(8001) }]))));
-  check("importCopybookEntries：有一筆不合格就整批不寫", (() => { const n = rows2.length; return throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "zh", title: "新的", text: "x" }, { lang: "zh", title: "", text: "x" }]))) && rows2.length === n; })());
-  check("importCopybookEntries：不是 JSON／空陣列丟錯", throws(() => be.importCopybookEntries("not json")) && throws(() => be.importCopybookEntries("[]")));
 }
 
 console.log("後端：同步到 Google 行事曆（對帳）");
