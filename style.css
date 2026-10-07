@@ -999,3 +999,7 @@ a.ghost-btn {
   text-decoration: none;
   line-height: 1.4;
 }
+
+/* 行事曆卡片底下的 Google 行事曆同步狀態 */
+.cal-sync-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 12px; color: var(--text-dim); }
+.cal-sync-btn { padding: 4px 10px; font-size: 12px; }

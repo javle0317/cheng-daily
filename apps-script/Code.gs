@@ -178,6 +178,10 @@ function dispatch_(p) {
         return respond({ ok: true, data: getCopybook() });
       case "importCopybookEntries":
         return respond({ ok: true, data: importCopybookEntries(p.entries) });
+      case "getCalendarSyncStatus":
+        return respond({ ok: true, data: getCalendarSyncStatus() });
+      case "syncCalendarNow":
+        return respond({ ok: true, data: syncCalendarNow(p.dryRun) });
       case "getCreditCardBills":
         return respond({ ok: true, data: getCreditCardBills() });
       case "addCreditCardBill":
@@ -332,6 +336,7 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
     numArg_(amount, "金額", { emptyValue: "", min: 0 }),
     boolArg_(hideFromCalendar),
   ]);
+  markCalendarDirty_();
   return getData(["events"]);
 }
 
@@ -344,6 +349,7 @@ function deleteEvent(id) {
       break;
     }
   }
+  markCalendarDirty_();
   return getData(["events"]);
 }
 
@@ -376,6 +382,7 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     new Date(),
     dateArg_(endDate, "截止日", { optional: true }),
   ]);
+  markCalendarDirty_();
   return getData(["recurringEvents"]);
 }
 
@@ -392,6 +399,7 @@ function setRecurringEndDate(id, endDate) {
       break;
     }
   }
+  markCalendarDirty_();
   return getData(["recurringEvents"]);
 }
 
@@ -404,12 +412,14 @@ function deleteRecurringEvent(id) {
       break;
     }
   }
+  markCalendarDirty_();
   return getData(["recurringEvents"]);
 }
 
 function addRecurringException(recurringId, date) {
   var sheet = getSheet("RecurringExceptions");
   appendRowSafe_(sheet, [Utilities.getUuid(), textArg_(recurringId, "循環行程", { required: true, max: 100 }), dateArg_(date, "跳過的"), new Date()]);
+  markCalendarDirty_();
   return getData(["recurringExceptions"]);
 }
 
@@ -422,6 +432,7 @@ function deleteRecurringException(id) {
       break;
     }
   }
+  markCalendarDirty_();
   return getData(["recurringExceptions"]);
 }
 
@@ -1314,4 +1325,277 @@ function sendLinePush_(token, userId, text) {
     }),
   };
   UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", options);
+}
+
+
+// ====== 同步到 Google 行事曆（單向：App → Google）======
+// 目標是 Dean 另外建的「承日常」行事曆（ID 放 Script Properties 的 CALENDAR_ID，不進 repo；沒設定 = 功能關閉）。
+// 做法是「對帳」：算出 App 裡「應該有」的事件（一次性事件 + 循環行程展開成單次），跟行事曆上
+// 「帶本 App 標記」的事件比對，只做差異（建立／更新／刪除）。只管理有標記的事件（CalendarEvent tag "dh"），
+// 別人在這個行事曆手動加的事件完全不碰。寫入 Events／循環行程時只設旗標 CAL_DIRTY（幾毫秒，不呼叫 Calendar），
+// 由每 5 分鐘的觸發器（calendarSyncTick）對帳；另有每天一次的完整對帳（calendarSyncDaily）把循環行程的視窗往前滾。
+// 設定步驟見 README「同步到 Google 行事曆」。
+
+var CAL_TAG = "dh";
+var CAL_DURATION_MIN = 60;      // 有時間的事件預設長度（分鐘）
+var CAL_PAST_DAYS = 7;          // 對帳視窗：今天往前幾天（更早的不動）
+var CAL_RECUR_DAYS = 120;       // 循環行程往後展開幾天
+var CAL_ONEOFF_DAYS = 365;      // 一次性事件往後同步幾天
+var CAL_OWNER_LABELS = { me: "承承", wife: "君君", shared: "一起" };
+
+function calendarId_() {
+  return PropertiesService.getScriptProperties().getProperty("CALENDAR_ID") || "";
+}
+
+function markCalendarDirty_() {
+  try {
+    if (calendarId_()) PropertiesService.getScriptProperties().setProperty("CAL_DIRTY", "1");
+  } catch (e) { /* 旗標寫不進去不能影響原本的寫入 */ }
+}
+
+// yyyy-MM-dd 加減天數（用 UTC 計算，不受時區影響）
+function calAddDays_(dateStr, days) {
+  var p = String(dateStr).split("-");
+  var d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + days));
+  return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2);
+}
+
+function calWeekday_(dateStr) {
+  var p = String(dateStr).split("-");
+  return new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]))).getUTCDay();
+}
+
+function calTitle_(owner, title) {
+  var label = CAL_OWNER_LABELS[owner] || (PET_NAMES.indexOf(owner) !== -1 ? owner : "");
+  return (label ? "[" + label + "] " : "") + String(title || "");
+}
+
+// 純函式：App 裡「應該出現在 Google 行事曆上」的事件清單。
+// 回傳 [{ key, title, date, time, description }]；time 為空 = 全天事件。
+function desiredCalendarEvents_(events, rules, exceptions, todayStr) {
+  var out = [];
+  var from = calAddDays_(todayStr, -CAL_PAST_DAYS);
+  var oneOffTo = calAddDays_(todayStr, CAL_ONEOFF_DAYS);
+  var recurTo = calAddDays_(todayStr, CAL_RECUR_DAYS);
+
+  (events || []).forEach(function (e) {
+    var hidden = e.hideFromCalendar === true || e.hideFromCalendar === "TRUE" || e.hideFromCalendar === "true";
+    var date = String(e.date || "");
+    if (hidden || !e.id || date < from || date > oneOffTo) return;
+    out.push({ key: "e:" + e.id, title: calTitle_(e.owner, e.title), date: date, time: e.time ? String(e.time) : "", description: String(e.notes || "") });
+  });
+
+  var skipped = {};
+  (exceptions || []).forEach(function (x) { skipped[x.recurringId + "|" + x.date] = true; });
+  (rules || []).forEach(function (r) {
+    if (!r.id) return;
+    for (var d = from; d <= recurTo; d = calAddDays_(d, 1)) {
+      if (r.endDate && d > String(r.endDate)) break;
+      var hit = r.frequency === "weekly" ? calWeekday_(d) === Number(r.dayOfWeek)
+        : r.frequency === "monthly" ? Number(d.slice(8, 10)) === Number(r.dayOfMonth) : false;
+      if (!hit || skipped[r.id + "|" + d]) continue;
+      out.push({ key: "r:" + r.id + ":" + d, title: calTitle_(r.owner, r.title), date: d, time: r.time ? String(r.time) : "", description: String(r.notes || "") });
+    }
+  });
+  return out;
+}
+
+// 純函式：期望清單 vs 行事曆上帶標記的現有事件（[{key, title, date, time, description, ref}]）→ 要做的差異。
+// 同一個 key 在行事曆上出現多次（不該發生）時，多的算要刪除。
+function planCalendarSync_(desired, existing) {
+  var byKey = {};
+  var plan = { create: [], update: [], del: [], unchanged: 0 };
+  (existing || []).forEach(function (ex) {
+    if (byKey[ex.key]) plan.del.push(ex); else byKey[ex.key] = ex;
+  });
+  var wanted = {};
+  (desired || []).forEach(function (d) {
+    wanted[d.key] = true;
+    var ex = byKey[d.key];
+    if (!ex) { plan.create.push(d); return; }
+    var same = ex.title === d.title && ex.date === d.date && ex.time === d.time && ex.description === d.description;
+    if (same) plan.unchanged++; else plan.update.push({ existing: ex, desired: d });
+  });
+  Object.keys(byKey).forEach(function (k) { if (!wanted[k]) plan.del.push(byKey[k]); });
+  return plan;
+}
+
+// ---- 以下碰 CalendarApp，薄薄一層（測試時用假的 cal 物件） ----
+
+function calStart_(d) {
+  return new Date(d.date + "T" + d.time + ":00+08:00"); // 台灣沒有日光節約，固定 +08:00
+}
+
+function calDay_(dateStr) {
+  var p = dateStr.split("-");
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); // 全天事件用「日期」，依腳本時區
+}
+
+function readExistingCalendarEvents_(cal, todayStr) {
+  var from = calDay_(calAddDays_(todayStr, -CAL_PAST_DAYS));
+  var to = calDay_(calAddDays_(todayStr, CAL_ONEOFF_DAYS + 2));
+  var out = [];
+  cal.getEvents(from, to).forEach(function (ev) {
+    var key = ev.getTag(CAL_TAG);
+    if (!key) return; // 不是本 App 同步出去的，不碰
+    var allDay = ev.isAllDayEvent();
+    out.push({
+      key: key,
+      title: ev.getTitle(),
+      date: allDay ? Utilities.formatDate(ev.getAllDayStartDate(), Session.getScriptTimeZone(), "yyyy-MM-dd") : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "yyyy-MM-dd"),
+      time: allDay ? "" : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "HH:mm"),
+      description: ev.getDescription() || "",
+      ref: ev,
+    });
+  });
+  return out;
+}
+
+function createCalendarEvent_(cal, d) {
+  var ev;
+  if (d.time) {
+    var start = calStart_(d);
+    ev = cal.createEvent(d.title, start, new Date(start.getTime() + CAL_DURATION_MIN * 60000), { description: d.description });
+  } else {
+    ev = cal.createAllDayEvent(d.title, calDay_(d.date), { description: d.description });
+  }
+  ev.setTag(CAL_TAG, d.key);
+  return ev;
+}
+
+function applyCalendarPlan_(cal, plan) {
+  plan.create.forEach(function (d) { createCalendarEvent_(cal, d); });
+  plan.update.forEach(function (u) {
+    var ex = u.existing, d = u.desired;
+    if (!!ex.time !== !!d.time) { // 全天 ↔ 定時 互換：刪掉重建
+      ex.ref.deleteEvent();
+      createCalendarEvent_(cal, d);
+      return;
+    }
+    ex.ref.setTitle(d.title);
+    ex.ref.setDescription(d.description);
+    if (d.time) {
+      var start = calStart_(d);
+      ex.ref.setTime(start, new Date(start.getTime() + CAL_DURATION_MIN * 60000));
+    } else if (ex.date !== d.date) {
+      ex.ref.setAllDayDate(calDay_(d.date));
+    }
+  });
+  plan.del.forEach(function (ex) { ex.ref.deleteEvent(); });
+}
+
+function summarizePlan_(plan, dryRun) {
+  var short = function (d) { return d.date + (d.time ? " " + d.time : "") + " " + d.title; };
+  return {
+    dryRun: !!dryRun,
+    created: plan.create.length, updated: plan.update.length, deleted: plan.del.length, unchanged: plan.unchanged,
+    preview: {
+      create: plan.create.slice(0, 30).map(short),
+      update: plan.update.slice(0, 30).map(function (u) { return short(u.desired); }),
+      del: plan.del.slice(0, 30).map(short),
+    },
+  };
+}
+
+// 對帳（cal 可注入，測試用）。dryRun 只算不動。
+function reconcileWith_(cal, data, todayStr, dryRun) {
+  var desired = desiredCalendarEvents_(data.events, data.rules, data.exceptions, todayStr);
+  var existing = readExistingCalendarEvents_(cal, todayStr);
+  var plan = planCalendarSync_(desired, existing);
+  // 保險：資料表讀不到（desired 全空）卻要刪掉一堆事件，八成是讀取出問題，中止而不是清空行事曆
+  if (!dryRun && !desired.length && plan.del.length > 5) throw new Error("對帳會刪除全部 " + plan.del.length + " 個事件，疑似資料表讀取異常，已中止");
+  if (!dryRun) applyCalendarPlan_(cal, plan);
+  return summarizePlan_(plan, dryRun);
+}
+
+function reconcileCalendar_(dryRun) {
+  var id = calendarId_();
+  if (!id) throw new Error("還沒設定 CALENDAR_ID（Apps Script 指令碼屬性）");
+  var cal = CalendarApp.getCalendarById(id);
+  if (!cal) throw new Error("找不到這個行事曆，請確認 CALENDAR_ID，以及這個帳號有編輯權限");
+  var props = PropertiesService.getScriptProperties();
+  var todayStr = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
+  var data = {
+    events: sheetToObjects(getSheet("Events")),
+    rules: sheetToObjects(getSheet("RecurringEvents")),
+    exceptions: sheetToObjects(getSheet("RecurringExceptions")),
+  };
+  try {
+    var res = reconcileWith_(cal, data, todayStr, dryRun);
+    if (!dryRun) {
+      props.setProperty("CAL_LAST_SYNC", new Date().toISOString());
+      props.deleteProperty("CAL_LAST_ERROR");
+      props.deleteProperty("CAL_DIRTY");
+    }
+    return res;
+  } catch (err) {
+    if (!dryRun) props.setProperty("CAL_LAST_ERROR", String(err && err.message ? err.message : err));
+    throw err;
+  }
+}
+
+// 網頁用：立即同步（可帶 dryRun=true 先預覽）
+function syncCalendarNow(dryRun) {
+  return reconcileCalendar_(dryRun === true || dryRun === "true");
+}
+
+function getCalendarSyncStatus() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    enabled: !!calendarId_(),
+    dirty: props.getProperty("CAL_DIRTY") === "1",
+    lastSyncAt: props.getProperty("CAL_LAST_SYNC") || "",
+    lastError: props.getProperty("CAL_LAST_ERROR") || "",
+  };
+}
+
+// 時間觸發器：每 5 分鐘（有待同步旗標才做事）、每天一次（完整對帳，循環行程視窗往前滾）。
+// 觸發器沒有走 handleRequest，要自己跟網頁的寫入搶同一把鎖。
+function runCalendarSyncSafely_(onlyIfDirty) {
+  if (!calendarId_()) return;
+  if (onlyIfDirty && PropertiesService.getScriptProperties().getProperty("CAL_DIRTY") !== "1") return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return; // 有人正在寫入，下一輪再說
+  try {
+    reconcileCalendar_(false);
+  } catch (err) {
+    Logger.log("行事曆同步失敗：" + err);
+  } finally {
+    lock.releaseLock();
+  }
+}
+function calendarSyncTick() { runCalendarSyncSafely_(true); }
+function calendarSyncDaily() { runCalendarSyncSafely_(false); }
+
+// ---- 一次性設定函式（在 Apps Script 編輯器手動執行；故意沒有底線結尾，才選得到） ----
+
+// 第一步：執行一次，跳出授權視窗（要允許讀寫 Google 行事曆），並確認 CALENDAR_ID 找得到行事曆
+function authorizeCalendar() {
+  var id = calendarId_();
+  if (!id) throw new Error("請先在「專案設定 → 指令碼屬性」新增 CALENDAR_ID");
+  var cal = CalendarApp.getCalendarById(id);
+  if (!cal) throw new Error("找不到這個行事曆，請確認 CALENDAR_ID");
+  return "OK：" + cal.getName();
+}
+
+// 第二步：建立兩個觸發器（可重複執行，不會重複建立）
+function installCalendarTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    var h = t.getHandlerFunction();
+    if (h === "calendarSyncTick" || h === "calendarSyncDaily") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("calendarSyncTick").timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger("calendarSyncDaily").timeBased().everyDays(1).atHour(4).create();
+  return "已建立：每 5 分鐘檢查待同步、每天 4 點完整對帳";
+}
+
+// 要退場或重來時：刪掉行事曆上所有帶本 App 標記的事件（別人手動加的不動）
+function clearSyncedCalendarEvents() {
+  var cal = CalendarApp.getCalendarById(calendarId_());
+  var todayStr = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
+  var n = 0;
+  cal.getEvents(calDay_(calAddDays_(todayStr, -400)), calDay_(calAddDays_(todayStr, 800))).forEach(function (ev) {
+    if (ev.getTag(CAL_TAG)) { ev.deleteEvent(); n++; }
+  });
+  return "已刪除 " + n + " 個同步出去的事件";
 }

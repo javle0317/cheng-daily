@@ -165,7 +165,11 @@ async function apiRequest(action, params) {
 let writeChain = Promise.resolve();
 function api(action, params = {}) {
   if (action.startsWith("get")) return apiRequest(action, params);
-  const run = writeChain.then(() => apiRequest(action, params));
+  const run = writeChain.then(() => apiRequest(action, params)).then((data) => {
+    // 讓頁面可以在「某類寫入成功」之後做事（例如首頁更新 Google 行事曆同步狀態）
+    try { window.dispatchEvent(new CustomEvent("api-write", { detail: { action } })); } catch (e) { /* ignore */ }
+    return data;
+  });
   writeChain = run.catch(() => {});
   return run;
 }

@@ -271,7 +271,63 @@ window.loadPageData = async function () {
   // 清單（購物/想法）要打開 📝 才看得到，登入時先不讀，打開時再載入
   applyData(await api("getData", { keys: "goals,events,habits,habitLogs,recurringEvents,recurringExceptions,holidays" }));
   renderAll();
+  refreshCalSync(); // Google 行事曆同步狀態（沒設定 CALENDAR_ID 就不顯示），不擋登入
 };
+
+// ====== Google 行事曆同步狀態（單向 App → Google，對帳邏輯在 Code.gs）======
+let calSyncTimer = null;
+async function refreshCalSync() {
+  clearTimeout(calSyncTimer);
+  const line = document.getElementById("calSyncLine");
+  try {
+    const s = await api("getCalendarSyncStatus");
+    if (!s.enabled) { line.classList.add("hidden"); return; }
+    let text;
+    if (s.dirty) text = "☁️ 等待同步到 Google 行事曆（約 5 分鐘內）";
+    else if (s.lastError) text = "⚠️ Google 行事曆同步失敗：" + s.lastError;
+    else if (s.lastSyncAt) {
+      const d = new Date(s.lastSyncAt);
+      const same = toDateStr(d) === toDateStr(new Date());
+      const hm = d.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
+      text = `☁️ 已同步到 Google 行事曆（${same ? "" : `${d.getMonth() + 1}/${d.getDate()} `}${hm}）`;
+    } else text = "☁️ 還沒同步過，可以先按「預覽」看會同步哪些事件";
+    document.getElementById("calSyncText").textContent = text;
+    line.classList.remove("hidden");
+    if (s.dirty) calSyncTimer = setTimeout(refreshCalSync, 60000); // 等排程跑完，一分鐘後再看一次
+  } catch (err) {
+    line.classList.add("hidden"); // 後端還沒更新或讀不到，就不顯示，不打擾
+  }
+}
+
+const CAL_SYNC_ACTIONS = new Set(["addEvent", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"]);
+window.addEventListener("api-write", (e) => { if (CAL_SYNC_ACTIONS.has(e.detail.action)) refreshCalSync(); });
+
+document.getElementById("calSyncBtn").addEventListener("click", async (e) => {
+  await withRowLock(e.currentTarget, async () => {
+    try {
+      const r = await api("syncCalendarNow");
+      showToast(`已同步：新增 ${r.created}、更新 ${r.updated}、刪除 ${r.deleted}`);
+    } catch (err) {
+      setStatus("同步失敗：" + err.message, true);
+    }
+    refreshCalSync();
+  }, [document.getElementById("calPreviewBtn")]);
+});
+
+document.getElementById("calPreviewBtn").addEventListener("click", async (e) => {
+  await withRowLock(e.currentTarget, async () => {
+    try {
+      const r = await api("syncCalendarNow", { dryRun: true });
+      const lines = [`預覽（還沒真的同步）：新增 ${r.created}、更新 ${r.updated}、刪除 ${r.deleted}、不變 ${r.unchanged}`];
+      [["新增", r.preview.create], ["更新", r.preview.update], ["刪除", r.preview.del]].forEach(([label, list]) => {
+        if (list.length) lines.push(`\n${label}（前 ${list.length} 筆）：\n` + list.join("\n"));
+      });
+      await showConfirm(lines.join("\n"));
+    } catch (err) {
+      setStatus("預覽失敗：" + err.message, true);
+    }
+  }, [document.getElementById("calSyncBtn")]);
+});
 
 // ====== Rendering ======
 function renderAll() {

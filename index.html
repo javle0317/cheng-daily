@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261007003810">
+<link rel="stylesheet" href="style.css?v=20261007104919">
 </head>
 <body>
 
@@ -68,6 +68,11 @@
           <button class="ghost-btn calendar-nav-spacer" aria-hidden="true" tabindex="-1">今天</button>
         </div>
         <div id="calendarGrid" class="calendar-grid"></div>
+        <p id="calSyncLine" class="cal-sync-line hidden">
+          <span id="calSyncText"></span>
+          <button id="calSyncBtn" type="button" class="ghost-btn cal-sync-btn">立即同步</button>
+          <button id="calPreviewBtn" type="button" class="ghost-btn cal-sync-btn">預覽</button>
+        </p>
       </section>
 
       <section class="card today-events-card">
@@ -285,7 +290,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007003810"></script>
-  <script src="app.js?v=20261007003810"></script>
+  <script src="shared.js?v=20261007104919"></script>
+  <script src="app.js?v=20261007104919"></script>
 </body>
 </html>

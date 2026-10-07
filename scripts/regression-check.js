@@ -2,6 +2,7 @@
 // 沒有測試框架，直接把前端／後端的原始碼載進 vm 跑（DOM 用萬用替身，Apps Script 服務用假物件），
 // 檢查「改過會壞」的純邏輯：數字解析、跳脫、連續天數、寫入防護、驗血項目驗證。
 // 登入、日期切換、匯入的畫面流程需要瀏覽器，見 README「回歸檢查清單」。
+process.env.TZ = "Asia/Taipei"; // 行事曆測試的日期運算以台北時間為準
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
@@ -23,6 +24,7 @@ function loadFrontend(files, cutAt, fixedNow) {
   const store = {};
   const ctx = {
     document: stub, window: {}, localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+    addEventListener() {}, dispatchEvent() {}, CustomEvent: class {},
     location: stub, performance: { now: () => 0 }, console, URL, fetch: () => Promise.reject(new Error("no network in tests")),
     setTimeout, clearTimeout, Intl, Date: fixedNow ? class extends Date { constructor(...a) { super(...(a.length ? a : [fixedNow])); } static now() { return new Date(fixedNow).getTime(); } } : Date, Math, JSON, Set, Map, Promise, Object, Array, String, Number,
   };
@@ -225,6 +227,75 @@ console.log("後端：練字內容庫");
   check("importCopybookEntries：壞語言、空篇名、空內容、過長都丟錯", throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "fr", title: "a", text: "x" }]))) && throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "en", title: " ", text: "x" }]))) && throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "en", title: "a", text: " " }]))) && throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "en", title: "a", text: "x".repeat(8001) }]))));
   check("importCopybookEntries：有一筆不合格就整批不寫", (() => { const n = rows2.length; return throws(() => be.importCopybookEntries(JSON.stringify([{ lang: "zh", title: "新的", text: "x" }, { lang: "zh", title: "", text: "x" }]))) && rows2.length === n; })());
   check("importCopybookEntries：不是 JSON／空陣列丟錯", throws(() => be.importCopybookEntries("not json")) && throws(() => be.importCopybookEntries("[]")));
+}
+
+console.log("後端：同步到 Google 行事曆（對帳）");
+{
+  const ev = (o) => Object.assign({ id: "e1", date: "2026-10-10", time: "", title: "看牙醫", owner: "me", notes: "", hideFromCalendar: false }, o);
+  const rule = (o) => Object.assign({ id: "r1", owner: "shared", title: "打球", time: "19:00", notes: "", frequency: "weekly", dayOfWeek: 3, dayOfMonth: "", endDate: "" }, o);
+  const today = "2026-10-07"; // 週三
+  let d = be.desiredCalendarEvents_([ev({}), ev({ id: "e2", time: "08:30", owner: "林萌", title: "打疫苗", notes: "地圖連結" }), ev({ id: "e3", hideFromCalendar: true }), ev({ id: "e4", date: "2026-09-01" })], [], [], today);
+  check("desired：一次性事件（owner 標籤、有時間／全天、備註）；記帳用與太舊的不同步", d.length === 2 && d[0].title === "[承承] 看牙醫" && d[0].time === "" && d[1].title === "[林萌] 打疫苗" && d[1].time === "08:30" && d[1].description === "地圖連結", d);
+  d = be.desiredCalendarEvents_([], [rule({})], [], today);
+  check("desired：每週三循環展開成單次（視窗 −7 ～ +120 天）、key 含規則 id 與日期", d.length >= 17 && d.length <= 19 && d.every(x => x.key.startsWith("r:r1:") && be.calWeekday_(x.date) === 3 && x.title === "[一起] 打球" && x.time === "19:00"), d.length);
+  d = be.desiredCalendarEvents_([], [rule({ endDate: "2026-10-14" })], [{ recurringId: "r1", date: "2026-10-07" }], today);
+  check("desired：截止日當天含、之後不展開；跳過日被扣掉", d.map(x => x.date).join() === "2026-09-30,2026-10-14", d.map(x => x.date));
+  d = be.desiredCalendarEvents_([], [rule({ frequency: "monthly", dayOfWeek: "", dayOfMonth: 15, time: "" })], [], today);
+  check("desired：每月 15 號（沒時間 = 全天）", d.length >= 4 && d.every(x => x.date.endsWith("-15") && x.time === ""), d.map(x => x.date));
+  check("calAddDays_：跨月跨年", be.calAddDays_("2026-12-31", 1) === "2027-01-01" && be.calAddDays_("2026-03-01", -1) === "2026-02-28");
+
+  const D = (key, over) => Object.assign({ key, title: "t", date: "2026-10-10", time: "", description: "" }, over);
+  let plan = be.planCalendarSync_([D("a"), D("b", { title: "新" }), D("c")], [{ key: "a", title: "t", date: "2026-10-10", time: "", description: "" }, { key: "b", title: "舊", date: "2026-10-10", time: "", description: "" }, { key: "z", title: "t", date: "2026-10-10", time: "", description: "" }]);
+  check("plan：沒變的略過、標題變了更新、新的建立、App 已刪除的移除", plan.unchanged === 1 && plan.update.length === 1 && plan.create.length === 1 && plan.create[0].key === "c" && plan.del.length === 1 && plan.del[0].key === "z", plan);
+  plan = be.planCalendarSync_([D("a")], [{ key: "a", title: "t", date: "2026-10-10", time: "", description: "" }]);
+  check("plan：完全相同不產生任何動作（冪等）", !plan.create.length && !plan.update.length && !plan.del.length && plan.unchanged === 1);
+  plan = be.planCalendarSync_([D("a")], [{ key: "a", title: "t", date: "2026-10-10", time: "", description: "" }, { key: "a", title: "t", date: "2026-10-10", time: "", description: "" }]);
+  check("plan：同一個 key 重複出現，多的刪掉", plan.del.length === 1 && plan.unchanged === 1);
+
+  // 假的 CalendarApp：事件物件、getEvents、createEvent、createAllDayEvent
+  be.Session = { getScriptTimeZone: () => "Asia/Taipei" };
+  be.Utilities.formatDate = (date, tz, fmt) => { const t = new Date(date.getTime() + 8 * 3600000).toISOString(); return fmt === "HH:mm" ? t.slice(11, 16) : t.slice(0, 10); };
+  const calEvents = [];
+  const mkEvent = (title, start, allDay, desc) => {
+    const e = { title, start, allDay, desc: desc || "", tag: null, deleted: false };
+    return Object.assign(e, {
+      getTag: () => e.tag, setTag: (k, v) => { e.tag = v; }, isAllDayEvent: () => e.allDay, getTitle: () => e.title, getAllDayStartDate: () => e.start,
+      getStartTime: () => e.start, getDescription: () => e.desc, setTitle: v => { e.title = v; }, setDescription: v => { e.desc = v; },
+      setTime: s => { e.start = s; }, setAllDayDate: s => { e.start = s; }, deleteEvent: () => { e.deleted = true; },
+    });
+  };
+  const fakeCal = {
+    getEvents: () => calEvents.filter(e => !e.deleted),
+    createEvent: (title, start, end, o) => { const e = mkEvent(title, start, false, o.description); calEvents.push(e); return e; },
+    createAllDayEvent: (title, day, o) => { const e = mkEvent(title, day, true, o.description); calEvents.push(e); return e; },
+  };
+  const manual = mkEvent("太太自己加的", new Date("2026-10-12T10:00:00+08:00"), false); calEvents.push(manual); // 沒有標記
+  const data = { events: [ev({ time: "08:30" }), ev({ id: "e2", date: "2026-10-11", title: "全天" })], rules: [], exceptions: [] };
+  let res = be.reconcileWith_(fakeCal, data, today, true);
+  check("乾跑：只算不動（行事曆上沒有新增事件）", res.dryRun && res.created === 2 && calEvents.length === 1);
+  res = be.reconcileWith_(fakeCal, data, today, false);
+  const synced = calEvents.filter(e => e.tag && !e.deleted);
+  check("對帳：建立 2 個、帶標記，定時事件是 08:30 起（台灣時間）、全天事件是全天", res.created === 2 && synced.length === 2 && synced.find(e => e.tag === "e:e1").start.getTime() === new Date("2026-10-10T08:30:00+08:00").getTime() && synced.find(e => e.tag === "e:e2").allDay === true);
+  res = be.reconcileWith_(fakeCal, data, today, false);
+  check("再對帳一次：沒有任何動作（冪等）", res.created === 0 && res.updated === 0 && res.deleted === 0 && res.unchanged === 2, res);
+  data.events[0].title = "看牙醫（改）"; data.events[0].time = "";
+  data.events.splice(1, 1);
+  res = be.reconcileWith_(fakeCal, data, today, false);
+  const alive = calEvents.filter(e => !e.deleted);
+  check("App 改標題＋定時改全天（刪掉重建）、刪除事件 → 行事曆跟著變；別人手動加的事件不被動到", res.updated === 1 && res.deleted === 1 && alive.some(e => e.tag === "e:e1" && e.allDay && e.title === "[承承] 看牙醫（改）") && !alive.some(e => e.tag === "e:e2") && !manual.deleted, res);
+  check("保險：資料表空卻要刪一大堆事件 → 中止，不清空行事曆", (() => { for (let i = 0; i < 6; i++) { const e = mkEvent("x" + i, new Date("2026-10-20T10:00:00+08:00"), false); e.tag = "z:" + i; calEvents.push(e); } return throws(() => be.reconcileWith_(fakeCal, { events: [], rules: [], exceptions: [] }, today, false)); })());
+  // 狀態與旗標
+  const propStore = {};
+  const origProps = be.PropertiesService.getScriptProperties;
+  be.PropertiesService.getScriptProperties = () => ({ getProperty: k => (k in propStore ? propStore[k] : null), setProperty: (k, v) => { propStore[k] = v; }, deleteProperty: k => { delete propStore[k]; } });
+  check("沒設定 CALENDAR_ID：功能關閉，寫入也不會設旗標", be.getCalendarSyncStatus().enabled === false && (be.markCalendarDirty_(), !propStore.CAL_DIRTY));
+  propStore.CALENDAR_ID = "cal-id";
+  be.markCalendarDirty_();
+  check("設定 CALENDAR_ID 後：寫入會設待同步旗標，狀態可讀", propStore.CAL_DIRTY === "1" && be.getCalendarSyncStatus().enabled && be.getCalendarSyncStatus().dirty);
+  const codeGs = read("apps-script/Code.gs");
+  const bodyOf = (fn) => { const i = codeGs.indexOf("function " + fn + "("); return codeGs.slice(i, codeGs.indexOf("\n}\n", i)); };
+  check("寫入 Events／循環行程／跳過日的 7 個函式都會標記待同步（改花費金額不用）", ["addEvent", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"].every(fn => bodyOf(fn).includes("markCalendarDirty_();")) && !bodyOf("setEventAmount").includes("markCalendarDirty_"));
+  be.PropertiesService.getScriptProperties = origProps; // 後面的傳輸測試要用原本的密碼屬性
 }
 
 console.log("後端：傳輸與寫入鎖");
