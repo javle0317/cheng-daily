@@ -602,6 +602,11 @@ a.ghost-btn {
   padding: 10px;
   text-align: center;
 }
+/* 體組成頁：方塊可點，選中的那一項外框標出來（對應下方的趨勢圖） */
+.bp-stat-tile.clickable { border: 1px solid transparent; cursor: pointer; }
+.bp-stat-tile.clickable:hover { border-color: var(--border); }
+.bp-stat-tile.clickable.selected { border-color: var(--accent); }
+.bp-stat-tile.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .bp-stat-value {
   font-size: 18px;

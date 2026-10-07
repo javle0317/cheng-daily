@@ -63,6 +63,17 @@
   function makeTile(label, valueText, opts = {}) {
     const tile = document.createElement("div");
     tile.className = "bp-stat-tile";
+    if (opts.key) {
+      // 點方塊 = 下面的趨勢圖切到這一項（跟驗血的方塊一樣；下拉仍可選沒有方塊的項目）
+      tile.classList.add("clickable");
+      if (opts.key === chartKey()) tile.classList.add("selected");
+      tile.setAttribute("role", "button");
+      tile.tabIndex = 0;
+      tile.title = "點一下看趨勢圖";
+      const pick = () => selectChart(opts.key);
+      tile.addEventListener("click", pick);
+      tile.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+    }
     const value = document.createElement("div");
     value.className = "bp-stat-value";
     value.textContent = valueText;
@@ -81,6 +92,7 @@
   }
 
   function renderStatus() {
+    renderChartOptions();
     const row = document.getElementById("bodyStatsRow");
     const meta = document.getElementById("bodyLatestMeta");
     const progress = document.getElementById("bodyProgress");
@@ -110,13 +122,13 @@
     const bodyAge = toNum(latest.bodyAge);
     const whr = toNum(latest.whr);
 
-    if (weight !== null) row.appendChild(makeTile("體重 kg", String(weight), { delta: delta("weight"), unit: " kg" }));
-    if (bmi !== null) row.appendChild(makeTile("BMI", String(bmi), { badge: classifyBmi(bmi) }));
-    if (bodyFat !== null) row.appendChild(makeTile("體脂率 %", String(bodyFat), { delta: delta("bodyFat"), unit: "%", badge: classifyBodyFat(bodyFat) }));
-    if (skeletal !== null) row.appendChild(makeTile("骨骼肌量 kg", String(skeletal), { delta: delta("skeletalMuscle"), unit: " kg" }));
-    if (visceral !== null) row.appendChild(makeTile("內臟脂肪", String(visceral), { delta: delta("visceralFat", 0), badge: classifyVisceral(visceral) }));
-    if (bodyAge !== null) row.appendChild(makeTile("身體年齡", String(bodyAge), { delta: delta("bodyAge", 0), unit: " 歲", badge: classifyBodyAge(bodyAge) }));
-    if (whr !== null) row.appendChild(makeTile("腰臀比", String(whr), { badge: classifyWhr(whr) }));
+    if (weight !== null) row.appendChild(makeTile("體重 kg", String(weight), { key: "weight", delta: delta("weight"), unit: " kg" }));
+    if (bmi !== null) row.appendChild(makeTile("BMI", String(bmi), { key: "bmi", badge: classifyBmi(bmi) }));
+    if (bodyFat !== null) row.appendChild(makeTile("體脂率 %", String(bodyFat), { key: "bodyFat", delta: delta("bodyFat"), unit: "%", badge: classifyBodyFat(bodyFat) }));
+    if (skeletal !== null) row.appendChild(makeTile("骨骼肌量 kg", String(skeletal), { key: "skeletalMuscle", delta: delta("skeletalMuscle"), unit: " kg" }));
+    if (visceral !== null) row.appendChild(makeTile("內臟脂肪", String(visceral), { key: "visceralFat", delta: delta("visceralFat", 0), badge: classifyVisceral(visceral) }));
+    if (bodyAge !== null) row.appendChild(makeTile("身體年齡", String(bodyAge), { key: "bodyAge", delta: delta("bodyAge", 0), unit: " 歲", badge: classifyBodyAge(bodyAge) }));
+    if (whr !== null) row.appendChild(makeTile("腰臀比", String(whr), { key: "whr", badge: classifyWhr(whr) }));
 
     // 目標進度：從第一筆體重到目標體重
     const first = toNum(all[0].weight);
@@ -432,10 +444,16 @@
     renderCharts();
   });
 
-  document.getElementById("bodyChartItem").addEventListener("change", (e) => {
-    try { localStorage.setItem("bodyChartKey", e.target.value); } catch (err) { /* 存不了就只對本次有效 */ }
+  function selectChart(key) {
+    document.getElementById("bodyChartItem").value = key;
+    state.chartKey = key;
+    try { localStorage.setItem("bodyChartKey", key); } catch (err) { /* 存不了就只對本次有效 */ }
+    renderStatus();
     renderCharts();
-  });
+    document.getElementById("bodyChart").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  document.getElementById("bodyChartItem").addEventListener("change", (e) => selectChart(e.target.value));
 
   // 寫入（新增/刪除）的回應 version+1；背景載入（登入後才讀其他分頁）拿到結果時如果 version 變了，
   // 代表使用者在載入期間已經寫入過，載入的是更舊的資料，要丟掉，不然剛新增的紀錄會「消失」
