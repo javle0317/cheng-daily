@@ -3,18 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261007120716">
+<title>承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261007142740">
 </head>
 <body>
 
   <div id="lockScreen" class="lock-screen">
     <div id="lockLoading" class="lock-card hidden">
-      <h1>Daily Hub</h1>
+      <h1>承日常</h1>
       <p>登入中…</p>
     </div>
     <form id="lockForm" class="lock-card">
-      <h1>Daily Hub</h1>
+      <h1>承日常</h1>
       <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
       <button type="submit">解鎖</button>
       <p id="lockError" class="error-text"></p>
@@ -24,13 +27,14 @@
   <div id="app" class="app hidden">
     <header class="app-header multi">
       <div>
+        <p id="todayEyebrow" class="eyebrow"></p>
         <h1 id="todayDate"></h1>
         <p id="progressLine" class="progress-line progress-link" role="button" tabindex="0" title="跳到今日待辦"></p>
       </div>
       <div class="header-actions">
-        <button id="shoppingBtn" class="ghost-btn" title="清單">📝</button>
-        <a href="health.html" class="ghost-btn" title="健康記錄">❤️</a>
-        <a href="bills.html" class="ghost-btn" title="信用卡帳單">💳</a>
+        <button id="shoppingBtn" class="ghost-btn" title="清單" aria-label="清單"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/></svg></button>
+        <a href="health.html" class="ghost-btn" title="健康記錄" aria-label="健康記錄"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10.1A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/></svg></a>
+        <a href="bills.html" class="ghost-btn" title="信用卡帳單" aria-label="信用卡帳單"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M6.5 15h3.5"/></svg></a>
         <button id="logoutBtn" class="ghost-btn">登出</button>
       </div>
     </header>
@@ -302,7 +306,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007120716"></script>
-  <script src="app.js?v=20261007120716"></script>
+  <script src="shared.js?v=20261007142740"></script>
+  <script src="app.js?v=20261007142740"></script>
 </body>
 </html>

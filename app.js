@@ -3,11 +3,11 @@
 // 跟 health.js 共用。
 
 const OWNER_META = {
-  me: { label: "承承", icon: "🧑", color: "#4f6df5" },
-  wife: { label: "君君", icon: "👩", color: "#e0699a" },
-  "林萌": { label: "林萌", icon: "🐕", color: "#c9852f" },
-  "咪嚕": { label: "咪嚕", icon: "🐈", color: "#8a5fd6" },
-  shared: { label: "一起", icon: "🤝", color: "#3fa373" },
+  me: { label: "承承", icon: "🧑", color: "#4c6fbf" },
+  wife: { label: "君君", icon: "👩", color: "#c4533b" },
+  "林萌": { label: "林萌", icon: "🐕", color: "#b8892e" },
+  "咪嚕": { label: "咪嚕", icon: "🐈", color: "#8c6fb0" },
+  shared: { label: "一起", icon: "🤝", color: "#2a7d5c" },
 };
 
 const PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡跟 Code.gs 的 PET_NAMES 都要加
@@ -387,9 +387,11 @@ function selectDate(dateStr) {
 
 function renderHeader() {
   const today = new Date();
-  document.getElementById("todayDate").textContent = today.toLocaleDateString("zh-TW", {
-    year: "numeric", month: "long", day: "numeric", weekday: "short",
-  });
+  // 上方小字「2026 · 十月」＋ 宋體大字「10月7日　週三」
+  const MONTHS = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
+  const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+  document.getElementById("todayEyebrow").textContent = `${today.getFullYear()} · ${MONTHS[today.getMonth()]}`;
+  document.getElementById("todayDate").textContent = `${today.getMonth() + 1}月${today.getDate()}日　週${WEEK[today.getDay()]}`;
   const todayStr = toDateStr(today);
   const todaysGoals = state.goals.filter(g => g.date === todayStr);
   const done = todaysGoals.filter(g => g.done === true || g.done === "TRUE").length;

@@ -1,15 +1,24 @@
+/* ====== 色票：藏青・黃銅（日間／夜間各一組）======
+   換色只要改這裡；元件樣式都吃這些變數。--on-accent 是放在主色（藏青）上的文字色。
+   健康燈號（--status-*）是醫學語意、血壓圖系列色（--series-*）要彼此好分辨，不跟著主題走。 */
 :root {
-  --bg: #f0ece4;
-  --card-bg: #faf8f3;
-  --input-bg: #e8e2d6;
-  --text: #2a2622;
-  --text-dim: #8a8171;
-  --accent: #4f6df5;
-  --accent-soft: #e8ecfe;
-  --border: #ddd5c5;
-  --danger: #e0555f;
-  --success-bg: #d9f5e3;
-  --success-text: #1e7a4c;
+  --bg: #f2eee4;
+  --card-bg: #fbf9f2;
+  --input-bg: #ebe5d6;
+  --text: #1f2a44;
+  --text-dim: #646a80;
+  --accent: #25407a;
+  --accent-soft: #e3e8f4;
+  --on-accent: #fbf9f2;
+  --border: #d8d3c4;
+  --danger: #b93a2b;
+  --success-bg: #dcebe3;
+  --success-text: #1f5a44;
+  --brass: #a47a28;
+  --brass-text: #8a6620;
+  --pop: #c4533b;
+  --ok: #1f5a44;
+  --font-serif: "Noto Serif TC", "Songti TC", "STSong", "Noto Serif CJK TC", serif;
   --series-systolic: #2a78d6;
   --series-diastolic: #eb6834;
   --series-pulse: #1baf7a;
@@ -21,17 +30,22 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1115;
-    --card-bg: #1c1f28;
-    --input-bg: #262b37;
-    --text: #eef0f4;
-    --text-dim: #9aa0ac;
-    --accent: #7c93ff;
-    --accent-soft: #262c45;
-    --border: #333847;
+    --bg: #10141f;
+    --card-bg: #171c2b;
+    --input-bg: #1f2638;
+    --text: #e8e6de;
+    --text-dim: #9aa0b5;
+    --accent: #7c9be0;
+    --accent-soft: #1e2742;
+    --on-accent: #10141f;
+    --border: #2c3550;
     --danger: #e88b91;
-    --success-bg: #163826;
-    --success-text: #6fd9a0;
+    --success-bg: #163b2c;
+    --success-text: #8cd3b4;
+    --brass: #d4a94e;
+    --brass-text: #d4a94e;
+    --pop: #e27a62;
+    --ok: #5bb394;
     --series-systolic: #3987e5;
     --series-diastolic: #d95926;
     --series-pulse: #199e70;
@@ -91,7 +105,7 @@ body {
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   font-size: 15px;
   cursor: pointer;
 }
@@ -254,7 +268,7 @@ a.ghost-btn {
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   font-weight: 600;
   cursor: pointer;
 }
@@ -708,7 +722,7 @@ a.ghost-btn {
   border: none;
   border-radius: 10px;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -727,7 +741,7 @@ a.ghost-btn {
   font-size: 14px;
   cursor: pointer;
 }
-.list-tab.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+.list-tab.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .inline-form textarea {
   flex: 1;
   min-width: 0;
@@ -772,7 +786,7 @@ a.ghost-btn {
   font-size: 15px;
   cursor: pointer;
 }
-.health-tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+.health-tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 
 @media (min-width: 760px) {
   .health-form-card { grid-column: 2; }
@@ -954,7 +968,7 @@ a.ghost-btn {
 .practice-main { display: flex; flex-direction: column; gap: 16px; }
 .practice-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
 .practice-tabs { display: flex; gap: 6px; margin-right: 6px; }
-.practice-lang.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.practice-lang.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .practice-options label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); }
 .practice-options label.checkbox-label { flex-direction: row; align-items: center; }
 .practice-info { font-size: 13px; color: var(--text); margin: 4px 0; }
@@ -1030,3 +1044,85 @@ a.ghost-btn {
 .modal-error { color: var(--danger); font-weight: 600; }
 .expense-tools { align-items: center; margin: 8px 0; }
 .card h2 .add-btn { flex: none; }
+
+
+/* ====== 視覺主題：藏青・黃銅（典雅、經典，正式中帶點活潑）======
+   色票在檔案最上面的 :root。這一段是元件樣式：宋體標題、雙線卡片、❦ 裝飾、圓形勾選框、
+   連續天數膠囊、黃銅 focus 外圈、手感細節。 */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+button, a, select { touch-action: manipulation; }
+
+h1, h2, h3, .serif { font-family: var(--font-serif); font-weight: 500; }
+.lock-card h1 { font-size: 26px; letter-spacing: 0.08em; }
+.lock-card h1::after { content: "❦"; display: block; color: var(--brass); font-size: 14px; letter-spacing: 0; margin-top: 4px; }
+
+.eyebrow { margin: 0 0 2px; font-family: var(--font-serif); font-size: 11px; letter-spacing: 0.24em; color: var(--brass-text); }
+.app-header h1 { font-size: 26px; letter-spacing: 0.02em; }
+.app-header .ghost-btn svg { width: 18px; height: 18px; display: block; }
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px var(--border);
+}
+.grid { gap: 20px; }
+.card > h2 { font-size: 17px; letter-spacing: 0.04em; }
+.card > h2::before { content: "❦"; color: var(--brass); font-size: 14px; }
+.card > h2::after { content: ""; order: 9; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+.card > h2 .add-btn { order: 10; }
+.sub-heading { color: var(--brass-text); font-weight: 500; letter-spacing: 0.14em; }
+
+/* 按鈕與輸入欄 */
+.ghost-btn { border-radius: 10px; transition: border-color 0.15s, background 0.15s; }
+.ghost-btn:hover { border-color: var(--accent); }
+.entry-form button, .inline-form button, .lock-card button, .dialog-actions button:not(.ghost-btn) { font-weight: 500; letter-spacing: 0.04em; border-radius: 10px; }
+button:not(:disabled):active { transform: scale(0.98); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+.dialog-card input:focus { outline-color: var(--brass); }
+@media (max-width: 760px) { input, select, textarea { font-size: 16px; } } /* iPhone 聚焦時小於 16px 會自動放大畫面 */
+
+/* 圓形勾選框 */
+input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; flex: none; margin: 0;
+  border: 1.5px solid var(--accent); border-radius: 50%;
+  background: transparent center / 12px no-repeat;
+  cursor: pointer; vertical-align: middle;
+}
+input[type="checkbox"]:checked {
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.5 6.4l2.3 2.3 4.7-5' fill='none' stroke='%23fbf9f2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+@media (prefers-color-scheme: dark) {
+  input[type="checkbox"]:checked { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.5 6.4l2.3 2.3 4.7-5' fill='none' stroke='%2310141f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>"); }
+}
+
+/* 列、標籤、連續天數 */
+.item-row { background: color-mix(in srgb, var(--bg) 70%, var(--card-bg)); border: 1px solid transparent; }
+.item-row.clickable:hover { border-color: var(--border); }
+.owner-badge { border-radius: 999px; padding: 2px 9px; }
+.item-time { color: var(--text-dim); }
+.streak-badge { background: color-mix(in srgb, var(--brass) 16%, transparent); color: var(--brass-text); border-radius: 999px; padding: 1px 9px; font-weight: 500; min-width: 0; }
+
+/* 日曆：今天＝黃銅細環、選取日＝淡藏青底 + 藏青框 */
+.calendar-nav h2 { font-size: 17px; letter-spacing: 0.06em; }
+.calendar-cell { border-radius: 8px; background: color-mix(in srgb, var(--bg) 70%, var(--card-bg)); }
+.calendar-cell.today { border-color: transparent; box-shadow: inset 0 0 0 1.5px var(--brass); }
+.calendar-cell.selected { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.calendar-cell.selected.today { box-shadow: inset 0 0 0 1.5px var(--brass); }
+
+/* 週／月目標 */
+.period-hist .hb i { background: var(--brass); opacity: 0.85; }
+.period-add-btn.is-done { background: var(--ok); border-color: var(--ok); }
+.period-row.done .period-pips .pip.on { background: var(--ok); border-color: var(--ok); }
+.period-hist .hb.full i { background: var(--ok); opacity: 1; }
+
+/* 提示、彈窗 */
+.toast { background: var(--accent); color: var(--on-accent); font-weight: 500; letter-spacing: 0.02em; }
+.toast.toast-error { background: var(--danger); color: #fff; }
+.modal-card { border-radius: 14px; box-shadow: 0 0 0 3px var(--card-bg), 0 0 0 4px var(--border), 0 16px 40px rgba(0, 0, 0, 0.3); }
+.modal-header h2 { font-size: 18px; letter-spacing: 0.04em; }
+.progress-link { text-decoration-color: var(--brass); }
+.goals-card.flash { outline-color: var(--brass); }
+.practice-link { border-color: var(--accent); color: var(--accent); }
