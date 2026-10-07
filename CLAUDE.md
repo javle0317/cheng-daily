@@ -16,3 +16,19 @@
 - 字帖（`practice*.js`、`data/copybook-seed.json`）之後搬到 lingo，並加日文。
 - 食譜留在這個專案（`recipes.html/js` + Sheet 分頁），尚未開始。
 - 完整計畫：`~/.claude/plans/sideproject-cheng-daily-github-dazzling-catmull.md`。
+
+## 健康頁「貼上匯入」格式（使用者傳體脂計／驗血報告截圖時，照這個產出 JSON 給他貼）
+匯入只會把數值填進表單，使用者核對後按「新增」才送出；日期要 `yyyy-MM-dd`，數值給純數字（不要單位、不要千分位以外的符號），報告沒有的欄位直接省略。未知鍵名會被忽略並提示。只輸出一個 JSON 區塊，不要加註解。
+
+體組成（`health-body.js` 的 `FIELD_MAP`）：
+```json
+{ "date": "2026-10-07", "values": { "weight": 113.3, "height": 175, "bodyFat": 39.0, "fatMass": 44.2, "skeletalMuscle": 35.1, "muscleMass": 66.0, "bodyWater": 45.0, "protein": 14.2, "bmr": 1900, "visceralFat": 18, "bodyAge": 50, "whr": 0.98 } }
+```
+`weight` 必填；身高沒給會沿用上次的。
+
+驗血（`health-labs.js` 的 `ITEMS`）：
+```json
+{ "date": "2026-10-07", "values": { "glucose": 98, "hba1c": 5.6 }, "extra": [{ "name": "項目名稱", "value": 12.3, "unit": "mg/dL", "refLow": 5, "refHigh": 20 }] }
+```
+`values` 可用的鍵：`glucose` 空腹血糖、`hba1c`、`cholesterol` 總膽固醇、`ldl`、`hdl`、`triglyceride`、`ast`、`alt`、`creatinine`、`egfr`、`bun`、`uricAcid`、`sodium`、`potassium`、`tsh`、`ck`。不在這份清單的項目放進 `extra`（`name` 不能重複，`unit`、`refLow`、`refHigh` 可省略）。
+單位換算要先做好再給（例如血糖用 mg/dL，不要給 mmol/L）。
