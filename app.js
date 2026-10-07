@@ -370,9 +370,6 @@ function renderAll() {
   renderRecurringList();
   renderShoppingList();
   renderPetExpenses();
-  const dateInput = document.getElementById("eventDate");
-  if (dateInput) dateInput.value = state.selectedDate;
-  if (typeof updateEventFormValidity === "function") updateEventFormValidity();
 }
 
 // 換選取日期：所有跟「選取日期」有關的區塊（待辦、事件、習慣、表單日期）一起重畫，
@@ -386,9 +383,6 @@ function selectDate(dateStr) {
   renderWeeklyHabits();
   renderMonthlyHabits();
   renderCalendar();
-  const dateInput = document.getElementById("eventDate");
-  if (dateInput) dateInput.value = state.selectedDate;
-  updateEventFormValidity();
 }
 
 function renderHeader() {
@@ -793,67 +787,13 @@ function renderEvents() {
       appendTextAndLink(metaRow, ev.notes, { textPrefix: "📝", linkIcon: "📍" });
     }
 
-    if (!ev.recurring) {
-      const amountBtn = document.createElement("button");
-      amountBtn.className = "event-shopping-btn";
-      amountBtn.title = "填寫/修改花費金額";
-      amountBtn.textContent = "💰";
-      amountBtn.addEventListener("click", async () => {
-        const input = await showPrompt("花費金額（留空清除）：", ev.amount || "");
-        if (input === null) return;
-        const amount = input.trim() === "" ? "" : parseStrictNumber(input);
-        if (amount === null) { setStatus(`花費金額「${input.trim()}」不是有效數字`, true); return; }
-        await withRowLock(amountBtn, async () => {
-          try {
-            applyData(await api("setEventAmount", { id: ev.id, amount }));
-            releasePending(amountBtn);
-            renderEvents();
-            renderPetExpenses();
-          } catch (err) {
-            setStatus("更新失敗：" + err.message, true);
-          }
-        });
-      });
-      metaRow.appendChild(amountBtn);
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "delete-btn";
-      delBtn.title = "刪除";
-      delBtn.textContent = "✕";
-      delBtn.addEventListener("click", async () => {
-        if (!(await showConfirm("確定要刪除這筆事件嗎？"))) return;
-        await withRowLock(delBtn, async () => {
-          try {
-            applyData(await api("deleteEvent", { id: ev.id }));
-            releasePending(delBtn);
-            renderEvents();
-            renderCalendar();
-          } catch (err) {
-            setStatus("刪除失敗：" + err.message, true);
-          }
-        });
-      });
-      metaRow.appendChild(delBtn);
-    } else {
-      const skipBtn = document.createElement("button");
-      skipBtn.className = "event-shopping-btn";
-      skipBtn.title = "跳過這一次";
-      skipBtn.textContent = "⏭️";
-      skipBtn.addEventListener("click", async () => {
-        if (!(await showConfirm("確定要跳過這一次嗎？（規則本身不會刪除）"))) return;
-        await withRowLock(skipBtn, async () => {
-          try {
-            applyData(await api("addRecurringException", { recurringId: ev.ruleId, date: ev.date }));
-            releasePending(skipBtn);
-            renderEvents();
-            renderCalendar();
-          } catch (err) {
-            setStatus("更新失敗：" + err.message, true);
-          }
-        });
-      });
-      metaRow.appendChild(skipBtn);
-    }
+    // 點一筆事件 = 開編輯視窗（改、刪除都在裡面）；循環行程那一列開的是整條規則的編輯視窗
+    li.classList.add("clickable");
+    li.addEventListener("click", (e) => {
+      if (e.target.closest("a, button")) return; // 連結、📝 按鈕照原本的行為
+      if (ev.recurring) openRecurringModal({ rule: state.recurringEvents.find(r => r.id === ev.ruleId), occurrenceDate: ev.date });
+      else openEventModal({ event: state.events.find(x => x.id === ev.id) || ev });
+    });
 
     li.appendChild(metaRow);
     li.dataset.lockKey = `event:${ev.id}`;
@@ -983,34 +923,12 @@ function renderRecurringList() {
       appendTextAndLink(li, rule.notes, { textPrefix: "📝", linkIcon: "📍" });
     }
 
-    const endBtn = document.createElement("button");
-    endBtn.className = "event-shopping-btn";
-    endBtn.type = "button";
-    endBtn.title = "設定/修改截止日";
-    endBtn.textContent = "📅";
-    endBtn.addEventListener("click", () => openRecurringEnd(rule));
-    li.appendChild(endBtn);
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "delete-btn";
-    delBtn.title = "刪除";
-    delBtn.textContent = "✕";
-    delBtn.addEventListener("click", async () => {
-      if (!(await showConfirm("確定要刪除這個循環行程嗎？"))) return;
-      await withRowLock(delBtn, async () => {
-        try {
-          applyData(await api("deleteRecurringEvent", { id: rule.id }));
-            releasePending(delBtn);
-          renderRecurringList();
-          renderEvents();
-          renderCalendar();
-        } catch (err) {
-          setStatus("刪除失敗：" + err.message, true);
-        }
-      });
+    li.classList.add("clickable");
+    li.addEventListener("click", (e) => {
+      if (e.target.closest("a, button")) return;
+      openRecurringModal({ rule });
     });
 
-    li.appendChild(delBtn);
     li.dataset.lockKey = `rule:${rule.id}`;
     lockIfPending(li);
     list.appendChild(li);
@@ -1079,31 +997,12 @@ function renderPetExpenses() {
       amountSpan.className = "item-time";
       amountSpan.textContent = `$${Number(ev.amount)}`;
 
-      const delBtn = document.createElement("button");
-      delBtn.className = "delete-btn";
-      delBtn.title = "刪除";
-      delBtn.textContent = "✕";
-      delBtn.addEventListener("click", async () => {
-        if (!(await showConfirm("確定要刪除這筆花費紀錄嗎？"))) return;
-        await withRowLock(delBtn, async () => {
-          try {
-            applyData(await api("deleteEvent", { id: ev.id }));
-            releasePending(delBtn);
-            renderPetExpenses();
-            renderEvents();
-            renderCalendar();
-          } catch (err) {
-            setStatus("刪除失敗：" + err.message, true);
-          }
-        });
-      });
+      li.classList.add("clickable");
+      li.addEventListener("click", () => openEventModal({ event: ev }));
 
       li.appendChild(badge);
       li.appendChild(textSpan);
       li.appendChild(amountSpan);
-      li.appendChild(delBtn);
-      li.dataset.lockKey = `event:${ev.id}`;
-      lockIfPending(li);
       ul.appendChild(li);
     });
     group.appendChild(ul);
@@ -1134,162 +1033,207 @@ document.getElementById("petExpenseFilter").addEventListener("change", (e) => {
   renderPetExpenses();
 });
 
-function updatePetExpenseFormValidity() {
-  const dateInput = document.getElementById("petExpenseDate");
-  const ownerSelect = document.getElementById("petExpenseOwner");
-  const titleInput = document.getElementById("petExpenseTitle");
-  const amountInput = document.getElementById("petExpenseAmount");
-  const submitBtn = document.getElementById("petExpenseSubmitBtn");
-  const valid = !!dateInput.value && !!ownerSelect.value && !!titleInput.value.trim() && Number(amountInput.value) > 0;
-  submitBtn.disabled = !valid;
+// ====== 事件／循環行程 編輯視窗（新增與編輯共用同一個）======
+// 約定：多欄位的實體（事件、循環行程）用彈窗新增與編輯；單欄快速輸入（待辦、購物清單）留在列表上。
+// 錯誤直接顯示在視窗裡（Toast 的層級比視窗低，會被蓋住）。
+const $id = (id) => document.getElementById(id);
+const openModalEl = (id) => $id(id).classList.remove("hidden");
+const closeModalEl = (id) => $id(id).classList.add("hidden");
+const modalError = (hintId, msg) => { const el = $id(hintId); el.textContent = msg; el.classList.toggle("modal-error", !!msg); };
+
+let editingEvent = null;
+
+function openEventModal({ event = null, date = null, hide = false } = {}) {
+  editingEvent = event;
+  $id("emHeading").textContent = event ? "編輯事件" : (hide ? "記一筆花費" : "新增事件");
+  $id("emTitle").value = event ? (event.title || "") : "";
+  $id("emDate").value = event ? String(event.date) : (date || state.selectedDate);
+  $id("emOwner").value = (event && event.owner) || "shared";
+  if (!$id("emOwner").value) $id("emOwner").value = "shared";
+  $id("emTime").value = event && event.time ? String(event.time) : "";
+  $id("emEndTime").value = event && event.endTime ? String(event.endTime) : "";
+  $id("emNote").value = event ? (event.notes || "") : "";
+  $id("emAmount").value = event && event.amount !== "" && event.amount != null ? String(event.amount) : "";
+  $id("emHide").checked = event ? isTruthy(event.hideFromCalendar) : !!hide;
+  modalError("emHint", "");
+  $id("emDeleteBtn").classList.toggle("hidden", !event);
+  openModalEl("eventModal");
+  if (!event) setTimeout(() => $id("emTitle").focus(), 0);
 }
 
-["petExpenseDate", "petExpenseOwner", "petExpenseTitle", "petExpenseAmount"].forEach(id => {
-  document.getElementById(id).addEventListener("input", updatePetExpenseFormValidity);
-  document.getElementById(id).addEventListener("change", updatePetExpenseFormValidity);
-});
+function closeEventModal() { closeModalEl("eventModal"); editingEvent = null; }
 
-document.getElementById("petExpenseForm").addEventListener("submit", async (e) => {
+$id("emCloseBtn").addEventListener("click", closeEventModal);
+$id("emCancelBtn").addEventListener("click", closeEventModal);
+$id("eventModal").addEventListener("click", (e) => { if (e.target.id === "eventModal") closeEventModal(); });
+$id("addEventBtn").addEventListener("click", () => openEventModal({ date: state.selectedDate }));
+$id("addExpenseBtn").addEventListener("click", () => openEventModal({ date: toDateStr(new Date()), hide: true }));
+
+$id("eventModalForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const dateInput = document.getElementById("petExpenseDate");
-  const ownerSelect = document.getElementById("petExpenseOwner");
-  const titleInput = document.getElementById("petExpenseTitle");
-  const amountInput = document.getElementById("petExpenseAmount");
-  const date = dateInput.value;
-  const owner = ownerSelect.value;
-  const title = titleInput.value.trim();
-  const amount = amountInput.value;
-  if (!date || !owner || !title || !(Number(amount) > 0)) return;
+  const title = $id("emTitle").value.trim();
+  const date = $id("emDate").value;
+  const time = $id("emTime").value;
+  const endTime = $id("emEndTime").value;
+  const amountRaw = $id("emAmount").value.trim();
+  const amount = amountRaw === "" ? "" : parseStrictNumber(amountRaw);
+  const hide = $id("emHide").checked;
+  const problem = !title ? "請填標題"
+    : !date ? "請選日期"
+    : amount === null ? `花費金額「${amountRaw}」不是有效數字`
+    : (amount !== "" && amount < 0) ? "花費不能是負數"
+    : (hide && !(amount > 0)) ? "「只記帳」的事件要填花費金額"
+    : checkTimeRange(time, endTime);
+  if (problem) { modalError("emHint", problem); return; }
+  const params = { date, time, endTime, title, notes: $id("emNote").value.trim(), owner: $id("emOwner").value, amount, hideFromCalendar: hide ? "true" : "false" };
+  if (editingEvent) params.id = editingEvent.id;
+  const wasEdit = !!editingEvent;
   setFormBusy(e.target, true);
   try {
-    applyData(await api("addEvent", {
-      date,
-      time: "",
-      title,
-      notes: "",
-      owner,
-      amount,
-      hideFromCalendar: "true",
-    }));
-    titleInput.value = "";
-    amountInput.value = "";
+    applyData(await api(wasEdit ? "updateEvent" : "addEvent", params));
+    closeEventModal();
+    renderEvents();
+    renderCalendar();
     renderPetExpenses();
-    showToast("已新增花費");
+    showToast(wasEdit ? "已儲存" : "已新增");
   } catch (err) {
-    setStatus("新增失敗：" + err.message, true);
+    modalError("emHint", (wasEdit ? "儲存失敗：" : "新增失敗：") + err.message);
   } finally {
     setFormBusy(e.target, false);
-    updatePetExpenseFormValidity();
   }
 });
 
-function updateRecurringFormValidity() {
-  const titleInput = document.getElementById("recurringTitle");
-  const submitBtn = document.getElementById("recurringSubmitBtn");
-  submitBtn.disabled = !titleInput.value.trim();
+$id("emDeleteBtn").addEventListener("click", async () => {
+  if (!editingEvent) return;
+  if (!(await showConfirm("確定要刪除這筆事件嗎？"))) return;
+  const id = editingEvent.id;
+  setFormBusy($id("eventModalForm"), true);
+  try {
+    applyData(await api("deleteEvent", { id }));
+    closeEventModal();
+    renderEvents();
+    renderCalendar();
+    renderPetExpenses();
+    showToast("已刪除");
+  } catch (err) {
+    modalError("emHint", "刪除失敗：" + err.message);
+  } finally {
+    setFormBusy($id("eventModalForm"), false);
+  }
+});
+
+let editingRule = null;
+let skipDate = null;
+
+function syncRecurringFrequency() {
+  const monthly = $id("rmFrequency").value === "monthly";
+  $id("rmWeekWrap").classList.toggle("hidden", monthly);
+  $id("rmMonthWrap").classList.toggle("hidden", !monthly);
+}
+$id("rmFrequency").addEventListener("change", syncRecurringFrequency);
+
+function openRecurringModal({ rule = null, occurrenceDate = null } = {}) {
+  if (!rule && occurrenceDate) return; // 規則找不到（剛被刪掉），不開
+  editingRule = rule;
+  skipDate = occurrenceDate;
+  const base = new Date((occurrenceDate || state.selectedDate) + "T00:00:00");
+  $id("rmHeading").textContent = rule ? "編輯循環行程" : "新增循環行程";
+  $id("rmNotice").classList.toggle("hidden", !rule);
+  modalError("rmHint", "");
+  $id("rmTitle").value = rule ? (rule.title || "") : "";
+  $id("rmOwner").value = (rule && rule.owner) || "shared";
+  if (!$id("rmOwner").value) $id("rmOwner").value = "shared";
+  $id("rmFrequency").value = rule ? rule.frequency : "weekly";
+  $id("rmDayOfWeek").value = String(rule && rule.dayOfWeek !== "" && rule.dayOfWeek != null ? Number(rule.dayOfWeek) : base.getDay());
+  $id("rmDayOfMonth").value = rule && rule.dayOfMonth !== "" && rule.dayOfMonth != null ? String(rule.dayOfMonth) : String(base.getDate());
+  $id("rmTime").value = rule && rule.time ? String(rule.time) : "";
+  $id("rmEndTime").value = rule && rule.endTime ? String(rule.endTime) : "";
+  $id("rmEndDate").value = rule && rule.endDate ? String(rule.endDate) : "";
+  $id("rmNote").value = rule ? (rule.notes || "") : "";
+  syncRecurringFrequency();
+  const skipBtn = $id("rmSkipBtn");
+  skipBtn.classList.toggle("hidden", !(rule && occurrenceDate));
+  skipBtn.textContent = occurrenceDate ? `只跳過 ${occurrenceDate} 這一次（規則不變）` : "";
+  $id("rmDeleteBtn").classList.toggle("hidden", !rule);
+  openModalEl("recurringModal");
+  if (!rule) setTimeout(() => $id("rmTitle").focus(), 0);
 }
 
-function updateRecurringFrequencyFields() {
-  const frequency = document.getElementById("recurringFrequency").value;
-  const dayOfWeekSelect = document.getElementById("recurringDayOfWeek");
-  const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
-  const isWeekly = frequency === "weekly";
-  dayOfWeekSelect.style.display = isWeekly ? "" : "none";
-  dayOfMonthInput.style.display = isWeekly ? "none" : "";
-}
+function closeRecurringModal() { closeModalEl("recurringModal"); editingRule = null; skipDate = null; }
+function renderAfterRecurringChange() { renderRecurringList(); renderEvents(); renderCalendar(); }
 
-document.getElementById("recurringTitle").addEventListener("input", updateRecurringFormValidity);
-document.getElementById("recurringFrequency").addEventListener("change", updateRecurringFrequencyFields);
-updateRecurringFrequencyFields();
+$id("rmCloseBtn").addEventListener("click", closeRecurringModal);
+$id("rmCancelBtn").addEventListener("click", closeRecurringModal);
+$id("recurringModal").addEventListener("click", (e) => { if (e.target.id === "recurringModal") closeRecurringModal(); });
+$id("addRecurringBtn").addEventListener("click", () => openRecurringModal());
 
-document.getElementById("recurringForm").addEventListener("submit", async (e) => {
+$id("recurringModalForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const ownerSelect = document.getElementById("recurringOwner");
-  const titleInput = document.getElementById("recurringTitle");
-  const frequencySelect = document.getElementById("recurringFrequency");
-  const dayOfWeekSelect = document.getElementById("recurringDayOfWeek");
-  const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
-  const timeInput = document.getElementById("recurringTime");
-  const endTimeInput = document.getElementById("recurringEndTime");
-  const noteInput = document.getElementById("recurringNote");
-  const title = titleInput.value.trim();
-  if (!title) return;
-  const timeError = checkTimeRange(timeInput.value, endTimeInput.value);
-  if (timeError) { setStatus(timeError, true); return; }
-  if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
+  const title = $id("rmTitle").value.trim();
+  const frequency = $id("rmFrequency").value;
+  const dayOfMonth = $id("rmDayOfMonth").value.trim();
+  const time = $id("rmTime").value;
+  const endTime = $id("rmEndTime").value;
+  const problem = !title ? "請填標題"
+    : (frequency === "monthly" && !(Number.isInteger(Number(dayOfMonth)) && Number(dayOfMonth) >= 1 && Number(dayOfMonth) <= 31)) ? "請填 1–31 的日期"
+    : checkTimeRange(time, endTime);
+  if (problem) { modalError("rmHint", problem); return; }
+  const params = {
+    owner: $id("rmOwner").value, title, time, endTime, notes: $id("rmNote").value.trim(), frequency,
+    dayOfWeek: $id("rmDayOfWeek").value, dayOfMonth, endDate: $id("rmEndDate").value || "",
+  };
+  const wasEdit = !!editingRule;
+  if (wasEdit) params.id = editingRule.id;
   setFormBusy(e.target, true);
   try {
-    applyData(await api("addRecurringEvent", {
-      owner: ownerSelect.value,
-      title,
-      time: timeInput.value || "",
-      endTime: endTimeInput.value || "",
-      notes: noteInput.value.trim(),
-      frequency: frequencySelect.value,
-      dayOfWeek: dayOfWeekSelect.value,
-      dayOfMonth: dayOfMonthInput.value,
-      endDate: document.getElementById("recurringEndDate").value || "",
-    }));
-    document.getElementById("recurringEndDate").value = "";
-    titleInput.value = "";
-    timeInput.value = "";
-    endTimeInput.value = "";
-    noteInput.value = "";
-    dayOfMonthInput.value = "";
-    renderRecurringList();
-    renderEvents();
-    renderCalendar();
-    showToast("已新增循環行程");
+    applyData(await api(wasEdit ? "updateRecurringEvent" : "addRecurringEvent", params));
+    closeRecurringModal();
+    renderAfterRecurringChange();
+    showToast(wasEdit ? "已儲存" : "已新增循環行程");
   } catch (err) {
-    setStatus("新增失敗：" + err.message, true);
+    modalError("rmHint", (wasEdit ? "儲存失敗：" : "新增失敗：") + err.message);
   } finally {
     setFormBusy(e.target, false);
-    updateRecurringFormValidity();
   }
 });
 
-// ====== 循環行程截止日（事後補登/修改/清除）======
-let editingRecurring = null;
-
-function openRecurringEnd(rule) {
-  editingRecurring = rule;
-  document.getElementById("recurringEndTitle").textContent = rule.title;
-  document.getElementById("recurringEndInput").value = rule.endDate ? String(rule.endDate) : "";
-  document.getElementById("recurringEndModal").classList.remove("hidden");
-}
-
-function closeRecurringEnd() {
-  document.getElementById("recurringEndModal").classList.add("hidden");
-  editingRecurring = null;
-}
-
-async function saveRecurringEnd(endDate) {
-  if (!editingRecurring) return;
-  const form = document.getElementById("recurringEndForm");
-  setFormBusy(form, true);
+$id("rmDeleteBtn").addEventListener("click", async () => {
+  if (!editingRule) return;
+  if (!(await showConfirm("確定要刪除這個循環行程嗎？（之後每一次都會消失）"))) return;
+  setFormBusy($id("recurringModalForm"), true);
   try {
-    applyData(await api("setRecurringEndDate", { id: editingRecurring.id, endDate }));
-    closeRecurringEnd();
-    renderRecurringList();
-    renderEvents();
-    renderCalendar();
-    showToast(endDate ? "已更新截止日" : "已清除截止日");
+    applyData(await api("deleteRecurringEvent", { id: editingRule.id }));
+    closeRecurringModal();
+    renderAfterRecurringChange();
+    showToast("已刪除");
   } catch (err) {
-    setStatus("更新失敗：" + err.message, true);
+    modalError("rmHint", "刪除失敗：" + err.message);
   } finally {
-    setFormBusy(form, false);
+    setFormBusy($id("recurringModalForm"), false);
   }
-}
+});
 
-document.getElementById("recurringEndCloseBtn").addEventListener("click", closeRecurringEnd);
-document.getElementById("recurringEndModal").addEventListener("click", (e) => {
-  if (e.target.id === "recurringEndModal") closeRecurringEnd();
+$id("rmSkipBtn").addEventListener("click", async () => {
+  if (!editingRule || !skipDate) return;
+  if (!(await showConfirm(`確定要跳過 ${skipDate} 這一次嗎？（規則本身不會刪除）`))) return;
+  setFormBusy($id("recurringModalForm"), true);
+  try {
+    applyData(await api("addRecurringException", { recurringId: editingRule.id, date: skipDate }));
+    closeRecurringModal();
+    renderAfterRecurringChange();
+    showToast("已跳過這一次");
+  } catch (err) {
+    modalError("rmHint", "更新失敗：" + err.message);
+  } finally {
+    setFormBusy($id("recurringModalForm"), false);
+  }
 });
-document.getElementById("recurringEndForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  saveRecurringEnd(document.getElementById("recurringEndInput").value);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !$id("dialogModal").classList.contains("hidden")) return;
+  if (!$id("eventModal").classList.contains("hidden")) closeEventModal();
+  else if (!$id("recurringModal").classList.contains("hidden")) closeRecurringModal();
 });
-document.getElementById("recurringEndClearBtn").addEventListener("click", () => saveRecurringEnd(""));
 
 // ====== 購物清單 ======
 // 「清單」彈窗分兩個分類：shopping（購物）、idea（想法），同一張 ShoppingList 表用
@@ -1478,62 +1422,6 @@ document.getElementById("goalForm").addEventListener("submit", async (e) => {
     setStatus("新增失敗：" + err.message, true);
   } finally {
     setFormBusy(e.target, false);
-  }
-});
-
-function updateEventFormValidity() {
-  const dateInput = document.getElementById("eventDate");
-  const titleInput = document.getElementById("eventTitle");
-  const ownerSelect = document.getElementById("eventOwner");
-  const submitBtn = document.getElementById("eventSubmitBtn");
-  const valid = !!dateInput.value && !!ownerSelect.value && !!titleInput.value.trim();
-  submitBtn.disabled = !valid;
-}
-
-["eventDate", "eventOwner", "eventTitle"].forEach(id => {
-  document.getElementById(id).addEventListener("input", updateEventFormValidity);
-  document.getElementById(id).addEventListener("change", updateEventFormValidity);
-});
-
-document.getElementById("eventForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const dateInput = document.getElementById("eventDate");
-  const timeInput = document.getElementById("eventTime");
-  const endTimeInput = document.getElementById("eventEndTime");
-  const titleInput = document.getElementById("eventTitle");
-  const noteInput = document.getElementById("eventNote");
-  const ownerSelect = document.getElementById("eventOwner");
-  const amountInput = document.getElementById("eventAmount");
-  const title = titleInput.value.trim();
-  const date = dateInput.value || state.selectedDate;
-  if (!title || !date || !ownerSelect.value) return;
-  const timeError = checkTimeRange(timeInput.value, endTimeInput.value);
-  if (timeError) { setStatus(timeError, true); return; }
-  setFormBusy(e.target, true);
-  try {
-    applyData(await api("addEvent", {
-      date,
-      time: timeInput.value || "",
-      endTime: endTimeInput.value || "",
-      title,
-      notes: noteInput.value.trim(),
-      owner: ownerSelect.value,
-      amount: amountInput.value || "",
-    }));
-    titleInput.value = "";
-    timeInput.value = "";
-    endTimeInput.value = "";
-    noteInput.value = "";
-    amountInput.value = "";
-    renderEvents();
-    renderCalendar();
-    renderPetExpenses();
-    showToast("已新增記事");
-  } catch (err) {
-    setStatus("新增失敗：" + err.message, true);
-  } finally {
-    setFormBusy(e.target, false);
-    updateEventFormValidity();
   }
 });
 

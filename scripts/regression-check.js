@@ -306,6 +306,37 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   be.PropertiesService.getScriptProperties = origProps; // 後面的傳輸測試要用原本的密碼屬性
 }
 
+console.log("後端：編輯事件／循環行程（依表頭寫回）");
+{
+  const writes = [];
+  const evHeaders = ["id", "date", "owner", "time", "title", "notes", "createdAt", "amount", "hideFromCalendar", "endTime"];
+  const sheets = {
+    Events: { values: [evHeaders, ["e1", "2026-10-10", "me", "08:30", "舊標題", "", "", "", false, ""]] },
+    RecurringEvents: { values: [["id", "owner", "title", "time", "notes", "frequency", "dayOfWeek", "dayOfMonth", "createdAt", "endDate", "endTime"], ["r1", "me", "打球", "19:00", "", "weekly", 3, "", "", "", ""]] },
+  };
+  Object.keys(sheets).forEach(name => {
+    const sh = sheets[name];
+    sh.getDataRange = () => ({ getValues: () => sh.values.map(r => r.slice()) });
+    sh.getLastRow = () => sh.values.length;
+    sh.getRange = (r, c) => ({ setNumberFormat() {}, setValue: v => writes.push({ name, row: r, col: c, v }), setValues() {} });
+  });
+  be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: n => sheets[n] });
+  const col = (name, h) => sheets[name].values[0].indexOf(h) + 1;
+  const wrote = (name, h) => { const w = writes.filter(x => x.name === name && x.col === col(name, h)); return w.length ? w[w.length - 1].v : undefined; };
+  be.updateEvent({ id: "e1", date: "2026-10-11", time: "09:00", endTime: "10:15", title: "新標題", notes: "地點", owner: "wife", amount: "1,200", hideFromCalendar: "true" });
+  check("updateEvent：依表頭名稱寫回正確的格（日期、時間、結束時間、標題、對象、金額、只記帳），都在 id 那一列", wrote("Events", "date") === "2026-10-11" && wrote("Events", "time") === "09:00" && wrote("Events", "endTime") === "10:15" && wrote("Events", "title") === "新標題" && wrote("Events", "owner") === "wife" && wrote("Events", "amount") === 1200 && wrote("Events", "hideFromCalendar") === true && writes.every(w => w.row === 2), writes);
+  const n = writes.length;
+  check("updateEvent：找不到 id、壞日期、空標題、結束早於開始、壞金額都丟錯且不寫入", throws(() => be.updateEvent({ id: "nope", date: "2026-10-11", title: "x", owner: "me" })) && throws(() => be.updateEvent({ id: "e1", date: "2026/10/11", title: "x", owner: "me" })) && throws(() => be.updateEvent({ id: "e1", date: "2026-10-11", title: " ", owner: "me" })) && throws(() => be.updateEvent({ id: "e1", date: "2026-10-11", time: "10:00", endTime: "09:00", title: "x", owner: "me" })) && throws(() => be.updateEvent({ id: "e1", date: "2026-10-11", title: "x", owner: "me", amount: "abc" })) && writes.length === n);
+  be.updateEvent({ id: "e1", date: "2026-10-11", title: "=1+1", owner: "me" });
+  check("updateEvent：公式開頭的標題走公式防護（先設純文字格式再寫入）", wrote("Events", "title") === "=1+1");
+  be.updateRecurringEvent({ id: "r1", owner: "shared", title: "打球（改）", time: "20:00", endTime: "21:30", notes: "", frequency: "monthly", dayOfWeek: "3", dayOfMonth: "15", endDate: "2026-12-31" });
+  check("updateRecurringEvent：改成每月 15 號 → 星期欄清空、日期欄 15、截止日與結束時間寫入", wrote("RecurringEvents", "frequency") === "monthly" && wrote("RecurringEvents", "dayOfWeek") === "" && wrote("RecurringEvents", "dayOfMonth") === 15 && wrote("RecurringEvents", "endDate") === "2026-12-31" && wrote("RecurringEvents", "endTime") === "21:30" && wrote("RecurringEvents", "time") === "20:00");
+  check("updateRecurringEvent：壞頻率、每月缺日期、日期超出範圍、找不到 id 丟錯", throws(() => be.updateRecurringEvent({ id: "r1", title: "x", frequency: "daily" })) && throws(() => be.updateRecurringEvent({ id: "r1", title: "x", frequency: "monthly", dayOfMonth: "" })) && throws(() => be.updateRecurringEvent({ id: "r1", title: "x", frequency: "monthly", dayOfMonth: "32" })) && throws(() => be.updateRecurringEvent({ id: "nope", title: "x", frequency: "weekly", dayOfWeek: "1" })));
+  const bodyOf2 = (fn) => { const t = read("apps-script/Code.gs"); const i = t.indexOf("function " + fn + "("); return t.slice(i, t.indexOf("\n}\n", i)); };
+  check("updateEvent、updateRecurringEvent 都會標記待同步", bodyOf2("updateEvent").includes("markCalendarDirty_();") && bodyOf2("updateRecurringEvent").includes("markCalendarDirty_();"));
+  be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => ({}) });
+}
+
 console.log("後端：傳輸與寫入鎖");
 const out = o => JSON.parse(o.text);
 check("GET 一律拒絕", out(be.doGet({ parameter: { action: "getData", password: "secret" } })).error === "請改用 POST");

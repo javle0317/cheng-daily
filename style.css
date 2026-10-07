@@ -1011,3 +1011,18 @@ a.ghost-btn {
 .time-range label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
 .time24 { display: inline-flex; align-items: center; gap: 2px; color: var(--text); }
 .time24 select { flex: none; width: auto; min-width: 56px; padding-left: 8px; padding-right: 4px; }
+
+/* 事件／循環行程 編輯視窗 */
+.add-btn { margin-left: auto; padding: 2px 10px; font-size: 16px; line-height: 1.2; }
+.modal-form { gap: 10px; }
+.modal-form .mf { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); min-width: 0; }
+.modal-form .form-row .mf { flex: 1 1 120px; }
+.modal-form .mf > input[type="text"], .modal-form .mf > input[type="date"], .modal-form .mf > input[type="number"], .modal-form .mf > select { width: 100%; }
+.modal-form .time-range { margin-top: 2px; }
+.modal-actions { align-items: center; margin-top: 4px; }
+.modal-actions .spacer { flex: 1; }
+.modal-form button.ghost-btn { background: none; color: var(--text); border: 1px solid var(--border); font-weight: 400; }
+.modal-form button.danger-btn { color: var(--danger); border-color: var(--danger); }
+.modal-error { color: var(--danger); font-weight: 600; }
+.expense-tools { align-items: center; margin: 8px 0; }
+.card h2 .add-btn { flex: none; }

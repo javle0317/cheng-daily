@@ -118,6 +118,10 @@ function dispatch_(p) {
         });
       case "deleteEvent":
         return respond({ ok: true, data: deleteEvent(p.id) });
+      case "updateEvent":
+        return respond({ ok: true, data: updateEvent(p) });
+      case "updateRecurringEvent":
+        return respond({ ok: true, data: updateRecurringEvent(p) });
       case "setEventAmount":
         return respond({ ok: true, data: setEventAmount(p.id, p.amount) });
       case "addHabit":
@@ -351,6 +355,67 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar, end
   ]);
   markCalendarDirty_();
   return getData(["events"]);
+}
+
+// 依「表頭名稱」改某一列（id 在第一欄）：只改有傳的欄位，文字走 setTextSafe_（公式防護）。
+// 找不到 id、表頭缺欄位都丟錯，不會寫一半。
+function updateRowByHeaders_(sheetName, id, fields) {
+  var sheet = getSheet(sheetName);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  Object.keys(fields).forEach(function (k) {
+    if (headers.indexOf(k) < 0) throw new Error(sheetName + " 缺少欄位 " + k + "，請先在表頭補上");
+  });
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) {
+      Object.keys(fields).forEach(function (k) {
+        var range = sheet.getRange(i + 1, headers.indexOf(k) + 1);
+        var v = fields[k];
+        if (typeof v === "string") setTextSafe_(range, v); else range.setValue(v);
+      });
+      return;
+    }
+  }
+  throw new Error("找不到這一筆（可能已經被刪除），請重新整理");
+}
+
+// 編輯事件（網頁的編輯視窗）：欄位驗證跟新增一樣，驗證都過了才寫
+function updateEvent(p) {
+  var id = textArg_(p.id, "事件", { required: true, max: 100 });
+  var time = timeArg_(p.time, "事件");
+  var fields = {
+    date: dateArg_(p.date, "事件"),
+    owner: enumArg_(p.owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES), { emptyValue: "" }),
+    time: time,
+    title: textArg_(p.title, "事件標題", { required: true, max: 200 }),
+    notes: textArg_(p.notes, "備註", { max: 2000 }),
+    amount: numArg_(p.amount, "金額", { emptyValue: "", min: 0 }),
+    hideFromCalendar: boolArg_(p.hideFromCalendar),
+    endTime: endTimeArg_(p.time, p.endTime, "事件"),
+  };
+  updateRowByHeaders_("Events", id, fields);
+  markCalendarDirty_();
+  return getData(["events"]);
+}
+
+// 編輯循環行程：改整條規則（之後每一次都變）
+function updateRecurringEvent(p) {
+  var id = textArg_(p.id, "循環行程", { required: true, max: 100 });
+  var frequency = enumArg_(p.frequency, "頻率", ["weekly", "monthly"]);
+  var fields = {
+    owner: enumArg_(p.owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES), { emptyValue: "" }),
+    title: textArg_(p.title, "行程標題", { required: true, max: 200 }),
+    time: timeArg_(p.time, "行程"),
+    notes: textArg_(p.notes, "備註", { max: 2000 }),
+    frequency: frequency,
+    dayOfWeek: frequency === "weekly" ? numArg_(p.dayOfWeek, "星期", { int: true, min: 0, max: 6 }) : "",
+    dayOfMonth: frequency === "monthly" ? numArg_(p.dayOfMonth, "日期", { int: true, min: 1, max: 31 }) : "",
+    endDate: dateArg_(p.endDate, "截止日", { optional: true }),
+    endTime: endTimeArg_(p.time, p.endTime, "行程"),
+  };
+  updateRowByHeaders_("RecurringEvents", id, fields);
+  markCalendarDirty_();
+  return getData(["recurringEvents"]);
 }
 
 function deleteEvent(id) {

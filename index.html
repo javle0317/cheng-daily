@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261007111926">
+<link rel="stylesheet" href="style.css?v=20261007115004">
 </head>
 <body>
 
@@ -75,7 +75,7 @@
       </section>
 
       <section class="card today-events-card">
-        <h2>今日事件 <span id="selectedDateLabel2"></span></h2>
+        <h2>今日事件 <span id="selectedDateLabel2"></span><button id="addEventBtn" type="button" class="ghost-btn add-btn" title="新增事件" aria-label="新增事件">＋</button></h2>
         <ul id="eventList" class="item-list"></ul>
       </section>
 
@@ -94,12 +94,15 @@
           <h2 id="petExpenseMonthLabel"></h2>
           <button id="petExpenseNext" class="ghost-btn">›</button>
         </div>
-        <select id="petExpenseFilter">
-          <option value="all">全部</option>
-          <option value="家庭">🤝 家庭</option>
-          <option value="林萌">🐕 林萌</option>
-          <option value="咪嚕">🐈 咪嚕</option>
-        </select>
+        <div class="form-row expense-tools">
+          <select id="petExpenseFilter">
+            <option value="all">全部</option>
+            <option value="家庭">🤝 家庭</option>
+            <option value="林萌">🐕 林萌</option>
+            <option value="咪嚕">🐈 咪嚕</option>
+          </select>
+          <button id="addExpenseBtn" type="button" class="ghost-btn">＋ 記一筆花費</button>
+        </div>
         <div id="petExpenseList"></div>
       </section>
 
@@ -107,99 +110,8 @@
 
       <!-- ====== 新增/管理區（依使用頻率排：記事、花費常用；循環行程、習慣不常用） ====== -->
 
-      <section class="card notes-card new-event-card">
-        <h2>新增記事</h2>
-        <form id="eventForm" class="entry-form entry-form-rows">
-          <div class="form-row">
-            <input id="eventDate" type="date" required>
-            <span class="time-range">
-              <label>開始 <input id="eventTime" type="time"></label>
-              <label>結束 <input id="eventEndTime" type="time" title="選填，不填就用預設 1 小時"></label>
-            </span>
-          </div>
-          <div class="form-row">
-            <select id="eventOwner">
-              <option value="shared">🤝 一起</option>
-              <option value="me">🧑 承承</option>
-              <option value="wife">👩 君君</option>
-              <option value="林萌">🐕 林萌</option>
-              <option value="咪嚕">🐈 咪嚕</option>
-            </select>
-            <input id="eventTitle" type="text" placeholder="項目…" required>
-          </div>
-          <div class="form-row">
-            <input id="eventNote" type="text" placeholder="備註/地點…">
-            <input id="eventAmount" type="number" min="0" placeholder="花費(選填)">
-            <button id="eventSubmitBtn" type="submit" disabled>新增</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card new-pet-expense-card">
-        <h2>新增花費</h2>
-        <form id="petExpenseForm" class="entry-form entry-form-rows">
-          <div class="form-row">
-            <input id="petExpenseDate" type="date" required>
-            <select id="petExpenseOwner">
-              <option value="shared">🤝 家庭</option>
-              <option value="林萌">🐕 林萌</option>
-              <option value="咪嚕">🐈 咪嚕</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <input id="petExpenseTitle" type="text" placeholder="項目…" required>
-            <input id="petExpenseAmount" type="number" min="0" placeholder="金額" required>
-            <button id="petExpenseSubmitBtn" type="submit" disabled>新增</button>
-          </div>
-        </form>
-      </section>
-
       <section class="card new-recurring-card">
-        <h2>循環行程</h2>
-        <form id="recurringForm" class="entry-form entry-form-rows">
-          <div class="form-row">
-            <select id="recurringOwner">
-              <option value="shared">🤝 一起</option>
-              <option value="me">🧑 承承</option>
-              <option value="wife">👩 君君</option>
-              <option value="林萌">🐕 林萌</option>
-              <option value="咪嚕">🐈 咪嚕</option>
-            </select>
-            <input id="recurringTitle" type="text" placeholder="項目…" required>
-          </div>
-          <div class="form-row">
-            <select id="recurringFrequency">
-              <option value="weekly">每週</option>
-              <option value="monthly">每月</option>
-            </select>
-            <select id="recurringDayOfWeek">
-              <option value="0">週日</option>
-              <option value="1">週一</option>
-              <option value="2">週二</option>
-              <option value="3">週三</option>
-              <option value="4">週四</option>
-              <option value="5">週五</option>
-              <option value="6">週六</option>
-            </select>
-            <input id="recurringDayOfMonth" type="number" min="1" max="31" placeholder="幾號">
-          </div>
-          <div class="form-row">
-            <span class="time-range">
-              <label>開始 <input id="recurringTime" type="time"></label>
-              <label>結束 <input id="recurringEndTime" type="time" title="選填，不填就用預設 1 小時"></label>
-            </span>
-          </div>
-          <div class="form-row">
-            <label class="checkbox-label recurring-end-label">
-              截止日（選填）
-              <input id="recurringEndDate" type="date">
-            </label>
-          </div>
-          <div class="form-row">
-            <input id="recurringNote" type="text" placeholder="備註/地點…">
-            <button id="recurringSubmitBtn" type="submit" disabled>新增</button>
-          </div>
-        </form>
+        <h2>循環行程<button id="addRecurringBtn" type="button" class="ghost-btn add-btn" title="新增循環行程" aria-label="新增循環行程">＋</button></h2>
         <ul id="recurringList" class="item-list"></ul>
       </section>
 
@@ -249,19 +161,99 @@
     </div>
   </div>
 
-  <div id="recurringEndModal" class="modal-overlay hidden">
-    <div class="modal-card dialog-card">
+  <div id="eventModal" class="modal-overlay hidden">
+    <div class="modal-card">
       <div class="modal-header">
-        <h2>截止日</h2>
-        <button id="recurringEndCloseBtn" class="ghost-btn" type="button">✕</button>
+        <h2 id="emHeading">新增事件</h2>
+        <button id="emCloseBtn" class="ghost-btn" type="button">✕</button>
       </div>
-      <p id="recurringEndTitle" class="progress-line"></p>
-      <form id="recurringEndForm" class="entry-form">
-        <input id="recurringEndInput" type="date">
-        <p class="progress-line">截止日當天仍會出現，之後就不再出現。留空 = 無限期。</p>
-        <div class="dialog-actions">
-          <button id="recurringEndClearBtn" class="ghost-btn" type="button">清除（無限期）</button>
-          <button id="recurringEndSaveBtn" type="submit">儲存</button>
+      <form id="eventModalForm" class="entry-form entry-form-rows modal-form">
+        <label class="mf">標題<input id="emTitle" type="text" placeholder="項目…" required maxlength="200"></label>
+        <div class="form-row">
+          <label class="mf">日期<input id="emDate" type="date" required></label>
+          <label class="mf">對象
+            <select id="emOwner">
+              <option value="shared">🤝 一起</option>
+              <option value="me">🧑 承承</option>
+              <option value="wife">👩 君君</option>
+              <option value="林萌">🐕 林萌</option>
+              <option value="咪嚕">🐈 咪嚕</option>
+            </select>
+          </label>
+        </div>
+        <div class="mf">時間（選填）
+          <span class="time-range">
+            <label>開始 <input id="emTime" type="time"></label>
+            <label>結束 <input id="emEndTime" type="time"></label>
+          </span>
+        </div>
+        <label class="mf">備註／地點<input id="emNote" type="text" placeholder="備註/地點…" maxlength="2000"></label>
+        <label class="mf">花費（選填）<input id="emAmount" type="text" inputmode="decimal" placeholder="金額"></label>
+        <label class="checkbox-label"><input id="emHide" type="checkbox"> 只記帳，不顯示在行事曆</label>
+        <p id="emHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="emDeleteBtn" class="ghost-btn danger-btn hidden" type="button">刪除</button>
+          <span class="spacer"></span>
+          <button id="emCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="emSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="recurringModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="rmHeading">新增循環行程</h2>
+        <button id="rmCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="recurringModalForm" class="entry-form entry-form-rows modal-form">
+        <p id="rmNotice" class="progress-line hidden">這是循環行程，修改會套用到之後每一次。</p>
+        <label class="mf">標題<input id="rmTitle" type="text" placeholder="項目…" required maxlength="200"></label>
+        <div class="form-row">
+          <label class="mf">對象
+            <select id="rmOwner">
+              <option value="shared">🤝 一起</option>
+              <option value="me">🧑 承承</option>
+              <option value="wife">👩 君君</option>
+              <option value="林萌">🐕 林萌</option>
+              <option value="咪嚕">🐈 咪嚕</option>
+            </select>
+          </label>
+          <label class="mf">頻率
+            <select id="rmFrequency">
+              <option value="weekly">每週</option>
+              <option value="monthly">每月</option>
+            </select>
+          </label>
+          <label id="rmWeekWrap" class="mf">星期
+            <select id="rmDayOfWeek">
+              <option value="0">週日</option>
+              <option value="1">週一</option>
+              <option value="2">週二</option>
+              <option value="3">週三</option>
+              <option value="4">週四</option>
+              <option value="5">週五</option>
+              <option value="6">週六</option>
+            </select>
+          </label>
+          <label id="rmMonthWrap" class="mf hidden">幾號<input id="rmDayOfMonth" type="number" min="1" max="31" placeholder="1–31"></label>
+        </div>
+        <div class="mf">時間（選填）
+          <span class="time-range">
+            <label>開始 <input id="rmTime" type="time"></label>
+            <label>結束 <input id="rmEndTime" type="time"></label>
+          </span>
+        </div>
+        <label class="mf">截止日（選填，含當天；空白 = 無限期）<input id="rmEndDate" type="date"></label>
+        <label class="mf">備註／地點<input id="rmNote" type="text" placeholder="備註/地點…" maxlength="2000"></label>
+        <button id="rmSkipBtn" class="ghost-btn hidden" type="button"></button>
+        <p id="rmHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="rmDeleteBtn" class="ghost-btn danger-btn hidden" type="button">刪除</button>
+          <span class="spacer"></span>
+          <button id="rmCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="rmSaveBtn" type="submit">儲存</button>
         </div>
       </form>
     </div>
@@ -310,7 +302,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007111926"></script>
-  <script src="app.js?v=20261007111926"></script>
+  <script src="shared.js?v=20261007115004"></script>
+  <script src="app.js?v=20261007115004"></script>
 </body>
 </html>
