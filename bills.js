@@ -61,9 +61,9 @@ function isPaidOff(b) {
 
 function buildPayBtn(b, paidVal) {
   const payBtn = document.createElement("button");
-  payBtn.className = "event-shopping-btn";
+  payBtn.className = "pay-btn";
   payBtn.title = "登記/修改已繳金額";
-  payBtn.textContent = "💰";
+  payBtn.textContent = paidVal === null ? "登記已繳" : "修改已繳";
   payBtn.addEventListener("click", async () => {
     const input = await showPrompt("已繳金額（留空清除）：", paidVal === null ? "" : String(paidVal));
     if (input === null) return;
@@ -442,6 +442,16 @@ function updateBillFormValidity() {
   document.getElementById(id).addEventListener("change", updateBillFormValidity);
 });
 
+// 新增帳單的彈窗（約定同首頁：多欄位輸入用彈窗，進頁面先看待繳款與圖表）
+function openBillForm() { document.getElementById("billFormModal").classList.remove("hidden"); }
+function closeBillForm() { document.getElementById("billFormModal").classList.add("hidden"); }
+document.getElementById("openBillForm").addEventListener("click", openBillForm);
+document.getElementById("billFormClose").addEventListener("click", closeBillForm);
+document.getElementById("billFormModal").addEventListener("click", (e) => { if (e.target.id === "billFormModal") closeBillForm(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("dialogModal").classList.contains("hidden")) closeBillForm();
+});
+
 document.getElementById("billForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const bank = document.getElementById("billBank").value;
@@ -456,6 +466,7 @@ document.getElementById("billForm").addEventListener("submit", async (e) => {
     document.getElementById("billFullAmount").value = "";
     document.getElementById("billLowestAmount").value = "";
     renderBillsAll();
+    closeBillForm();
     showToast("已新增帳單");
   } catch (err) {
     setStatus("新增失敗：" + err.message, true);

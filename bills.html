@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261007144253">
+<link rel="stylesheet" href="style.css?v=20261007145155">
 </head>
 <body>
 
@@ -45,36 +45,11 @@
     </header>
 
     <main class="grid dense">
+      <div class="health-toolbar"><button id="openBillForm" type="button" class="add-primary">＋ 新增帳單</button></div>
+
       <section id="billUnpaidCard" class="card bill-unpaid-card hidden">
         <h2>待繳款</h2>
         <ul id="billUnpaidList" class="item-list"></ul>
-      </section>
-
-      <section class="card new-bp-card">
-        <h2>新增帳單</h2>
-        <form id="billForm" class="entry-form entry-form-rows">
-          <div class="form-row">
-            <select id="billBank">
-              <option value="聯邦">聯邦</option>
-              <option value="國泰">國泰</option>
-              <option value="中信">中信</option>
-              <option value="富邦">富邦</option>
-              <option value="兆豐">兆豐</option>
-              <option value="玉山">玉山</option>
-            </select>
-            <input id="billBillingMonth" type="month" required>
-          </div>
-          <div class="form-row">
-            <input id="billDate" type="date" placeholder="繳費截止日" required>
-          </div>
-          <div class="form-row">
-            <input id="billFullAmount" type="number" min="0" placeholder="帳單全額" required>
-            <input id="billLowestAmount" type="number" min="0" placeholder="最低應繳" required>
-          </div>
-          <div class="form-row">
-            <button id="billSubmitBtn" type="submit" disabled>新增</button>
-          </div>
-        </form>
       </section>
 
       <section class="card bp-chart-card">
@@ -127,6 +102,47 @@
     <p id="statusLine" class="status-line"></p>
   </div>
 
+  <div id="billFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增帳單</h2>
+        <button id="billFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="billForm" class="entry-form entry-form-rows modal-form">
+        <div class="form-row">
+          <label class="mf">銀行
+            <select id="billBank">
+              <option value="聯邦">聯邦</option>
+              <option value="國泰">國泰</option>
+              <option value="中信">中信</option>
+              <option value="富邦">富邦</option>
+              <option value="兆豐">兆豐</option>
+              <option value="玉山">玉山</option>
+            </select>
+          </label>
+          <label class="mf">帳單年月
+            <input id="billBillingMonth" type="month" required>
+          </label>
+        </div>
+        <label class="mf">繳費截止日
+          <input id="billDate" type="date" required>
+        </label>
+        <div class="form-row">
+          <label class="mf">帳單全額
+            <input id="billFullAmount" type="number" min="0" inputmode="decimal" placeholder="金額" required>
+          </label>
+          <label class="mf">最低應繳
+            <input id="billLowestAmount" type="number" min="0" inputmode="decimal" placeholder="金額" required>
+          </label>
+        </div>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="billSubmitBtn" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <div id="dialogModal" class="modal-overlay hidden">
@@ -140,7 +156,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007144253"></script>
-  <script src="bills.js?v=20261007144253"></script>
+  <script src="shared.js?v=20261007145155"></script>
+  <script src="bills.js?v=20261007145155"></script>
 </body>
 </html>

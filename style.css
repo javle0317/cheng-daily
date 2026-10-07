@@ -1166,3 +1166,12 @@ input[type="checkbox"]:checked {
 .bp-band-label { font-size: 13px; }
 .inline-field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
 .inline-field select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 14px; }
+
+/* 帳單頁：登記已繳按鈕（原本是看不懂的 💰）、新增帳單彈窗 */
+.pay-btn { padding: 4px 12px; border: 1px solid var(--accent); border-radius: 999px; background: none; color: var(--accent); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; cursor: pointer; white-space: nowrap; }
+.pay-btn:hover { background: var(--accent-soft); }
+.bill-unpaid-card .bill-row { align-items: center; }
+
+/* 清單（購物／想法）彈窗：想法的輸入框很高，「新增」鈕不要被拉得跟輸入框一樣高 */
+#shoppingForm button { align-self: flex-end; }
+#shoppingModal .modal-header h2 { letter-spacing: 0.08em; }
