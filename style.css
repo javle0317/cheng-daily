@@ -1179,3 +1179,6 @@ input[type="checkbox"]:checked {
 /* 清單項目編輯視窗的文字框；已完成的項目不顯示編輯鈕（本來就是等著被清除） */
 .modal-form .mf > textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font: inherit; resize: vertical; }
 #shoppingList .item-row.done .habit-edit-btn { display: none; }
+
+.version-line { text-align: center; font-size: 11px; color: var(--text-dim); opacity: 0.7; margin: 6px 0 0; letter-spacing: 0.04em; }
+@media print { .version-line { display: none; } }

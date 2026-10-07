@@ -161,6 +161,7 @@ async function apiRequest(action, params) {
   // 量測：每次 API 的耗時，開瀏覽器 console 看 apiTimings（要判斷哪裡慢、要不要加快取時用）
   (window.apiTimings ||= []).push({ action, ms: Math.round(performance.now() - t0) });
   window.backendVersion = json.v || "";
+  if (typeof renderVersionLine === "function" && document.getElementById("versionLine")) renderVersionLine();
   if (json.ok && !backendWarned && (!json.v || json.v < BACKEND_MIN_VERSION)) {
     backendWarned = true;
     showToast(`⚠️ 後端程式（Apps Script）不是最新版：目前 ${json.v || "舊版"}，需要 ${BACKEND_MIN_VERSION}。請貼上最新的 Code.gs，並用「管理部署作業 → 編輯 → 新版本」重新部署。`, { error: true });
@@ -203,6 +204,24 @@ function showLockLoading() {
 function showApp() {
   document.getElementById("lockScreen").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
+  renderVersionLine();
+}
+
+// 頁面最底下一行很小的版本資訊：前端版本（script 網址的 ?v=）與後端版本。
+// 畫面怪怪的（例如新功能沒出現）時先看這裡，就知道是手機還在用舊的快取，還是後端沒部署到新版本。
+function renderVersionLine() {
+  const status = document.getElementById("statusLine");
+  if (!status) return;
+  let el = document.getElementById("versionLine");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "versionLine";
+    el.className = "version-line";
+    status.insertAdjacentElement("afterend", el);
+  }
+  const me = [...document.scripts].find(sc => /shared\.js/.test(sc.src));
+  const m = me && me.src.match(/[?&]v=(\d+)/);
+  el.textContent = `版本　前端 ${m ? m[1] : "?"}　後端 ${window.backendVersion || "…"}`;
 }
 
 async function tryUnlock(password) {
