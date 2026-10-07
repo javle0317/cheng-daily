@@ -7,13 +7,16 @@
  *   LINE_TOKEN     - LINE Messaging API 的 channel access token
  *   LINE_MY_ID     - 你的 LINE 使用者 ID
  *   LINE_WIFE_ID   - 太太的 LINE 使用者 ID
+ *   CHALLENGE_URL / CHALLENGE_PLAYER / CHALLENGE_PIN - 每日運動挑戰（朋友的挑戰站）的網址、玩家名稱、密碼
+ *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
+ *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要六個分頁：
+ * Sheet 需要這十二個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
- *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced | cardId
- *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空；cardId 欄位現在沒有用到，可以留著）
+ *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
+ *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空。舊的 cardId 欄位已經沒有用到，可以刪除）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）

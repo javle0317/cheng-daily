@@ -7,7 +7,7 @@
 
 ### 1. 建立 Google Sheet
 
-新增一個 Google Sheet，依下面的清單建立所有分頁（共 13 個：Goals、Habits、HabitLog、Events、RecurringEvents、RecurringExceptions、BloodPressure、InBody、LabResults、LabExtra、CreditCardBills、ShoppingList，加上你自己用的其他分頁不影響）。每個分頁第一列貼上表頭（直接複製下面表格的欄位名稱，漏一欄會在寫入時報「缺少欄位」）：
+新增一個 Google Sheet，依下面的清單建立所有分頁（共 12 個：Goals、Habits、HabitLog、Events、RecurringEvents、RecurringExceptions、BloodPressure、InBody、LabResults、LabExtra、CreditCardBills、ShoppingList，加上你自己用的其他分頁不影響）。每個分頁第一列貼上表頭（直接複製下面表格的欄位名稱，漏一欄會在寫入時報「缺少欄位」）：
 
 **Goals**（今日待辦，一次性手動輸入的項目）
 
@@ -292,12 +292,13 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 - 圖示：[icons/icon.svg](icons/icon.svg)（印章・承：藏青底、磚紅略傾斜印章、象牙色「承」、黃銅細線），`sh scripts/make-icons.sh` 用本機 Chrome 輸出 180／192／512／32 的 PNG（要連網載入宋體）。
   **換圖示或名稱後，要把 iPhone 主畫面舊的捷徑刪掉重新加**，iPhone 只在加入那一刻讀一次圖示。
 - 狀態列樣式先用 `default`（最保險；iPhone 17 Pro 的實際顏色沒有驗證過）。若頂端顏色不協調，可改 `black-translucent` 並做藏青頂欄（白字）。
-- 全螢幕 App 的行為：登入資料與 Safari 分開（首次要重新輸入密碼）；`target=_blank` 的外部連結（地圖）會跳去 Safari；練字頁列印在 Mac 做。
+- 全螢幕 App 的行為：登入資料與 Safari 分開（首次要重新輸入密碼）；`target=_blank` 的外部連結（地圖）會跳去 Safari；字帖（在 cheng-lingo）列印在 Mac 做。
 
 ## 健康頁的版面
 
 - **進頁面先看資料**：血壓、體組成、驗血三個分頁最上面各有一顆「＋ 記一筆血壓／記錄體組成／新增驗血」，新增表單在彈窗裡（`#bpFormModal`、`#bodyFormModal`、`#labFormModal`，欄位 id 與送出邏輯沒變；貼上匯入也在彈窗裡）。成功才關閉彈窗，錯誤用 Toast（`z-index` 已調到彈窗之上）。
 - 分頁籤用線條圖示，數據方塊兩欄（寬螢幕四欄）整齊排、數字用宋體，血壓圖的系列色跟新主題（藍／磚紅／深綠，日夜各一組），分級色帶的文字標籤放大並留出右邊空間。
+- 體組成頁的趨勢圖是「一張圖 + 下拉」（跟驗血同一種做法）：上面的數據方塊可以點，點了下方圖表切到那一項（選中的方塊有外框），下拉另外有沒有方塊的項目（體脂重量、肌肉量、體水分、蛋白質、基礎代謝率）。上次選的項目記在 localStorage（`bodyChartKey`）。圖表工具 `drawTimeChart` 在 `health-charts.js`，`highlightLast` 會放大最新一點。
 - 過去驗血表單中間一大片空白是版面 bug：直排的表單（`.entry-form-rows`）同時設了 `flex-wrap: wrap`，會把某個項目撐高；現在直排表單一律 `nowrap`。
 
 ## 信用卡帳單與清單（購物／想法）的版面
@@ -324,6 +325,7 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
   整列不是點擊區，避免誤觸。
 - 規則：這一期（今天／本週／本月）還沒達標**不算斷**，從上一期往回數；更早任何一期沒達標才斷。
   程式在 [app.js](app.js) 的 `computeStreak`（每日）與 `computePeriodStreak` / `computePeriodStats` / `getPeriodHistory`（週月）。
+- **有特殊行為的習慣**（id 寫死在程式裡，要跟 Sheet 的 Habits 那一列一致）：每日運動挑戰（`CHALLENGE_HABIT_ID`，兩邊都有，抽卡／完成回傳、不能直接勾選）；練字（`PRACTICE_HABIT_ID`，列上多一個「字」連結到 cheng-lingo 字帖頁）；語言練習（`LANG_HABIT_ID`，多一個「語」連結到 cheng-lingo，打卡是手動的）；週活動（`BODY_HABIT_ID`，只在後端）：登記「新的一天」的體組成就自動幫這一週打卡（`addInBodyReading` → `markHabitProgress_`；同一天補填不重複計次，週目標大於 1 時累計到達標為止，不會歸零；仍可手動點）。
 - 手機窄螢幕（≤480px）的版面規則在 [style.css](style.css) 最後面的 `@media`；首頁 header 有 `.multi` 才會換行，
   健康／帳單頁只有一個登出鈕，維持左右並排。
 
@@ -374,7 +376,7 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 node scripts/regression-check.js
 ```
 
-會檢查數字解析、跳脫、習慣連續天數、公式防護、驗血項目驗證（純邏輯，不連網路）。畫面流程要在瀏覽器手動
+會檢查數字解析、跳脫、習慣連續天數、公式防護、驗血項目驗證、每一種習慣列都能渲染（刪了變數卻漏改用法會讓登入後整頁讀不出來，畫面顯示成「密碼錯誤」）、登記體組成自動幫週活動打卡的週期與計次（純邏輯，不連網路）。畫面流程要在瀏覽器手動
 過一遍：
 
 1. **登入**：輸入錯誤密碼 → 留在登入頁並顯示錯誤、不進畫面；正確密碼 → 進入；按登出 → 回到登入頁，
@@ -390,7 +392,7 @@ node scripts/regression-check.js
 
 需要先做決定才能動工的：
 
-- 食譜功能——先決定要不要繼續往同一個 app 塞功能，還是另開（可以先把點子丟進「清單」的想法分頁累積）
+- 食譜功能——已決定留在這個 app（新增 `recipes.html/js` + Sheet 分頁 + `Code.gs` 幾個 action，沿用 `shared.js` / `style.css`；新分頁用 `ensureSheet`），還沒開始做
 - Google 行事曆第二階段（唯讀讀取 Google 行事曆顯示在 App、公司忙碌／空閒衝突提示）——見上面「同步到 Google 行事曆」
 
 ## 時間輸入（24 小時制）
