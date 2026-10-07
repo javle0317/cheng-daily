@@ -266,7 +266,7 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 1. Google 日曆新增行事曆「承日常」→ 設定 → 與特定使用者共用 → 加太太的 email（**不要設成公開**）。給它一個和其他行事曆不同的顏色。
 2. 該行事曆設定頁最下面「整合行事曆」複製**行事曆 ID**。
 3. Apps Script「專案設定 → 指令碼屬性」新增 `CALENDAR_ID`＝那個 ID。
-4. 貼新版 `Code.gs`。編輯器依序執行：`authorizeCalendar`（跳出授權視窗，允許讀寫行事曆）→ `installCalendarTriggers`（建立兩個觸發器，可重複執行）。
+4. 貼新版 `Code.gs`。編輯器依序執行：`authorizeCalendar`（跳出授權視窗，允許讀寫行事曆）→ `installCalendarTriggers`（建立兩個觸發器，可重複執行）。**這兩個是一次性函式，Dean 已經執行完、已從 `Code.gs` 移除**（授權與觸發器會留著；要重新設定時到 git 歷史找回，`git log -S installCalendarTriggers`）。
 5. 重新部署新版本。首頁按「預覽」看會同步哪些事件，沒問題再按「立即同步」。
 6. 太太在她的 Google 日曆接受分享。**建議先用一個測試行事曆跑一輪**，確認手機上看到的沒問題，再把 `CALENDAR_ID` 換成正式的。
 

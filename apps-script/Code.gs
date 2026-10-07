@@ -54,8 +54,8 @@
  * （一次性搬移／整理函式跑完就整段刪除，不留在這個檔案裡；需要參考的話到 git 歷史紀錄找：
  * migrateFromPetsSheet / fillBlankEventOwners / migratePetsIntoEvents / normalizeEventDates /
  * migrateBloodPressureFromPressure2026 / migrateCreditCardBillsFromBankSheet / mergeDuplicateHealthRows。
- * 目前保留的手動執行函式只有行事曆同步的設定用的 authorizeCalendar / installCalendarTriggers /
- * clearSyncedCalendarEvents，見檔案最後面。）
+ * authorizeCalendar / installCalendarTriggers。目前保留的手動執行函式只有退場用的 clearSyncedCalendarEvents，
+ * 見檔案最後面。）
  */
 
 var PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡加名字就好
@@ -1511,28 +1511,12 @@ function runCalendarSyncSafely_(onlyIfDirty) {
 function calendarSyncTick() { runCalendarSyncSafely_(true); }
 function calendarSyncDaily() { runCalendarSyncSafely_(false); }
 
-// ---- 一次性設定函式（在 Apps Script 編輯器手動執行；故意沒有底線結尾，才選得到） ----
-
-// 第一步：執行一次，跳出授權視窗（要允許讀寫 Google 行事曆），並確認 CALENDAR_ID 找得到行事曆
-function authorizeCalendar() {
-  var id = calendarId_();
-  if (!id) throw new Error("請先在「專案設定 → 指令碼屬性」新增 CALENDAR_ID");
-  var cal = CalendarApp.getCalendarById(id);
-  if (!cal) throw new Error("找不到這個行事曆，請確認 CALENDAR_ID");
-  return "OK：" + cal.getName();
-}
-
-// 第二步：建立兩個觸發器（可重複執行，不會重複建立）
-function installCalendarTriggers() {
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    var h = t.getHandlerFunction();
-    if (h === "calendarSyncTick" || h === "calendarSyncDaily") ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger("calendarSyncTick").timeBased().everyMinutes(5).create();
-  ScriptApp.newTrigger("calendarSyncDaily").timeBased().everyDays(1).atHour(4).create();
-  return "已建立：每 5 分鐘檢查待同步、每天 4 點完整對帳";
-}
-
+// ---- 手動執行的函式 ----
+// 一次性的設定函式 authorizeCalendar()（跳出授權視窗、確認 CALENDAR_ID）與 installCalendarTriggers()
+// （建立 calendarSyncTick 每 5 分鐘、calendarSyncDaily 每天 4 點兩個觸發器）已經執行完並移除。
+// 觸發器與授權都會留著，換新版部署也不受影響；需要重建時到 git 歷史找這兩個函式。
+//
+// 下面這個是退場／重來用的，等同步穩定了再決定要不要也刪掉。
 // 要退場或重來時：刪掉行事曆上所有帶本 App 標記的事件（別人手動加的不動）
 function clearSyncedCalendarEvents() {
   var cal = CalendarApp.getCalendarById(calendarId_());
