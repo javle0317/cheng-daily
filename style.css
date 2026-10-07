@@ -1127,6 +1127,11 @@ input[type="checkbox"]:checked {
 .goals-card.flash { outline-color: var(--brass); }
 .practice-link { border-color: var(--accent); color: var(--accent); }
 
+/* 練字頁控制列：沒有包在 .entry-form 裡，按鈕與下拉要自己套主題樣式 */
+.practice-controls button:not(.ghost-btn) { padding: 10px 16px; border: none; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-weight: 500; letter-spacing: 0.04em; cursor: pointer; }
+.practice-controls select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 14px; }
+.practice-gray { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); }
+
 /* ====== 加到主畫面（全螢幕 App）：安全邊距 ======
    iPhone 17 Pro 上方有動態島（約 59pt）、下方有 Home 指示條（約 34pt）；viewport-fit=cover 之後
    內容會延伸到那些區域，所以主要容器、固定位置的提示與彈窗都要避開（環境變數在一般瀏覽器是 0，不影響）。 */
