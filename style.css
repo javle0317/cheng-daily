@@ -1175,3 +1175,7 @@ input[type="checkbox"]:checked {
 /* 清單（購物／想法）彈窗：想法的輸入框很高，「新增」鈕不要被拉得跟輸入框一樣高 */
 #shoppingForm button { align-self: flex-end; }
 #shoppingModal .modal-header h2 { letter-spacing: 0.08em; }
+
+/* 清單項目編輯視窗的文字框；已完成的項目不顯示編輯鈕（本來就是等著被清除） */
+.modal-form .mf > textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font: inherit; resize: vertical; }
+#shoppingList .item-row.done .habit-edit-btn { display: none; }

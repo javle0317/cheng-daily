@@ -312,6 +312,7 @@ console.log("後端：編輯事件／循環行程（依表頭寫回）");
   const evHeaders = ["id", "date", "owner", "time", "title", "notes", "createdAt", "amount", "hideFromCalendar", "endTime"];
   const sheets = {
     Events: { values: [evHeaders, ["e1", "2026-10-10", "me", "08:30", "舊標題", "", "", "", false, ""]] },
+    ShoppingList: { values: [["id", "item", "done", "createdAt", "category"], ["s1", "牛奶", false, "", "shopping"]] },
     RecurringEvents: { values: [["id", "owner", "title", "time", "notes", "frequency", "dayOfWeek", "dayOfMonth", "createdAt", "endDate", "endTime"], ["r1", "me", "打球", "19:00", "", "weekly", 3, "", "", "", ""]] },
   };
   Object.keys(sheets).forEach(name => {
@@ -332,6 +333,9 @@ console.log("後端：編輯事件／循環行程（依表頭寫回）");
   be.updateRecurringEvent({ id: "r1", owner: "shared", title: "打球（改）", time: "20:00", endTime: "21:30", notes: "", frequency: "monthly", dayOfWeek: "3", dayOfMonth: "15", endDate: "2026-12-31" });
   check("updateRecurringEvent：改成每月 15 號 → 星期欄清空、日期欄 15、截止日與結束時間寫入", wrote("RecurringEvents", "frequency") === "monthly" && wrote("RecurringEvents", "dayOfWeek") === "" && wrote("RecurringEvents", "dayOfMonth") === 15 && wrote("RecurringEvents", "endDate") === "2026-12-31" && wrote("RecurringEvents", "endTime") === "21:30" && wrote("RecurringEvents", "time") === "20:00");
   check("updateRecurringEvent：壞頻率、每月缺日期、日期超出範圍、找不到 id 丟錯", throws(() => be.updateRecurringEvent({ id: "r1", title: "x", frequency: "daily" })) && throws(() => be.updateRecurringEvent({ id: "r1", title: "x", frequency: "monthly", dayOfMonth: "" })) && throws(() => be.updateRecurringEvent({ id: "r1", title: "x", frequency: "monthly", dayOfMonth: "32" })) && throws(() => be.updateRecurringEvent({ id: "nope", title: "x", frequency: "weekly", dayOfWeek: "1" })));
+  be.updateShoppingItem("s1", "鮮奶 2 瓶");
+  check("updateShoppingItem：只改 item 欄（勾選、分類不動），都在 id 那一列", wrote("ShoppingList", "item") === "鮮奶 2 瓶" && !writes.some(w => w.name === "ShoppingList" && w.col !== col("ShoppingList", "item")) && writes[writes.length - 1].row === 2);
+  check("updateShoppingItem：空白、過長、找不到 id 丟錯", throws(() => be.updateShoppingItem("s1", "  ")) && throws(() => be.updateShoppingItem("s1", "x".repeat(5001))) && throws(() => be.updateShoppingItem("nope", "x")));
   const bodyOf2 = (fn) => { const t = read("apps-script/Code.gs"); const i = t.indexOf("function " + fn + "("); return t.slice(i, t.indexOf("\n}\n", i)); };
   check("updateEvent、updateRecurringEvent 都會標記待同步", bodyOf2("updateEvent").includes("markCalendarDirty_();") && bodyOf2("updateRecurringEvent").includes("markCalendarDirty_();"));
   be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => ({}) });

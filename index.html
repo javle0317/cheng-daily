@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261007145155">
+<link rel="stylesheet" href="style.css?v=20261007145555">
 </head>
 <body>
 
@@ -291,6 +291,24 @@
     </div>
   </div>
 
+  <div id="listEditModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="leHeading">編輯項目</h2>
+        <button id="leCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="listEditForm" class="entry-form entry-form-rows modal-form">
+        <label class="mf">內容<textarea id="leText" rows="3" required maxlength="5000"></textarea></label>
+        <p id="leHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="leCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="leSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="calSyncModal" class="modal-overlay hidden">
     <div class="modal-card dialog-card">
       <h3 class="cal-sync-title">Google 行事曆同步</h3>
@@ -315,7 +333,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007145155"></script>
-  <script src="app.js?v=20261007145155"></script>
+  <script src="shared.js?v=20261007145555"></script>
+  <script src="app.js?v=20261007145555"></script>
 </body>
 </html>

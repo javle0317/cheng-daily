@@ -1124,6 +1124,45 @@ $id("emDeleteBtn").addEventListener("click", async () => {
   }
 });
 
+// ====== 清單項目編輯（購物項目、想法）======
+let editingListItem = null;
+
+function openListEdit(item) {
+  editingListItem = item;
+  const idea = getItemCategory(item) === "idea";
+  $id("leHeading").textContent = idea ? "編輯想法" : "編輯購物項目";
+  $id("leText").rows = idea ? 6 : 2;
+  $id("leText").value = item.item || "";
+  modalError("leHint", "");
+  openModalEl("listEditModal");
+  setTimeout(() => { const t = $id("leText"); t.focus(); t.setSelectionRange(t.value.length, t.value.length); }, 0);
+}
+
+function closeListEdit() { closeModalEl("listEditModal"); editingListItem = null; }
+
+$id("leCloseBtn").addEventListener("click", closeListEdit);
+$id("leCancelBtn").addEventListener("click", closeListEdit);
+$id("listEditModal").addEventListener("click", (e) => { if (e.target.id === "listEditModal") closeListEdit(); });
+
+$id("listEditForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!editingListItem) return;
+  const text = $id("leText").value.trim();
+  if (!text) { modalError("leHint", "內容不能空白"); return; }
+  if (text === String(editingListItem.item || "").trim()) { closeListEdit(); return; }
+  setFormBusy(e.target, true);
+  try {
+    applyData(await api("updateShoppingItem", { id: editingListItem.id, item: text }));
+    closeListEdit();
+    renderShoppingList();
+    showToast("已儲存");
+  } catch (err) {
+    modalError("leHint", "儲存失敗：" + err.message);
+  } finally {
+    setFormBusy(e.target, false);
+  }
+});
+
 let editingRule = null;
 let skipDate = null;
 
@@ -1233,7 +1272,8 @@ $id("rmSkipBtn").addEventListener("click", async () => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || !$id("dialogModal").classList.contains("hidden")) return;
-  if (!$id("eventModal").classList.contains("hidden")) closeEventModal();
+  if (!$id("listEditModal").classList.contains("hidden")) closeListEdit();
+  else if (!$id("eventModal").classList.contains("hidden")) closeEventModal();
   else if (!$id("recurringModal").classList.contains("hidden")) closeRecurringModal();
 });
 
@@ -1291,8 +1331,10 @@ function renderShoppingList() {
     li.innerHTML = `
       <input type="checkbox" ${done ? "checked" : ""}>
       <span class="item-text"></span>
+      <button class="event-shopping-btn habit-edit-btn" title="編輯" type="button">✏️</button>
       <button class="delete-btn" title="刪除">✕</button>
     `;
+    li.querySelector(".habit-edit-btn").addEventListener("click", () => openListEdit(item));
     const textEl = li.querySelector(".item-text");
     textEl.textContent = item.item;
     if (listCategory === "idea") {
