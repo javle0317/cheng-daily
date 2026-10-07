@@ -9,6 +9,12 @@
 - 純邏輯有回歸檢查：`node scripts/regression-check.js`。
 - 本機預覽：`python3 -m http.server 8791`（`.claude/launch.json`）。
 
+## 新增 Google Sheet 分頁的規則（已有 ensureSheet）
+- 新功能需要「全新的分頁」時，用 `ensureSheet(名稱, 表頭陣列)`（`apps-script/Code.gs`，在 `getSheet` 旁邊）：找不到分頁就自己建立、寫入表頭、凍結第一列，已存在的分頁完全不動。這樣不用請 Dean 手動建分頁與表頭（cheng-lingo 的 `sheet_` 是同樣做法）。
+- 既有的分頁（Events、Habits、HabitLog、InBody、LabResults…）仍然用 `getSheet`：缺分頁或缺欄位就丟錯，不要悄悄用欄位對不上的表寫入，避免資料寫錯位置。不要把既有分頁改成自動建立或自動補欄位。
+- 用 `ensureSheet` 建的分頁，要把「分頁名稱＋欄位」寫進 `Code.gs` 開頭的分頁清單註解；分頁名稱與欄位是程式寫死的，不能改名或調整順序。
+- 寫入純文字（日期、數字、使用者輸入）時照既有慣例處理（`setNumberFormat("@")`、使用者輸入過 `safeText_` 類的處理），避免 Sheet 自動轉型或把 `= + - @` 開頭當公式。
+
 ## 與 cheng-lingo 的關係
 姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。
 - 語言練習：**不聯動**。練習在 lingo 做（自己抽卡、自己看進度），daily 的語言練習習慣就是一般的手動打卡習慣（`LANG_HABIT_ID` 那一列只多一個「語」連結連到 lingo）。想分成英文、日文各一個習慣，直接在 Sheet 的 Habits 分頁加列即可（不需要改程式）。之前的抽卡／同步（`drawLanguageCard`、`syncLanguageCard`、`LANG_URL` / `LANG_TOKEN`）已經拿掉。
