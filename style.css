@@ -1126,3 +1126,18 @@ input[type="checkbox"]:checked {
 .progress-link { text-decoration-color: var(--brass); }
 .goals-card.flash { outline-color: var(--brass); }
 .practice-link { border-color: var(--accent); color: var(--accent); }
+
+/* ====== 加到主畫面（全螢幕 App）：安全邊距 ======
+   iPhone 17 Pro 上方有動態島（約 59pt）、下方有 Home 指示條（約 34pt）；viewport-fit=cover 之後
+   內容會延伸到那些區域，所以主要容器、固定位置的提示與彈窗都要避開（環境變數在一般瀏覽器是 0，不影響）。 */
+.app {
+  padding-top: max(20px, calc(env(safe-area-inset-top) + 8px));
+  padding-bottom: max(60px, calc(env(safe-area-inset-bottom) + 32px));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+.lock-screen { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.toast { top: calc(env(safe-area-inset-top) + 12px); }
+.modal-overlay { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.modal-card { max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+@media print { .app { padding: 0; } }

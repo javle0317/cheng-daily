@@ -299,6 +299,22 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 - 網址 `?lang=&ids=` 可以重現同一頁；按「重新抽」換一批（最近用過的篇章排後面）。
 - 列印用 Mac 的 Chrome／Safari 最穩；`@page` 由頁面依語言設成橫向／直向。iPhone AirPrint 對頁面方向支援不完整，不建議。
 
+## 視覺主題與主畫面（App）
+
+**主題「藏青・黃銅」**：暖米色底、藏青主色、黃銅點綴、磚紅當活潑色、深綠表示完成／達標；標題用宋體（Noto Serif TC，Google Fonts），內文維持系統字體。
+- **換色只改一個地方**：[style.css](style.css) 最上面的 `:root`（日間）與 `@media (prefers-color-scheme: dark)`（夜間）兩組變數（`--bg`、`--card-bg`、`--text`、`--accent`、`--brass`、`--pop`、`--ok`、`--on-accent`…）。
+  元件樣式在檔案最後面「視覺主題」那一段（雙線卡片、❦ 標題裝飾、圓形勾選框、連續天數膠囊、黃銅 focus 外圈）。
+- 健康燈號（`--status-*`）是醫學語意、血壓圖系列色（`--series-*`）要彼此好分辨，**不跟著主題走**。對象標籤顏色在 `app.js` 的 `OWNER_META`（要在日夜背景都看得清楚，用中間色調）。
+- `scripts/regression-check.js` 會檢查色票對比（WCAG ≥ 4.5），改色後跑一次。
+- 品牌名稱「承日常」（分頁標題、鎖定畫面、App 名稱）；專案／repo 名稱仍是 Daily Hub / cheng-daily。
+
+**Safari 加到主畫面（全螢幕 App）**：每頁 `<head>` 有 `apple-mobile-web-app-capable`、App 標題、`theme-color`（日夜各一）、`apple-touch-icon`、`manifest.webmanifest`、
+`viewport-fit=cover`；`.app`、Toast、彈窗用 `env(safe-area-inset-*)` 避開動態島與 Home 指示條。手感：去掉點擊閃光、`overscroll-behavior`、手機上輸入欄 16px（避免聚焦時自動放大）。
+- 圖示：[icons/icon.svg](icons/icon.svg)（印章・承：藏青底、磚紅略傾斜印章、象牙色「承」、黃銅細線），`sh scripts/make-icons.sh` 用本機 Chrome 輸出 180／192／512／32 的 PNG（要連網載入宋體）。
+  **換圖示或名稱後，要把 iPhone 主畫面舊的捷徑刪掉重新加**，iPhone 只在加入那一刻讀一次圖示。
+- 狀態列樣式先用 `default`（最保險；iPhone 17 Pro 的實際顏色沒有驗證過）。若頂端顏色不協調，可改 `black-translucent` 並做藏青頂欄（白字）。
+- 全螢幕 App 的行為：登入資料與 Safari 分開（首次要重新輸入密碼）；`target=_blank` 的外部連結（地圖）會跳去 Safari；練字頁列印在 Mac 做。
+
 ## 事件／循環行程的新增與編輯（彈窗）
 
 **約定：多欄位的實體（事件、循環行程）用彈窗新增與編輯；單欄快速輸入（待辦、購物清單）留在列表上；健康與帳單頁的表單不動。**
