@@ -13,8 +13,7 @@
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced | cardId
- *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到；exercise/cardId 也給
- *                   「每日語言練習」用，其他習慣留空）
+ *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空；cardId 欄位現在沒有用到，可以留著）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
@@ -129,10 +128,6 @@ function dispatch_(p) {
         return respond({ ok: true, data: drawChallenge() });
       case "completeChallenge":
         return respond({ ok: true, data: completeChallenge() });
-      case "drawLanguageCard":
-        return respond({ ok: true, data: drawLanguageCard() });
-      case "syncLanguageCard":
-        return respond({ ok: true, data: syncLanguageCard() });
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
       case "updateHabit":
@@ -208,7 +203,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-08.2";
+var BACKEND_VERSION = "2026-10-08.3";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1063,7 +1058,6 @@ function deleteHabit(id) {
 // 「目前做到第幾次」，不是單純有沒有。
 function toggleHabitLog(habitId, periodKey, target) {
   if (habitId === CHALLENGE_HABIT_ID) throw new Error("每日運動挑戰請用抽卡/完成打卡，不能直接勾選");
-  if (habitId === LANG_HABIT_ID) throw new Error("每日語言練習要在 cheng-lingo 完成，不能直接勾選");
   if (!/^\d{4}-\d{2}(-\d{2})?$/.test(String(periodKey))) throw new Error("週期格式錯誤");
   {
     var sheet = getSheet("HabitLog");
@@ -1243,129 +1237,6 @@ function completeChallenge() {
     sheet.getRange(rowIndex, cols.synced).setValue(true);
     return getData(["habitLogs"]);
   }
-}
-
-// ====== 每日語言練習（cheng-lingo）======
-// 練習本身在 cheng-lingo 做，這裡只抽卡、顯示今天的卡、同步完成狀態。HabitLog 一天一列
-// （habitId = LANG_HABIT_ID）：exercise 存顯示用標題、cardId 存 lingo 的卡片 id，
-// count=1 代表 lingo 那邊已完成。抽卡先寫佔位列（count=0），lingo 回應成功才補內容，失敗就刪掉。
-// 連線設定放指令碼屬性：LANG_URL（lingo 的 web app /exec 網址）、LANG_TOKEN（= lingo 的 LINGO_TOKEN）。
-var LANG_HABIT_ID = "6322a232-5caa-4714-bd37-cfb41306d6ec";
-var LANG_LABELS_ = { en: "英文", ja: "日文" };
-
-function callLangApi_(payload) {
-  var props = PropertiesService.getScriptProperties();
-  var url = props.getProperty("LANG_URL");
-  var token = props.getProperty("LANG_TOKEN");
-  if (!url || !token) throw new Error("尚未設定 LANG_URL / LANG_TOKEN（指令碼屬性）");
-  var body = { token: token };
-  Object.keys(payload).forEach(function (k) { body[k] = payload[k]; });
-  var res = UrlFetchApp.fetch(url, {
-    method: "post",
-    contentType: "text/plain",
-    payload: JSON.stringify(body),
-    muteHttpExceptions: true,
-    followRedirects: true,
-  });
-  var json;
-  try {
-    json = JSON.parse(res.getContentText());
-  } catch (e) {
-    throw new Error("語言練習站回應格式錯誤（HTTP " + res.getResponseCode() + "）：" + res.getContentText().slice(0, 200));
-  }
-  if (!json.ok) throw new Error("語言練習站：" + String(json.error || "未知錯誤"));
-  return json.data;
-}
-
-// lingo 的 getToday / drawCard 回傳 { en: {cardId, lang, front, done}, ja: {...} }。
-// 今天可能有不只一個語言有進度（在 lingo 自己抽過）：優先挑還沒完成的，否則第一個。
-function pickLangEntry_(state) {
-  var list = Object.keys(state || {}).map(function (k) { return state[k]; });
-  if (!list.length) return null;
-  return list.filter(function (e) { return !e.done; })[0] || list[0];
-}
-
-// 找出「我們這一列」對應 lingo 今天的哪一筆：先用 cardId；找不到代表使用者在 lingo 按了「換一張」，
-// 改用標題的語言標籤（英文・／日文・）找同語言那筆，之後會把 cardId 與標題更新成新的卡。
-function resolveLangEntry_(state, cardId, title) {
-  state = state || {};
-  var list = Object.keys(state).map(function (k) { return state[k]; });
-  var hit = list.filter(function (e) { return e.cardId === cardId; })[0];
-  if (hit) return hit;
-  var lang = Object.keys(LANG_LABELS_).filter(function (k) {
-    return String(title || "").indexOf(LANG_LABELS_[k] + "・") === 0 || String(title) === LANG_LABELS_[k];
-  })[0];
-  return (lang && state[lang]) || null;
-}
-
-function formatLangTitle_(entry) {
-  var label = LANG_LABELS_[entry.lang] || "語言";
-  var front = String(entry.front || "").replace(/\s+/g, " ").trim();
-  if (front.length > 40) front = front.slice(0, 40) + "…";
-  return front ? label + "・" + front : label;
-}
-
-function langCols_(sheet) {
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var cols = {};
-  ["habitId", "periodKey", "count", "exercise", "cardId"].forEach(function (h) {
-    cols[h] = headers.indexOf(h) + 1;
-  });
-  if (!cols.exercise || !cols.cardId) throw new Error("HabitLog 缺少 exercise / cardId 欄位，請先在表頭補上");
-  return cols;
-}
-
-function drawLanguageCard() {
-  var sheet = getSheet("HabitLog");
-  var cols = langCols_(sheet);
-  var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
-  if (findChallengeRow_(sheet, today, LANG_HABIT_ID)) return getData(["habitLogs"]);
-
-  var width = sheet.getLastColumn();
-  var row = [];
-  for (var c = 0; c < width; c++) row.push("");
-  row[0] = Utilities.getUuid();
-  row[cols.habitId - 1] = LANG_HABIT_ID;
-  row[cols.periodKey - 1] = today;
-  row[cols.count - 1] = 0;
-  var createdAtCol = sheet.getRange(1, 1, 1, width).getValues()[0].indexOf("createdAt");
-  if (createdAtCol >= 0) row[createdAtCol] = new Date();
-  appendRowSafe_(sheet, row);
-  var rowIndex = sheet.getLastRow();
-
-  var entry;
-  try {
-    entry = pickLangEntry_(callLangApi_({ action: "drawCard", date: today }));
-    if (!entry || !entry.cardId) throw new Error("語言練習站沒有回傳卡片");
-  } catch (err) {
-    sheet.deleteRow(rowIndex); // 抽卡失敗，拿掉佔位列，使用者可以重抽
-    throw err;
-  }
-  setTextSafe_(sheet.getRange(rowIndex, cols.exercise), formatLangTitle_(entry));
-  sheet.getRange(rowIndex, cols.cardId).setNumberFormat("@").setValue(String(entry.cardId));
-  if (entry.done) sheet.getRange(rowIndex, cols.count).setValue(1);
-  return getData(["habitLogs"]);
-}
-
-// 向 lingo 查今天的卡是否完成，完成就把 count 設成 1。沒有列、已完成、沒有 cardId 都直接回傳現況。
-function syncLanguageCard() {
-  var sheet = getSheet("HabitLog");
-  var cols = langCols_(sheet);
-  var today = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
-  var rowIndex = findChallengeRow_(sheet, today, LANG_HABIT_ID);
-  if (!rowIndex) return getData(["habitLogs"]);
-  if (Number(sheet.getRange(rowIndex, cols.count).getValue()) >= 1) return getData(["habitLogs"]);
-  var cardId = String(sheet.getRange(rowIndex, cols.cardId).getValue());
-  if (!cardId) return getData(["habitLogs"]);
-  var title = String(sheet.getRange(rowIndex, cols.exercise).getValue());
-  var entry = resolveLangEntry_(callLangApi_({ action: "getToday", date: today }), cardId, title);
-  if (!entry) return getData(["habitLogs"]);
-  if (entry.cardId !== cardId) { // 在 lingo 換過卡：跟著換
-    setTextSafe_(sheet.getRange(rowIndex, cols.exercise), formatLangTitle_(entry));
-    sheet.getRange(rowIndex, cols.cardId).setNumberFormat("@").setValue(String(entry.cardId));
-  }
-  if (entry.done) sheet.getRange(rowIndex, cols.count).setValue(1);
-  return getData(["habitLogs"]);
 }
 
 /**

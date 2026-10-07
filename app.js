@@ -272,7 +272,6 @@ window.loadPageData = async function () {
   // 清單（購物/想法）要打開 📝 才看得到，登入時先不讀，打開時再載入
   applyData(await api("getData", { keys: "goals,events,habits,habitLogs,recurringEvents,recurringExceptions,holidays" }));
   renderAll();
-  autoSyncLanguage();
   refreshCalSync(); // Google 行事曆同步狀態（沒設定 CALENDAR_ID 就不顯示），不擋登入
 };
 
@@ -469,8 +468,8 @@ function isTruthy(v) {
 // （完成後回傳給朋友的挑戰站，見 setupChallengeRow）。id 要跟 apps-script/Code.gs 的 CHALLENGE_HABIT_ID 一致。
 const CHALLENGE_HABIT_ID = "85bf9ff2-7233-4b66-a301-f5a0c3ac36a6";
 
-// 「每日語言練習」：練習在 cheng-lingo 做，這一列只顯示今天抽到的卡、「去練習 →」連結與完成狀態
-// （完成由後端向 lingo 同步，不能手動勾選，見 setupLanguageRow）。id 要跟 Code.gs 的 LANG_HABIT_ID 一致。
+// 語言練習習慣：列上多一個「語」連結，連到 cheng-lingo；打卡是自己手動勾，跟 lingo 沒有任何聯動。
+// 勾選、編輯、刪除都照一般每日習慣。這個 id 是 Habits 分頁裡那一列的 id。
 const LANG_HABIT_ID = "6322a232-5caa-4714-bd37-cfb41306d6ec";
 const LINGO_URL = "https://javle0317.github.io/cheng-lingo/";
 
@@ -537,12 +536,9 @@ function renderDailyHabits() {
     `;
     const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
     const isChallenge = habit.id === CHALLENGE_HABIT_ID;
-    const isLang = habit.id === LANG_HABIT_ID;
     const challengeLog = isChallenge ? getChallengeLog(periodKey) : null;
-    const langLog = isLang ? getHabitDayLog(LANG_HABIT_ID, periodKey) : null;
-    // 運動挑戰／語言練習：抽卡前標題是習慣名稱，抽卡後換成抽到的內容
-    const drawnLog = challengeLog || langLog;
-    li.querySelector(".item-text").textContent = (drawnLog && drawnLog.exercise) ? drawnLog.exercise : habitName;
+    // 運動挑戰：抽卡前標題是習慣名稱，抽卡後換成抽到的內容
+    li.querySelector(".item-text").textContent = (challengeLog && challengeLog.exercise) ? challengeLog.exercise : habitName;
     li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
     const streak = computeStreak(habit);
     const stats = computeHabitStats(habit);
@@ -562,14 +558,21 @@ function renderDailyHabits() {
       a.textContent = "字";
       li.insertBefore(a, editBtn);
     }
+    if (habit.id === LANG_HABIT_ID) {
+      const editBtn = li.querySelector(".habit-edit-btn");
+      const a = document.createElement("a");
+      a.className = "practice-link";
+      a.href = LINGO_URL;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.title = "開啟承語（英文、日文每日練習）";
+      a.textContent = "語";
+      li.insertBefore(a, editBtn);
+    }
     if (isChallenge) {
       li.querySelector(".delete-btn").remove(); // 刪掉這個習慣整個挑戰就沒了，不給刪
       setupChallengeRow(li, periodKey, challengeLog); // 裡面用編輯鈕當插入位置，所以編輯鈕等它跑完再移除
       li.querySelector(".habit-edit-btn").remove(); // 名稱/設定不開放從網頁修改
-    } else if (isLang) {
-      li.querySelector(".delete-btn").remove();
-      setupLanguageRow(li, periodKey, langLog);
-      li.querySelector(".habit-edit-btn").remove();
     } else if (habitUrl) {
       const link = document.createElement("a");
       link.href = habitUrl;
@@ -1586,72 +1589,6 @@ async function runChallengeAction(action, failText) {
     await showConfirm(failText + "：" + err.message);
   }
 }
-
-// ====== 每日語言練習 ======
-// 抽卡前是 🎲；抽卡後標題是今天的卡（HabitLog 的 exercise），右邊「去練習 →」開 cheng-lingo
-// 的那張卡。勾選框永遠鎖住：完成由後端向 lingo 查（載入、回到分頁、🔄 都會觸發）。
-function getHabitDayLog(habitId, dateStr) {
-  return state.habitLogs.find(l => l.habitId === habitId && String(l.periodKey) === dateStr) || null;
-}
-
-function langPracticeUrl(cardId) {
-  return `${LINGO_URL}?card=${encodeURIComponent(cardId)}`;
-}
-
-function setupLanguageRow(li, periodKey, log) {
-  const box = li.querySelector('input[type="checkbox"]');
-  box.disabled = true;
-  if (periodKey !== toDateStr(new Date())) return;
-  const editBtn = li.querySelector(".habit-edit-btn");
-  const cardId = log ? String(log.cardId || "") : "";
-  const isDone = !!log && Number(log.count) >= 1;
-
-  const addBtn = (label, title, handler) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "event-shopping-btn";
-    btn.title = title;
-    btn.textContent = label;
-    btn.addEventListener("click", () => withRowLock(li, handler));
-    li.insertBefore(btn, editBtn);
-  };
-
-  if (!log) {
-    addBtn("🎲", "抽今天的語言練習", () => runChallengeAction("drawLanguageCard", "抽卡失敗"));
-  } else if (!cardId) {
-    li.querySelector(".item-text").textContent += "（抽卡狀態異常，請檢查 HabitLog）";
-  } else {
-    const a = document.createElement("a");
-    a.className = "practice-link";
-    a.href = langPracticeUrl(cardId);
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.title = "到 cheng-lingo 練習這張卡";
-    a.textContent = "去練習 →";
-    li.insertBefore(a, editBtn);
-    if (!isDone) addBtn("🔄", "練習完了？點一下重新同步完成狀態", () => runChallengeAction("syncLanguageCard", "同步失敗"));
-  }
-}
-
-// 今天的卡還沒完成就向後端同步一次（靜默：失敗不打擾，🔄 還是可以手動按）
-let langSyncing = false;
-async function autoSyncLanguage() {
-  if (langSyncing) return;
-  const log = getHabitDayLog(LANG_HABIT_ID, toDateStr(new Date()));
-  if (!log || !log.cardId || Number(log.count) >= 1) return;
-  langSyncing = true;
-  try {
-    applyData(await api("syncLanguageCard"));
-    renderDailyHabits();
-  } catch (err) {
-    console.warn("語言練習同步失敗", err);
-  } finally {
-    langSyncing = false;
-  }
-}
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") autoSyncLanguage(); // 從 lingo 分頁切回來
-});
 
 // ====== 編輯習慣 ======
 let editingHabit = null;

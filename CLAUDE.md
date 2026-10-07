@@ -11,8 +11,7 @@
 
 ## 與 cheng-lingo 的關係
 姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。
-- 已做（待部署驗證）：單一「語言練習」習慣（`LANG_HABIT_ID`）。`drawLanguageCard` 抽卡（不帶 lang，由 lingo 隨機挑語言）、`syncLanguageCard` 向 lingo 查完成並寫 count；`setupLanguageRow` 顯示卡片、「去練習 →」、🔄；不能手動勾選。HabitLog 需有 `exercise`、`cardId` 欄。之後要拆英/日各一個習慣時，`drawCard` 多傳 `lang` 即可。
-- daily 的 Apps Script 以指令碼屬性 `LANG_URL` / `LANG_TOKEN` 呼叫 lingo 後端（lingo 端屬性叫 `LINGO_TOKEN`，兩邊同一串）。
+- 語言練習：**不聯動**。練習在 lingo 做（自己抽卡、自己看進度），daily 的語言練習習慣就是一般的手動打卡習慣（`LANG_HABIT_ID` 那一列只多一個「語」連結連到 lingo）。想分成英文、日文各一個習慣，直接在 Sheet 的 Habits 分頁加列即可（不需要改程式）。之前的抽卡／同步（`drawLanguageCard`、`syncLanguageCard`、`LANG_URL` / `LANG_TOKEN`）已經拿掉。
 - 字帖已搬到 lingo（`copybook.html`）；首頁「練字」習慣的「字」連結連過去（語言在字帖頁內切換）。Sheet 的 `Copybook` 分頁已沒用，可刪。
 - 食譜留在這個專案（`recipes.html/js` + Sheet 分頁），尚未開始。
 - 完整計畫：`~/.claude/plans/sideproject-cheng-daily-github-dazzling-catmull.md`。
