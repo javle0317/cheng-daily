@@ -473,10 +473,10 @@
 
   document.getElementById("labDate").addEventListener("input", updateForm);
 
-  // 同一天出現不只一筆固定項目紀錄 = 後端還是舊版（沒有「同一天合併更新」），提醒使用者
+  // 同一天出現不只一筆固定項目紀錄 = 後端還是舊版（沒有「同一天合併更新」）或舊資料遺留，提醒使用者
   function warnIfDuplicated(date) {
     if (state.results.filter(r => r.date === date).length > 1) {
-      showConfirm(`⚠️ ${fmtHealthDate(date)} 出現了不只一筆驗血紀錄。\n後端（Apps Script）可能還是舊版，請重新部署新版本，再執行一次 mergeDuplicateHealthRows 合併重複的紀錄。`);
+      showConfirm(`⚠️ ${fmtHealthDate(date)} 出現了不只一筆驗血紀錄。\n後端（Apps Script）可能還是舊版，請重新部署新版本；已經存在的重複列請直接到 Sheet 的 LabResults 分頁手動合併（保留一列、刪掉其他）。`);
     }
   }
 

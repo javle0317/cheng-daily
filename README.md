@@ -124,7 +124,7 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   ADA、台灣血脂指引、KDIGO 等，依男性）。要加新項目：Sheet 加欄位、`Code.gs` 的 `LAB_FIELDS`
   加 key、`ITEMS` 加一筆
 - 這兩張表跟 BloodPressure 一樣不經過主頁面的 `getData()`
-- 若部署到舊版後端而產生同一天重複的列，可在 Apps Script 編輯器手動執行 `mergeDuplicateHealthRows`（合併重複、可重複執行）；前端偵測到同一天出現多筆也會彈窗提醒
+- 若部署到舊版後端而產生同一天重複的列，請直接到 Sheet 手動合併（保留一列、刪掉其他）；前端偵測到同一天出現多筆會彈窗提醒。曾經用過的一次性合併函式 `mergeDuplicateHealthRows` 已移除，要參考到 git 歷史找
 - 同一天已經有紀錄時，新增會**合併更新**：只覆蓋這次有填的欄位，沒填的保留（InBody、LabResults 按日期；LabExtra 按日期+項目名稱）；前端會先跳確認。要整天刪掉再重建用 ✕
 - 分級依據（2026-10-03 查證過）：BMI 用國健署成人標準；血糖/HbA1c 用 ADA；總膽固醇/三酸甘油酯/HDL 用台灣血脂指引；
   eGFR 用 KDIGO 分期。**自己推估、非正式指引**的：AST/ALT/肌酸酐/BUN/尿酸/TSH/CK 的「注意/偏高」分界、

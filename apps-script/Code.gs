@@ -51,9 +51,11 @@
  * 供前端 isWorkday() 判斷 workdaysOnly 的習慣要不要排除假日。第一次存檔或部署
  * 時會跳出要求授權 Calendar 讀取權限的視窗，允許即可。
  *
- * （曾經用過的幾支一次性搬移/整理函式都已經跑完並移除，需要參考的話到 git
- * 歷史紀錄找 migrateFromPetsSheet / fillBlankEventOwners / migratePetsIntoEvents /
- * normalizeEventDates。）
+ * （一次性搬移／整理函式跑完就整段刪除，不留在這個檔案裡；需要參考的話到 git 歷史紀錄找：
+ * migrateFromPetsSheet / fillBlankEventOwners / migratePetsIntoEvents / normalizeEventDates /
+ * migrateBloodPressureFromPressure2026 / migrateCreditCardBillsFromBankSheet / mergeDuplicateHealthRows。
+ * 目前保留的手動執行函式只有行事曆同步的設定用的 authorizeCalendar / installCalendarTriggers /
+ * clearSyncedCalendarEvents，見檔案最後面。）
  */
 
 var PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡加名字就好
@@ -815,55 +817,6 @@ function deleteLabDay(date) {
   return getLabData();
 }
 
-// 一次性清理：把「同一天有多筆」的 InBody / LabResults 合併成一筆（後來的非空值覆蓋前面的，
-// 其他欄位保留），LabExtra 同一天同名稱只留一筆（以最新的為準）。部署到舊版時匯入會多出重複列，
-// 部署新版後在 Apps Script 編輯器手動執行一次即可；沒有重複時什麼都不會動，可以重複執行。
-function mergeDuplicateHealthRows() {
-  var report = [];
-  ["InBody", "LabResults"].forEach(function (name) {
-    var sheet = getSheet(name);
-    var values = sheet.getDataRange().getValues();
-    var headers = values[0];
-    var dateCol = headers.indexOf("date");
-    var skip = { id: true, date: true, createdAt: true };
-    var groups = {};
-    for (var i = 1; i < values.length; i++) {
-      var key = normalizeDateCell_(values[i][dateCol]);
-      (groups[key] = groups[key] || []).push(i);
-    }
-    var toDelete = [];
-    Object.keys(groups).forEach(function (key) {
-      var rows = groups[key];
-      if (rows.length < 2) return;
-      var target = rows[0];
-      for (var r = 1; r < rows.length; r++) {
-        headers.forEach(function (h, c) {
-          var v = values[rows[r]][c];
-          if (skip[h] || v === "" || v === null) return;
-          sheet.getRange(target + 1, c + 1).setValue(v);
-        });
-        toDelete.push(rows[r]);
-      }
-    });
-    toDelete.sort(function (a, b) { return b - a; }).forEach(function (idx) { sheet.deleteRow(idx + 1); });
-    report.push(name + " 合併掉 " + toDelete.length + " 筆重複");
-  });
-
-  var extra = getSheet("LabExtra");
-  var ev = extra.getDataRange().getValues();
-  var eh = ev[0];
-  var dCol = eh.indexOf("date"), nCol = eh.indexOf("name");
-  var seen = {};
-  var del = [];
-  for (var j = ev.length - 1; j >= 1; j--) {
-    var k = normalizeDateCell_(ev[j][dCol]) + "|" + ev[j][nCol];
-    if (seen[k]) del.push(j); else seen[k] = true;
-  }
-  del.forEach(function (idx) { extra.deleteRow(idx + 1); });
-  report.push("LabExtra 移除 " + del.length + " 筆重複");
-  return report.join("、");
-}
-
 // ====== 練字字帖內容庫（practice.html）======
 // 一篇 = 一列：lang（zh/en）、篇名、作者、全文。全部回傳 { entries }，量很小，前端自己隨機挑。
 // 新增／修改內容直接在 Sheet 的 Copybook 分頁改；網頁只負責讀，以及第一次「匯入內建範例」（importCopybookEntries）。
@@ -968,15 +921,6 @@ function deleteCreditCardBill(id) {
   }
   return getCreditCardBills();
 }
-
-// 一次性搬移函式 migrateCreditCardBillsFromBankSheet()（含常數跟
-// pad2Bill_/formatBankDate_ 輔助函式）已經執行完、資料確認搬移成功，整段刪除
-// 了。要參考寫法到 git 歷史紀錄找，跟 migrateBloodPressureFromPressure2026
-// 一樣的模式。
-
-// 一次性搬移函式 migrateBloodPressureFromPressure2026()（含 pad2_/parseBpCell_
-// 輔助函式）已經執行完、資料確認搬移成功（888 筆），整段刪除了。要參考寫法
-// 到 git 歷史紀錄找，跟 migrateFromPetsSheet 等舊的一次性函式一樣的模式。
 
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
