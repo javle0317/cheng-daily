@@ -10,11 +10,11 @@
  *
  * Sheet 需要六個分頁：
  *   Goals           欄位: id | date | text | done | createdAt
- *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar
+ *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
  *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空）
- *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）
+ *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
@@ -114,7 +114,7 @@ function dispatch_(p) {
       case "addEvent":
         return respond({
           ok: true,
-          data: addEvent(p.date, p.time, p.title, p.notes, p.owner, p.amount, p.hideFromCalendar),
+          data: addEvent(p.date, p.time, p.title, p.notes, p.owner, p.amount, p.hideFromCalendar, p.endTime),
         });
       case "deleteEvent":
         return respond({ ok: true, data: deleteEvent(p.id) });
@@ -136,7 +136,7 @@ function dispatch_(p) {
         return respond({
           ok: true,
           data: addRecurringEvent(
-            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth, p.endDate
+            p.owner, p.title, p.time, p.notes, p.frequency, p.dayOfWeek, p.dayOfMonth, p.endDate, p.endTime
           ),
         });
       case "setRecurringEndDate":
@@ -325,8 +325,18 @@ function deleteGoal(id) {
   return getData(["goals"]);
 }
 
-function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
+// 結束時間（選填）：要有開始時間、而且同一天內晚於開始時間（不處理跨日）。不填就是空字串，同步到 Google 時用預設長度。
+function endTimeArg_(time, endTime, label) {
+  var start = timeArg_(time, label);
+  var end = timeArg_(endTime, label + "結束");
+  if (end && !start) throw new Error(label + "要先填開始時間才能填結束時間");
+  if (end && end <= start) throw new Error(label + "的結束時間要晚於開始時間");
+  return end;
+}
+
+function addEvent(date, time, title, notes, owner, amount, hideFromCalendar, endTime) {
   var sheet = getSheet("Events");
+  var end = endTimeArg_(time, endTime, "事件");
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
     dateArg_(date, "事件"),
@@ -337,6 +347,7 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar) {
     new Date(),
     numArg_(amount, "金額", { emptyValue: "", min: 0 }),
     boolArg_(hideFromCalendar),
+    end,
   ]);
   markCalendarDirty_();
   return getData(["events"]);
@@ -370,8 +381,9 @@ function setEventAmount(id, amount) {
   return getData(["events"]);
 }
 
-function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate) {
+function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayOfMonth, endDate, endTime) {
   var sheet = getSheet("RecurringEvents");
+  var end = endTimeArg_(time, endTime, "行程");
   appendRowSafe_(sheet, [
     Utilities.getUuid(),
     enumArg_(owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES), { emptyValue: "" }),
@@ -383,6 +395,7 @@ function addRecurringEvent(owner, title, time, notes, frequency, dayOfWeek, dayO
     numArg_(dayOfMonth, "日期", { emptyValue: "", int: true, min: 1, max: 31 }),
     new Date(),
     dateArg_(endDate, "截止日", { optional: true }),
+    end,
   ]);
   markCalendarDirty_();
   return getData(["recurringEvents"]);
@@ -1200,7 +1213,7 @@ function sendDailyNotifications() {
   var recurringToday = sheetToObjects(getSheet("RecurringEvents"))
     .filter(function (r) { return matchesRecurringRule_(r, todayDate, todayStr) && !skippedToday[r.id]; })
     .map(function (r) {
-      return { date: todayStr, owner: r.owner, time: r.time, title: r.title, notes: r.notes };
+      return { date: todayStr, owner: r.owner, time: r.time, endTime: r.endTime, title: r.title, notes: r.notes };
     });
   events = events.concat(recurringToday);
 
@@ -1251,7 +1264,7 @@ function matchesRecurringRule_(rule, dateObj, dateStr) {
 function formatEventLine_(e) {
   var isPet = PET_NAMES.indexOf(e.owner) !== -1;
   var line = (isPet ? "🐾 " + e.owner + "：" : "📅 ") + (e.title || "");
-  if (e.time) line += "\n   ⏰ 時間：" + e.time;
+  if (e.time) line += "\n   ⏰ 時間：" + e.time + (e.endTime ? "–" + e.endTime : "");
   if (e.notes) line += "\n   📍 " + e.notes;
   return line;
 }
@@ -1314,6 +1327,19 @@ function calTitle_(owner, title) {
   return (label ? "[" + label + "] " : "") + String(title || "");
 }
 
+// HH:mm 加分鐘（不跨日，超過就停在 23:59）
+function calAddMinutes_(hhmm, minutes) {
+  var p = String(hhmm).split(":");
+  var total = Math.min(Number(p[0]) * 60 + Number(p[1]) + minutes, 23 * 60 + 59);
+  return ("0" + Math.floor(total / 60)).slice(-2) + ":" + ("0" + (total % 60)).slice(-2);
+}
+
+// 事件在 Google 上的結束時間：有填就用，沒填用預設長度；全天事件（沒開始時間）沒有結束時間
+function calEndTime_(time, endTime) {
+  if (!time) return "";
+  return endTime ? String(endTime) : calAddMinutes_(time, CAL_DURATION_MIN);
+}
+
 // 純函式：App 裡「應該出現在 Google 行事曆上」的事件清單。
 // 回傳 [{ key, title, date, time, description }]；time 為空 = 全天事件。
 function desiredCalendarEvents_(events, rules, exceptions, todayStr) {
@@ -1326,7 +1352,7 @@ function desiredCalendarEvents_(events, rules, exceptions, todayStr) {
     var hidden = e.hideFromCalendar === true || e.hideFromCalendar === "TRUE" || e.hideFromCalendar === "true";
     var date = String(e.date || "");
     if (hidden || !e.id || date < from || date > oneOffTo) return;
-    out.push({ key: "e:" + e.id, title: calTitle_(e.owner, e.title), date: date, time: e.time ? String(e.time) : "", description: String(e.notes || "") });
+    out.push({ key: "e:" + e.id, title: calTitle_(e.owner, e.title), date: date, time: e.time ? String(e.time) : "", endTime: calEndTime_(e.time, e.endTime), description: String(e.notes || "") });
   });
 
   var skipped = {};
@@ -1338,7 +1364,7 @@ function desiredCalendarEvents_(events, rules, exceptions, todayStr) {
       var hit = r.frequency === "weekly" ? calWeekday_(d) === Number(r.dayOfWeek)
         : r.frequency === "monthly" ? Number(d.slice(8, 10)) === Number(r.dayOfMonth) : false;
       if (!hit || skipped[r.id + "|" + d]) continue;
-      out.push({ key: "r:" + r.id + ":" + d, title: calTitle_(r.owner, r.title), date: d, time: r.time ? String(r.time) : "", description: String(r.notes || "") });
+      out.push({ key: "r:" + r.id + ":" + d, title: calTitle_(r.owner, r.title), date: d, time: r.time ? String(r.time) : "", endTime: calEndTime_(r.time, r.endTime), description: String(r.notes || "") });
     }
   });
   return out;
@@ -1357,7 +1383,7 @@ function planCalendarSync_(desired, existing) {
     wanted[d.key] = true;
     var ex = byKey[d.key];
     if (!ex) { plan.create.push(d); return; }
-    var same = ex.title === d.title && ex.date === d.date && ex.time === d.time && ex.description === d.description;
+    var same = ex.title === d.title && ex.date === d.date && ex.time === d.time && ex.endTime === d.endTime && ex.description === d.description;
     if (same) plan.unchanged++; else plan.update.push({ existing: ex, desired: d });
   });
   Object.keys(byKey).forEach(function (k) { if (!wanted[k]) plan.del.push(byKey[k]); });
@@ -1368,6 +1394,10 @@ function planCalendarSync_(desired, existing) {
 
 function calStart_(d) {
   return new Date(d.date + "T" + d.time + ":00+08:00"); // 台灣沒有日光節約，固定 +08:00
+}
+
+function calEnd_(d) {
+  return new Date(d.date + "T" + d.endTime + ":00+08:00");
 }
 
 function calDay_(dateStr) {
@@ -1388,6 +1418,7 @@ function readExistingCalendarEvents_(cal, todayStr) {
       title: ev.getTitle(),
       date: allDay ? Utilities.formatDate(ev.getAllDayStartDate(), Session.getScriptTimeZone(), "yyyy-MM-dd") : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "yyyy-MM-dd"),
       time: allDay ? "" : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "HH:mm"),
+      endTime: allDay ? "" : Utilities.formatDate(ev.getEndTime(), TIME_ZONE, "HH:mm"),
       description: ev.getDescription() || "",
       ref: ev,
     });
@@ -1398,8 +1429,7 @@ function readExistingCalendarEvents_(cal, todayStr) {
 function createCalendarEvent_(cal, d) {
   var ev;
   if (d.time) {
-    var start = calStart_(d);
-    ev = cal.createEvent(d.title, start, new Date(start.getTime() + CAL_DURATION_MIN * 60000), { description: d.description });
+    ev = cal.createEvent(d.title, calStart_(d), calEnd_(d), { description: d.description });
   } else {
     ev = cal.createAllDayEvent(d.title, calDay_(d.date), { description: d.description });
   }
@@ -1419,8 +1449,7 @@ function applyCalendarPlan_(cal, plan) {
     ex.ref.setTitle(d.title);
     ex.ref.setDescription(d.description);
     if (d.time) {
-      var start = calStart_(d);
-      ex.ref.setTime(start, new Date(start.getTime() + CAL_DURATION_MIN * 60000));
+      ex.ref.setTime(calStart_(d), calEnd_(d));
     } else if (ex.date !== d.date) {
       ex.ref.setAllDayDate(calDay_(d.date));
     }
@@ -1429,7 +1458,7 @@ function applyCalendarPlan_(cal, plan) {
 }
 
 function summarizePlan_(plan, dryRun) {
-  var short = function (d) { return d.date + (d.time ? " " + d.time : "") + " " + d.title; };
+  var short = function (d) { return d.date + (d.time ? " " + d.time + (d.endTime ? "–" + d.endTime : "") : "") + " " + d.title; };
   return {
     dryRun: !!dryRun,
     created: plan.create.length, updated: plan.update.length, deleted: plan.del.length, unchanged: plan.unchanged,

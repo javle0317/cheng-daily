@@ -233,6 +233,42 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   location.reload();
 });
 
+// ====== 24 小時制的時間選擇 ======
+// <input type="time"> 的顯示格式跟著瀏覽器／系統（常常是上午／下午 12 小時制），網頁沒辦法強制。
+// 所以把頁面上的 type="time" 換成「時」「分」兩個下拉（00–23、每 5 分鐘），一律 24 小時制；
+// 換掉之後那個元素（同 id）仍然有 .value（"HH:mm" 或 ""），其他程式碼照舊用 .value 讀寫。
+function initTimeSelects() {
+  document.querySelectorAll('input[type="time"]').forEach(input => {
+    const wrap = document.createElement("span");
+    wrap.className = "time24";
+    wrap.id = input.id;
+    const mk = (label, values) => {
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", label + (input.title ? "（" + input.title + "）" : ""));
+      const first = document.createElement("option");
+      first.value = ""; first.textContent = label;
+      sel.appendChild(first);
+      values.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); });
+      return sel;
+    };
+    const pad = n => String(n).padStart(2, "0");
+    const hour = mk("時", Array.from({ length: 24 }, (_, i) => pad(i)));
+    const minute = mk("分", Array.from({ length: 12 }, (_, i) => pad(i * 5)));
+    hour.addEventListener("change", () => { if (!hour.value) minute.value = ""; else if (!minute.value) minute.value = "00"; wrap.dispatchEvent(new Event("input", { bubbles: true })); });
+    minute.addEventListener("change", () => { if (minute.value && !hour.value) hour.value = "00"; wrap.dispatchEvent(new Event("input", { bubbles: true })); });
+    Object.defineProperty(wrap, "value", {
+      get: () => (hour.value && minute.value ? hour.value + ":" + minute.value : ""),
+      set: (v) => {
+        const m = /^(\d{2}):(\d{2})$/.exec(String(v || ""));
+        hour.value = m ? m[1] : "";
+        minute.value = m ? m[2] : "";
+      },
+    });
+    wrap.append(hour, document.createTextNode(":"), minute);
+    input.replaceWith(wrap);
+  });
+}
+
 // ====== 確認/輸入 modal（取代原生 confirm()/prompt()，手機瀏覽器對話框關閉後
 // 有時不會立刻重繪畫面，且外觀跟整個 App 風格不一致） ======
 let dialogResolve = null;

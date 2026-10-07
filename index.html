@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Hub</title>
-<link rel="stylesheet" href="style.css?v=20261007111112">
+<link rel="stylesheet" href="style.css?v=20261007111926">
 </head>
 <body>
 
@@ -112,7 +112,10 @@
         <form id="eventForm" class="entry-form entry-form-rows">
           <div class="form-row">
             <input id="eventDate" type="date" required>
-            <input id="eventTime" type="time">
+            <span class="time-range">
+              <label>開始 <input id="eventTime" type="time"></label>
+              <label>結束 <input id="eventEndTime" type="time" title="選填，不填就用預設 1 小時"></label>
+            </span>
           </div>
           <div class="form-row">
             <select id="eventOwner">
@@ -179,7 +182,12 @@
               <option value="6">週六</option>
             </select>
             <input id="recurringDayOfMonth" type="number" min="1" max="31" placeholder="幾號">
-            <input id="recurringTime" type="time">
+          </div>
+          <div class="form-row">
+            <span class="time-range">
+              <label>開始 <input id="recurringTime" type="time"></label>
+              <label>結束 <input id="recurringEndTime" type="time" title="選填，不填就用預設 1 小時"></label>
+            </span>
           </div>
           <div class="form-row">
             <label class="checkbox-label recurring-end-label">
@@ -302,7 +310,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261007111112"></script>
-  <script src="app.js?v=20261007111112"></script>
+  <script src="shared.js?v=20261007111926"></script>
+  <script src="app.js?v=20261007111926"></script>
 </body>
 </html>

@@ -210,6 +210,7 @@ check("textArg_：必填、長度上限、trim", throws(() => be.textArg_("  ", 
   check("addEvent：欄位依型別寫入（金額 1,200 → 1200、owner/時間正確）", rows[0] && rows[0][1] === "2026-10-05" && rows[0][2] === "me" && rows[0][3] === "08:30" && rows[0][7] === 1200 && rows[0][8] === false, rows[0]);
   check("addEvent：壞日期／壞金額／空標題都丟錯且不寫入",
     (() => { const n = rows.length; return throws(() => be.addEvent("2026/10/05", "", "x", "", "me", "", "")) && throws(() => be.addEvent("2026-10-05", "", "x", "", "me", "abc", "")) && throws(() => be.addEvent("2026-10-05", "", " ", "", "me", "", "")) && rows.length === n; })());
+  check("addEvent：結束時間要有開始時間、要晚於開始時間；有效的會寫入（列的最後一欄）", throws(() => be.addEvent("2026-10-05", "", "x", "", "me", "", "", "10:00")) && throws(() => be.addEvent("2026-10-05", "10:00", "x", "", "me", "", "", "09:00")) && throws(() => be.addEvent("2026-10-05", "10:00", "x", "", "me", "", "", "10:00")) && (be.addEvent("2026-10-05", "10:00", "有結束", "", "me", "", "", "11:30"), rows[rows.length - 1][9] === "11:30"), rows[rows.length - 1]);
   check("addCreditCardBill：銀行必填、月份格式、金額 abc 丟錯", throws(() => be.addCreditCardBill("", "2026-10", "2026-10-20", "100", "")) && throws(() => be.addCreditCardBill("國泰", "2026-10-01", "2026-10-20", "100", "")) && throws(() => be.addCreditCardBill("國泰", "2026-10", "2026-10-20", "abc", "")));
 }
 
@@ -242,6 +243,9 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   check("desired：截止日當天含、之後不展開；跳過日被扣掉", d.map(x => x.date).join() === "2026-09-30,2026-10-14", d.map(x => x.date));
   d = be.desiredCalendarEvents_([], [rule({ frequency: "monthly", dayOfWeek: "", dayOfMonth: 15, time: "" })], [], today);
   check("desired：每月 15 號（沒時間 = 全天）", d.length >= 4 && d.every(x => x.date.endsWith("-15") && x.time === ""), d.map(x => x.date));
+  d = be.desiredCalendarEvents_([ev({ time: "11:00" }), ev({ id: "e2", time: "11:00", endTime: "12:30" }), ev({ id: "e3", time: "23:30" }), ev({ id: "e4" })], [rule({ endTime: "21:00" })], [], today);
+  check("desired：沒填結束時間 = 開始 + 1 小時；有填就用；晚上不跨日（23:30 → 23:59）；全天事件沒有結束時間",
+    d[0].endTime === "12:00" && d[1].endTime === "12:30" && d[2].endTime === "23:59" && d[3].endTime === "" && d.filter(x => x.key.startsWith("r:")).every(x => x.endTime === "21:00"), d.slice(0, 4).map(x => x.endTime));
   check("calAddDays_：跨月跨年", be.calAddDays_("2026-12-31", 1) === "2027-01-01" && be.calAddDays_("2026-03-01", -1) === "2026-02-28");
 
   const D = (key, over) => Object.assign({ key, title: "t", date: "2026-10-10", time: "", description: "" }, over);
@@ -256,17 +260,17 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   be.Session = { getScriptTimeZone: () => "Asia/Taipei" };
   be.Utilities.formatDate = (date, tz, fmt) => { const t = new Date(date.getTime() + 8 * 3600000).toISOString(); return fmt === "HH:mm" ? t.slice(11, 16) : t.slice(0, 10); };
   const calEvents = [];
-  const mkEvent = (title, start, allDay, desc) => {
-    const e = { title, start, allDay, desc: desc || "", tag: null, deleted: false };
+  const mkEvent = (title, start, allDay, desc, end) => {
+    const e = { title, start, end: end || start, allDay, desc: desc || "", tag: null, deleted: false };
     return Object.assign(e, {
       getTag: () => e.tag, setTag: (k, v) => { e.tag = v; }, isAllDayEvent: () => e.allDay, getTitle: () => e.title, getAllDayStartDate: () => e.start,
-      getStartTime: () => e.start, getDescription: () => e.desc, setTitle: v => { e.title = v; }, setDescription: v => { e.desc = v; },
-      setTime: s => { e.start = s; }, setAllDayDate: s => { e.start = s; }, deleteEvent: () => { e.deleted = true; },
+      getStartTime: () => e.start, getEndTime: () => e.end, getDescription: () => e.desc, setTitle: v => { e.title = v; }, setDescription: v => { e.desc = v; },
+      setTime: (s, en) => { e.start = s; e.end = en; }, setAllDayDate: s => { e.start = s; }, deleteEvent: () => { e.deleted = true; },
     });
   };
   const fakeCal = {
     getEvents: () => calEvents.filter(e => !e.deleted),
-    createEvent: (title, start, end, o) => { const e = mkEvent(title, start, false, o.description); calEvents.push(e); return e; },
+    createEvent: (title, start, end, o) => { const e = mkEvent(title, start, false, o.description, end); calEvents.push(e); return e; },
     createAllDayEvent: (title, day, o) => { const e = mkEvent(title, day, true, o.description); calEvents.push(e); return e; },
   };
   const manual = mkEvent("太太自己加的", new Date("2026-10-12T10:00:00+08:00"), false); calEvents.push(manual); // 沒有標記
@@ -275,7 +279,11 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   check("乾跑：只算不動（行事曆上沒有新增事件）", res.dryRun && res.created === 2 && calEvents.length === 1);
   res = be.reconcileWith_(fakeCal, data, today, false);
   const synced = calEvents.filter(e => e.tag && !e.deleted);
-  check("對帳：建立 2 個、帶標記，定時事件是 08:30 起（台灣時間）、全天事件是全天", res.created === 2 && synced.length === 2 && synced.find(e => e.tag === "e:e1").start.getTime() === new Date("2026-10-10T08:30:00+08:00").getTime() && synced.find(e => e.tag === "e:e2").allDay === true);
+  check("對帳：建立 2 個、帶標記，定時事件是 08:30–09:30（台灣時間、預設 1 小時）、全天事件是全天", res.created === 2 && synced.length === 2 && synced.find(e => e.tag === "e:e1").start.getTime() === new Date("2026-10-10T08:30:00+08:00").getTime() && synced.find(e => e.tag === "e:e1").end.getTime() === new Date("2026-10-10T09:30:00+08:00").getTime() && synced.find(e => e.tag === "e:e2").allDay === true);
+  data.events[0].endTime = "10:15";
+  res = be.reconcileWith_(fakeCal, data, today, false);
+  check("改結束時間 → 更新（用 setTime），行事曆上的結束時間變 10:15；再對帳一次沒有動作", res.updated === 1 && calEvents.find(e => e.tag === "e:e1" && !e.deleted).end.getTime() === new Date("2026-10-10T10:15:00+08:00").getTime() && be.reconcileWith_(fakeCal, data, today, false).updated === 0);
+  data.events[0].endTime = ""; data.events[0].time = "08:30"; be.reconcileWith_(fakeCal, data, today, false);
   res = be.reconcileWith_(fakeCal, data, today, false);
   check("再對帳一次：沒有任何動作（冪等）", res.created === 0 && res.updated === 0 && res.deleted === 0 && res.unchanged === 2, res);
   data.events[0].title = "看牙醫（改）"; data.events[0].time = "";

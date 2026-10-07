@@ -54,10 +54,11 @@
 
 **Events**
 
-| id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar |
-|----|------|-------|------|-------|-------|-----------|--------|------------------|
+| id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime |
+|----|------|-------|------|-------|-------|-----------|--------|------------------|---------|
 
 - `amount`：選填的花費金額（任何 owner 的事件都可以填，花費統計用）
+- `endTime`：選填，`HH:mm`，結束時間（要有 `time`、同一天內晚於 `time`，不處理跨日）；不填，同步到 Google 時用預設 1 小時
 - `hideFromCalendar`：`TRUE` 代表這筆只是記帳（例如買貓砂），不出現在行事曆與每日 LINE 提醒；預設 `FALSE`
 
 `owner` 是 `me` / `wife` / `shared` / 寵物名字（見 `Code.gs` 的 `PET_NAMES`）其中一個，
@@ -68,12 +69,13 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 
 **RecurringEvents**（循環行程，固定週期規則，例如「每週三打球」「每月15號幫咪嚕點藥」）
 
-| id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate |
-|----|-------|-------|------|-------|-----------|-----------|------------|-----------|---------|
+| id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate | endTime |
+|----|-------|-------|------|-------|-----------|-----------|------------|-----------|---------|---------|
 
 - `frequency`：`weekly` / `monthly`
 - `dayOfWeek`：0-6（0=日、1=一...6=六），只有 `weekly` 用得到
 - `dayOfMonth`：1-31，只有 `monthly` 用得到
+- `endTime`：選填，`HH:mm`，每次行程的結束時間（規則同 Events 的 `endTime`；注意跟 `endDate` 截止日不同）
 - `owner`：跟 Events 一樣的值域
 - `endDate`：選填，`yyyy-MM-dd`，截止日當天（含）仍會出現、之後不再展開；空白 = 無限期。
   新增時可以不填，之後隨時能在循環行程清單的 📅 按鈕補登、修改或清除
@@ -253,7 +255,7 @@ Repo 目前是公開的（免費方案的 Pages 需要），所以**原始碼與
 App 裡的事件（含循環行程）會自動出現在 Google 的「承日常」行事曆，手機原生行事曆、提醒都能用。**單向**：App 是來源，
 在 Google 那邊改標題／時間，下次同步會被 App 的內容蓋回來（想改請在 App 改）。沒設定 `CALENDAR_ID` 時整個功能關閉，其他一切照舊。
 
-**同步什麼**：一次性事件（有填時間 = 定時事件、預設 1 小時；沒填 = 全天事件，備註放說明欄）；循環行程**展開成單次事件**，
+**同步什麼**：一次性事件（有填時間 = 定時事件，長度用 `endTime`、沒填結束時間就預設 1 小時；沒填時間 = 全天事件，備註放說明欄）；循環行程**展開成單次事件**，
 只維護今天起 120 天（扣掉「跳過這一次」的日子、遵守截止日）；標題 `[承承] 看牙醫`。標了「不顯示在行事曆」的純記帳事件不同步。
 
 **怎麼運作**（`Code.gs` 的「同步到 Google 行事曆」那一段）：「對帳」——算出 App 裡應該有的事件，跟行事曆上**帶本 App 標記**
@@ -373,3 +375,9 @@ node scripts/regression-check.js
 
 - 食譜功能——先決定要不要繼續往同一個 app 塞功能，還是另開（可以先把點子丟進「清單」的想法分頁累積）
 - Google 行事曆第二階段（唯讀讀取 Google 行事曆顯示在 App、公司忙碌／空閒衝突提示）——見上面「同步到 Google 行事曆」
+
+## 時間輸入（24 小時制）
+
+`<input type="time">` 的顯示格式跟著瀏覽器／系統（常是上午／下午 12 小時制），網頁沒辦法強制，所以 `shared.js` 的 `initTimeSelects()` 把頁面上
+所有 `type="time"` 換成「時」「分」兩個下拉（00–23、每 5 分鐘），一律 24 小時制；換掉後同 id 的元素仍有 `.value`（`"HH:mm"` 或 `""`），
+其他程式照舊用 `.value` 讀寫。新增含時間的輸入欄位時，直接寫 `<input type="time">`，頁面載入時會自動換成這個。

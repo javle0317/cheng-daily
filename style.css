@@ -269,7 +269,6 @@ a.ghost-btn {
 #eventDate { flex: 1 1 140px; }
 #eventOwner { flex: 0 1 90px; }
 #eventTitle { flex: 2 1 140px; }
-#eventTime { flex: 0 1 110px; }
 #eventNote { flex: 2 1 160px; }
 
 .entry-form-rows {
@@ -288,7 +287,6 @@ a.ghost-btn {
 #recurringFrequency { flex: 0 1 80px; }
 #recurringDayOfWeek { flex: 0 1 90px; }
 #recurringDayOfMonth { flex: 0 1 80px; }
-#recurringTime { flex: 0 1 110px; }
 #recurringNote { flex: 2 1 160px; }
 
 .muted {
@@ -1007,3 +1005,9 @@ a.ghost-btn {
 .cal-sync-alert { font-size: 12px; color: var(--danger); }
 .cal-sync-title { margin: 0 0 8px; font-size: 16px; }
 .cal-sync-preview { max-height: 40vh; overflow: auto; white-space: pre-wrap; font-size: 12px; background: var(--bg); border-radius: 8px; padding: 10px; margin: 8px 0 0; color: var(--text); }
+
+/* 時間選擇：時／分兩個下拉（24 小時制），開始～結束放在同一組 */
+.time-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.time-range label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.time24 { display: inline-flex; align-items: center; gap: 2px; color: var(--text); }
+.time24 select { flex: none; width: auto; min-width: 56px; padding-left: 8px; padding-right: 4px; }

@@ -109,6 +109,7 @@ function expandRecurringForDate(dateStr) {
       date: dateStr,
       owner: r.owner,
       time: r.time,
+      endTime: r.endTime,
       title: r.title,
       notes: r.notes,
       recurring: true,
@@ -764,7 +765,7 @@ function renderEvents() {
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "item-time";
-    timeSpan.textContent = ev.time || "";
+    timeSpan.textContent = formatTimeRange(ev.time, ev.endTime);
 
     const textSpan = document.createElement("span");
     textSpan.className = "item-text";
@@ -962,7 +963,7 @@ function renderRecurringList() {
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "item-time";
-    timeSpan.textContent = scheduleText + (rule.time ? ` ${rule.time}` : "");
+    timeSpan.textContent = scheduleText + (rule.time ? ` ${formatTimeRange(rule.time, rule.endTime)}` : "");
 
     li.appendChild(textSpan);
     li.appendChild(timeSpan);
@@ -1209,9 +1210,12 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
   const dayOfWeekSelect = document.getElementById("recurringDayOfWeek");
   const dayOfMonthInput = document.getElementById("recurringDayOfMonth");
   const timeInput = document.getElementById("recurringTime");
+  const endTimeInput = document.getElementById("recurringEndTime");
   const noteInput = document.getElementById("recurringNote");
   const title = titleInput.value.trim();
   if (!title) return;
+  const timeError = checkTimeRange(timeInput.value, endTimeInput.value);
+  if (timeError) { setStatus(timeError, true); return; }
   if (frequencySelect.value === "monthly" && !dayOfMonthInput.value) return;
   setFormBusy(e.target, true);
   try {
@@ -1219,6 +1223,7 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
       owner: ownerSelect.value,
       title,
       time: timeInput.value || "",
+      endTime: endTimeInput.value || "",
       notes: noteInput.value.trim(),
       frequency: frequencySelect.value,
       dayOfWeek: dayOfWeekSelect.value,
@@ -1228,6 +1233,7 @@ document.getElementById("recurringForm").addEventListener("submit", async (e) =>
     document.getElementById("recurringEndDate").value = "";
     titleInput.value = "";
     timeInput.value = "";
+    endTimeInput.value = "";
     noteInput.value = "";
     dayOfMonthInput.value = "";
     renderRecurringList();
@@ -1493,6 +1499,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const dateInput = document.getElementById("eventDate");
   const timeInput = document.getElementById("eventTime");
+  const endTimeInput = document.getElementById("eventEndTime");
   const titleInput = document.getElementById("eventTitle");
   const noteInput = document.getElementById("eventNote");
   const ownerSelect = document.getElementById("eventOwner");
@@ -1500,11 +1507,14 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
   const title = titleInput.value.trim();
   const date = dateInput.value || state.selectedDate;
   if (!title || !date || !ownerSelect.value) return;
+  const timeError = checkTimeRange(timeInput.value, endTimeInput.value);
+  if (timeError) { setStatus(timeError, true); return; }
   setFormBusy(e.target, true);
   try {
     applyData(await api("addEvent", {
       date,
       time: timeInput.value || "",
+      endTime: endTimeInput.value || "",
       title,
       notes: noteInput.value.trim(),
       owner: ownerSelect.value,
@@ -1512,6 +1522,7 @@ document.getElementById("eventForm").addEventListener("submit", async (e) => {
     }));
     titleInput.value = "";
     timeInput.value = "";
+    endTimeInput.value = "";
     noteInput.value = "";
     amountInput.value = "";
     renderEvents();
@@ -1711,6 +1722,20 @@ document.getElementById("progressLine").addEventListener("click", jumpToGoals);
 document.getElementById("progressLine").addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jumpToGoals(); }
 });
+
+// 事件的時間顯示：11:00–12:30（沒填結束時間就只顯示開始）
+function formatTimeRange(time, endTime) {
+  return time ? (endTime ? `${time}–${endTime}` : time) : "";
+}
+
+// 送出前檢查開始／結束時間（後端也會驗證，這裡是為了立刻看到提示）
+function checkTimeRange(time, endTime) {
+  if (endTime && !time) return "請先填開始時間，才能填結束時間";
+  if (endTime && endTime <= time) return "結束時間要晚於開始時間";
+  return "";
+}
+
+initTimeSelects();
 
 // ====== Boot ======
 initAuth();
