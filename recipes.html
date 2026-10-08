@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="承日常">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141f" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>食譜 · 承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261008104628">
+</head>
+<body>
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>承日常</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>承日常</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1>食譜</h1>
+        <p class="progress-line"><a href="index.html" class="back-link">← 返回</a></p>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <main class="grid dense">
+      <div class="health-toolbar"><button id="openRecipeForm" type="button" class="add-primary">＋ 新增食譜</button></div>
+
+      <section class="card recipe-card-wrap">
+        <div class="recipe-filters">
+          <input id="recipeSearch" type="search" placeholder="搜尋名稱或食材" autocomplete="off">
+          <select id="recipeTagFilter" aria-label="標籤"></select>
+          <select id="recipeSort" aria-label="排序">
+            <option value="new">最近新增</option>
+            <option value="rating">評分高到低</option>
+            <option value="cooked">煮最多次</option>
+          </select>
+        </div>
+        <p id="recipeCount" class="progress-line"></p>
+        <ul id="recipeList" class="item-list recipe-list"></ul>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="recipeFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2 id="recipeFormTitle">新增食譜</h2>
+        <button id="recipeFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="recipeForm" class="entry-form entry-form-rows modal-form">
+        <details id="recipeImportBox" class="more-fields">
+          <summary>貼上匯入（從整理好的食譜）</summary>
+          <textarea id="recipeImportText" rows="4" placeholder="貼上對話裡給你的食譜資料（JSON）…"></textarea>
+          <button id="recipeImportBtn" type="button" class="ghost-btn">填入表單</button>
+          <p id="recipeImportMsg" class="progress-line"></p>
+        </details>
+        <label class="mf">名稱
+          <input id="recipeName" type="text" maxlength="100" required autocomplete="off">
+        </label>
+        <label class="mf">標籤（用逗號分隔）
+          <input id="recipeTags" type="text" list="recipeTagOptions" placeholder="例如：主菜, 低醣" autocomplete="off">
+          <datalist id="recipeTagOptions"></datalist>
+        </label>
+        <label class="mf">食材（一行一項）
+          <textarea id="recipeIngredients" rows="6" maxlength="5000"></textarea>
+        </label>
+        <label class="mf">步驟（一行一步）
+          <textarea id="recipeSteps" rows="8" maxlength="5000"></textarea>
+        </label>
+        <label class="mf">備註
+          <textarea id="recipeNotes" rows="3" maxlength="2000"></textarea>
+        </label>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="recipeSubmitBtn" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js?v=20261008104628"></script>
+  <script src="recipes.js?v=20261008104628"></script>
+</body>
+</html>

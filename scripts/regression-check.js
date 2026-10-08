@@ -121,6 +121,28 @@ console.log("前端：每種習慣列都能渲染（刪掉變數卻漏改用法�
   check("日常、週、月習慣（含運動挑戰／練字／語言練習）渲染不丟錯", err === null, err);
 }
 
+console.log("前端：食譜頁（標籤、搜尋、排序、貼上匯入、每張卡都能渲染）");
+{
+  const rec = loadFrontend(["shared.js", "recipes.js"], "// ====== Boot ======");
+  const ev = code => vm.runInContext(code, rec);
+  rec.__recipes = [
+    { id: "a", name: "番茄炒蛋", tags: "家常,蛋", ingredients: "番茄 2 顆\n雞蛋 3 顆", steps: "炒", notes: "", rating: 4, cookCount: 3, lastCookedAt: "2026-10-01" },
+    { id: "b", name: "Chicken Soup", tags: "湯,家常", ingredients: "雞腿", steps: "", notes: "n", rating: 5, cookCount: 1, lastCookedAt: "" },
+    { id: "c", name: "空白食譜", tags: "", ingredients: "", steps: "", notes: "", rating: "", cookCount: "", lastCookedAt: "" },
+  ];
+  check("splitTags：全形半形逗號、去空白、去重", JSON.stringify(ev('splitTags(" 主菜，低醣, 主菜 ,,、湯")')) === JSON.stringify(["主菜", "低醣", "湯"]));
+  check("allTags：彙整不重複", JSON.stringify(ev("allTags(__recipes)").sort()) === JSON.stringify(["家常", "湯", "蛋"].sort()));
+  check("filterRecipes：標籤篩選", ev('filterRecipes(__recipes, "", "湯").map(r => r.id).join()') === "b");
+  check("filterRecipes：搜尋比對名稱與食材（不分大小寫）", ev('filterRecipes(__recipes, "番茄", "all").map(r => r.id).join()') === "a" && ev('filterRecipes(__recipes, "chicken", "all").map(r => r.id).join()') === "b" && ev('filterRecipes(__recipes, "雞腿", "all").map(r => r.id).join()') === "b");
+  check("sortRecipes：最近新增在前／評分高到低／煮最多次", ev('sortRecipes(__recipes, "new").map(r => r.id).join()') === "c,b,a" && ev('sortRecipes(__recipes, "rating").map(r => r.id).join()') === "b,a,c" && ev('sortRecipes(__recipes, "cooked").map(r => r.id).join()') === "a,b,c");
+  const imp = ev('parseRecipeImport(\'{"name":"滷肉飯","tags":["主菜","台式"],"ingredients":["五花肉 600g","醬油 80ml"],"steps":"1. 炒\\\\n2. 滷","notes":"","extra":1}\')');
+  check("parseRecipeImport：陣列轉多行、標籤轉逗號、不認得的欄位列出", imp && imp.fields.name === "滷肉飯" && imp.fields.tags === "主菜, 台式" && imp.fields.ingredients === "五花肉 600g\n醬油 80ml" && imp.unknown.join() === "extra" && !("notes" in imp.fields), imp);
+  check("parseRecipeImport：壞 JSON／非物件回傳 null", ev('parseRecipeImport("abc")') === null && ev("parseRecipeImport(\"[1]\")") === null);
+  let err = null;
+  try { ev("state.recipes = __recipes; renderRecipeList(); state.expanded = new Set(['a','b','c']); renderRecipeList(); renderTagFilter(); renderTagOptions();"); } catch (e) { err = String(e); }
+  check("每張食譜卡（含空白欄位、展開）渲染不丟錯", err === null, err);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -164,6 +186,8 @@ console.log("後端：欄位型別驗證（文字／日期／時間／列舉）"
 check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateArg_("2026-02-30", "x")) && be.dateArg_("2026-02-28", "x") === "2026-02-28");
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
+check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+check("setRecipeRating：評分要 0–5 整數", throws(() => be.setRecipeRating("x", "6")) && throws(() => be.setRecipeRating("x", "2.5")) && throws(() => be.setRecipeRating("x", "abc")));
 check("enumArg_：不在清單丟錯；空白可給預設", throws(() => be.enumArg_("x", "對象", ["me"])) && be.enumArg_("", "對象", ["me"], { emptyValue: "" }) === "");
 check("textArg_：必填、長度上限、trim", throws(() => be.textArg_("  ", "標題", { required: true })) && throws(() => be.textArg_("a".repeat(11), "標題", { max: 10 })) && be.textArg_("  hi ", "標題") === "hi");
 {

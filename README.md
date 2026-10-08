@@ -155,6 +155,15 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   寫法。剩餘未繳（`remain`）不存，前端用 `fullAmount - paidAmount` 即時算
 - 這張表也不會出現在主頁面的 `getData()` 回傳裡，理由跟 BloodPressure 一樣
 
+**Recipes**（食譜，獨立頁面 `recipes.html`；分頁由後端 `ensureSheet` 自動建立，不用手動建）
+
+| id | name | tags | ingredients | steps | notes | rating | cookCount | lastCookedAt | createdAt |
+|----|------|------|-------------|-------|-------|--------|-----------|--------------|-----------|
+
+- `tags`：逗號分隔的文字（最多 10 個、每個 ≤20 字）；`ingredients`／`steps` 一行一項／一步；`rating` 0–5（0＝未評分）
+- 編輯（`updateRecipe`）只改名稱／標籤／食材／步驟／備註，不動評分與煮過次數；評分（`setRecipeRating`）與「煮過 +1」（`markRecipeCooked`，同時記 `lastCookedAt`）各自獨立
+- 這張表不會出現在主頁面的 `getData()` 回傳裡，用 `getRecipes`；欄位名稱與順序寫死在 `Code.gs` 的 `RECIPE_HEADERS`，不能改
+
 **ShoppingList**（「清單」，不綁日期、處理完就勾掉再清除；分購物/想法兩個分類）
 
 | id | item | done | createdAt | category |
@@ -307,6 +316,12 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 - 清單彈窗（`#shoppingModal`）標題去掉 emoji（頂端已有線條圖示）；想法的輸入框很高，「新增」鈕靠底對齊。
 - 清單項目可以編輯：每一筆有 ✏️（已完成的不顯示），開 `#listEditModal`（購物項目 2 行、想法 6 行的文字框），後端 `updateShoppingItem` 只改 `item` 欄（勾選與分類不動）。帳單「已繳金額 = 全額」就視為繳清、鎖定不能再改（前端不顯示按鈕、後端也擋，但仍可刪除）。
 
+## 食譜頁的版面
+
+- 進頁面是搜尋框（比對名稱與食材）＋標籤下拉（資料中實際出現的標籤，有新標籤自動多一個選項）＋排序（最近新增／評分高到低／煮最多次），下面是食譜卡片，點名稱展開食材、步驟、備註。
+- 卡片上：★ 評分（再點同一顆清除）、「煮過 +1」、✏️ 編輯（同一個彈窗 `#recipeFormModal`）、✕ 刪除。
+- **貼上匯入**（只在新增時出現，跟健康頁同一個做法）：把整理好的 JSON 填進表單，不送出，核對後再按「新增」。格式見 CLAUDE.md。
+
 ## 事件／循環行程的新增與編輯（彈窗）
 
 **約定：多欄位的實體（事件、循環行程）用彈窗新增與編輯；單欄快速輸入（待辦、購物清單）留在列表上；健康與帳單頁的表單不動。**
@@ -392,7 +407,6 @@ node scripts/regression-check.js
 
 需要先做決定才能動工的：
 
-- 食譜功能——已決定留在這個 app（新增 `recipes.html/js` + Sheet 分頁 + `Code.gs` 幾個 action，沿用 `shared.js` / `style.css`；新分頁用 `ensureSheet`），還沒開始做
 - Google 行事曆第二階段（唯讀讀取 Google 行事曆顯示在 App、公司忙碌／空閒衝突提示）——見上面「同步到 Google 行事曆」
 
 ## 時間輸入（24 小時制）

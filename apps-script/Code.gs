@@ -11,7 +11,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這十二個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這十三個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -28,6 +28,8 @@
  *   LabExtra        欄位: id | date | name | value | unit | refLow | refHigh | createdAt
  *                         （驗血「其他項目」：報告上有、LabResults 沒列的項目，一個項目一列，自帶報告參考範圍）
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
+ *   Recipes         欄位: id | name | tags | ingredients | steps | notes | rating | cookCount | lastCookedAt | createdAt
+ *                   （用 ensureSheet 自動建立，欄位與順序寫死在 RECIPE_HEADERS；tags 是逗號分隔、rating 0–5（0=未評分））
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -198,6 +200,18 @@ function dispatch_(p) {
         return respond({ ok: true, data: setCreditCardBillPaid(p.id, p.paidAmount) });
       case "deleteCreditCardBill":
         return respond({ ok: true, data: deleteCreditCardBill(p.id) });
+      case "getRecipes":
+        return respond({ ok: true, data: getRecipes() });
+      case "addRecipe":
+        return respond({ ok: true, data: addRecipe(p) });
+      case "updateRecipe":
+        return respond({ ok: true, data: updateRecipe(p) });
+      case "markRecipeCooked":
+        return respond({ ok: true, data: markRecipeCooked(p.id) });
+      case "setRecipeRating":
+        return respond({ ok: true, data: setRecipeRating(p.id, p.rating) });
+      case "deleteRecipe":
+        return respond({ ok: true, data: deleteRecipe(p.id) });
       default:
         return respond({ ok: false, error: "unknown action" });
     }
@@ -206,7 +220,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-08.3";
+var BACKEND_VERSION = "2026-10-08.4";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -272,7 +286,7 @@ function sheetToObjects(sheet) {
       if (Object.prototype.toString.call(v) === "[object Date]") {
         if (h === "time" || h === "endTime") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
-        } else if (h === "date" || h === "periodKey" || h === "endDate") {
+        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
           // Google Sheets 常會把這種格子自動判斷成日期型態存，讀回來要轉回純
           // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
@@ -1634,4 +1648,93 @@ function clearSyncedCalendarEvents() {
     if (ev.getTag(CAL_TAG)) { ev.deleteEvent(); n++; }
   });
   return "已刪除 " + n + " 個同步出去的事件";
+}
+
+// ====== 食譜（recipes.html）======
+// 新分頁，用 ensureSheet 自動建立。欄位與順序寫死，不能改名或調整。
+var RECIPE_HEADERS = ["id", "name", "tags", "ingredients", "steps", "notes", "rating", "cookCount", "lastCookedAt", "createdAt"];
+
+function recipeSheet_() {
+  return ensureSheet("Recipes", RECIPE_HEADERS);
+}
+
+function getRecipes() {
+  return sheetToObjects(recipeSheet_());
+}
+
+// 標籤：逗號（全形半形都收）分隔，去空白、去重，最多 10 個、每個 ≤20 字，存成 "a,b"
+function tagsArg_(v) {
+  var raw = v === undefined || v === null ? "" : String(v);
+  var seen = {};
+  var tags = [];
+  raw.split(/[,，、]/).forEach(function (t) {
+    t = t.trim();
+    if (t === "" || seen[t]) return;
+    if (t.length > 20) throw new Error("標籤「" + t.slice(0, 8) + "…」太長（最多 20 字）");
+    seen[t] = true;
+    tags.push(t);
+  });
+  if (tags.length > 10) throw new Error("標籤最多 10 個");
+  return tags.join(",");
+}
+
+function recipeFields_(p) {
+  return {
+    name: textArg_(p.name, "食譜名稱", { required: true, max: 100 }),
+    tags: tagsArg_(p.tags),
+    ingredients: textArg_(p.ingredients, "食材", { max: 5000 }),
+    steps: textArg_(p.steps, "步驟", { max: 5000 }),
+    notes: textArg_(p.notes, "備註", { max: 2000 }),
+  };
+}
+
+function addRecipe(p) {
+  var f = recipeFields_(p);
+  appendRowSafe_(recipeSheet_(), [
+    Utilities.getUuid(), f.name, f.tags, f.ingredients, f.steps, f.notes,
+    0, // rating：0 = 未評分
+    0, // cookCount
+    "", // lastCookedAt
+    new Date(),
+  ]);
+  return getRecipes();
+}
+
+// 編輯只改內容欄位，不動評分與煮過次數
+function updateRecipe(p) {
+  var id = textArg_(p.id, "食譜", { required: true, max: 100 });
+  updateRowByHeaders_("Recipes", id, recipeFields_(p));
+  return getRecipes();
+}
+
+function findRecipeRow_(id) {
+  id = textArg_(id, "食譜", { required: true, max: 100 });
+  var sheet = recipeSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] === id) return { sheet: sheet, row: i + 1, values: values[i] };
+  }
+  throw new Error("找不到這道食譜（可能已經被刪除），請重新整理");
+}
+
+function markRecipeCooked(id) {
+  var r = findRecipeRow_(id);
+  var count = Number(r.values[RECIPE_HEADERS.indexOf("cookCount")]) || 0;
+  r.sheet.getRange(r.row, RECIPE_HEADERS.indexOf("cookCount") + 1).setValue(count + 1);
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  r.sheet.getRange(r.row, RECIPE_HEADERS.indexOf("lastCookedAt") + 1).setNumberFormat("@").setValue(today); // 純文字，免得被轉成日期
+  return getRecipes();
+}
+
+function setRecipeRating(id, rating) {
+  var n = numArg_(rating, "評分", { int: true, min: 0, max: 5 });
+  var r = findRecipeRow_(id);
+  r.sheet.getRange(r.row, RECIPE_HEADERS.indexOf("rating") + 1).setValue(n);
+  return getRecipes();
+}
+
+function deleteRecipe(id) {
+  var r = findRecipeRow_(id);
+  r.sheet.deleteRow(r.row);
+  return getRecipes();
 }

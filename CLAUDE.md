@@ -27,7 +27,7 @@
 姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。
 - 語言練習：**不聯動**。練習在 lingo 做（自己抽卡、自己看進度），daily 的語言練習習慣就是一般的手動打卡習慣（`LANG_HABIT_ID` 那一列只多一個「語」連結連到 lingo）。想分成英文、日文各一個習慣，直接在 Sheet 的 Habits 分頁加列即可（不需要改程式）。之前的抽卡／同步（`drawLanguageCard`、`syncLanguageCard`、`LANG_URL` / `LANG_TOKEN`）已經拿掉。
 - 字帖已搬到 lingo（`copybook.html`）；首頁「練字」習慣的「字」連結連過去（語言在字帖頁內切換）。Sheet 的 `Copybook` 分頁已沒用，可刪。
-- 食譜留在這個專案（`recipes.html/js` + Sheet 分頁），尚未開始。
+- 食譜留在這個專案（`recipes.html/js` + Sheet 分頁 `Recipes`），已完成；內容用「貼上匯入」（格式見下）。
 - 完整計畫：`~/.claude/plans/sideproject-cheng-daily-github-dazzling-catmull.md`。
 
 ## 健康頁「貼上匯入」格式（使用者傳體脂計／驗血報告截圖時，照這個產出 JSON 給他貼）
@@ -45,3 +45,12 @@
 ```
 `values` 可用的鍵：`glucose` 空腹血糖、`hba1c`、`cholesterol` 總膽固醇、`ldl`、`hdl`、`triglyceride`、`ast`、`alt`、`creatinine`、`egfr`、`bun`、`uricAcid`、`sodium`、`potassium`、`tsh`、`ck`。不在這份清單的項目放進 `extra`（`name` 不能重複，`unit`、`refLow`、`refHigh` 可省略）。
 單位換算要先做好再給（例如血糖用 mg/dL，不要給 mmol/L）。
+
+## 食譜頁「貼上匯入」格式（使用者傳食譜網頁／截圖／文字時，照這個產出 JSON 給他貼）
+匯入只會把內容填進表單，使用者核對後按「新增」才送出。只輸出一個 JSON 區塊，不要加註解；沒有的欄位直接省略，未知鍵名會被忽略並提示。評分與煮過次數不在匯入範圍（在 App 裡記）。
+```json
+{ "name": "滷肉飯", "tags": ["主菜", "台式"], "ingredients": ["五花肉 600g", "醬油 80ml"], "steps": ["五花肉切丁炒香", "加醬油與水滷 40 分鐘"], "notes": "可加滷蛋" }
+```
+- `name` 必填（≤100 字）；`tags` 陣列（或逗號分隔字串），每個 ≤20 字、最多 10 個，優先沿用已有的標籤（例如主菜、湯、點心、早餐、低醣）。
+- `ingredients`、`steps` 用字串陣列（一項一元素）；食材帶份量與單位（`雞胸肉 300g`），步驟不要自己加編號。
+- 單位、份量照原文，不要擅自換算；來源不明或沒寫的就省略，不要編造。
