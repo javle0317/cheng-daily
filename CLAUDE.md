@@ -8,6 +8,8 @@
 - 改了 `Code.gs`：要手動貼進 Apps Script 重新部署新版本，並同步 `BACKEND_VERSION` 與 `shared.js` 的 `BACKEND_MIN_VERSION`。
 - 純邏輯有回歸檢查：`node scripts/regression-check.js`。
 - 本機預覽：`python3 -m http.server 8791`（`.claude/launch.json`）。
+- 做完一項改動：**直接 commit 並 push 到 main**，不用再問（Dean 直接在線上檢查）。commit 前先跑 `node scripts/regression-check.js`。
+- 文件跟著程式走：改了行為、版面、欄位、慣例，同一個 commit 內一併更新 README.md（對應段落）與本檔相關條目，避免文件飄移；純內部重構不用。
 
 ## 新增 Google Sheet 分頁的規則（已有 ensureSheet）
 - 新功能需要「全新的分頁」時，用 `ensureSheet(名稱, 表頭陣列)`（`apps-script/Code.gs`，在 `getSheet` 旁邊）：找不到分頁就自己建立、寫入表頭、凍結第一列，已存在的分頁完全不動。這樣不用請 Dean 手動建分頁與表頭（cheng-lingo 的 `sheet_` 是同樣做法）。

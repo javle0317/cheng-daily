@@ -676,6 +676,7 @@ a.ghost-btn {
   margin-top: 16px;
 }
 
+#billListMonth { margin-left: auto; margin-right: 8px; }
 .bp-list-header select {
   padding: 6px 8px;
   border-radius: 8px;

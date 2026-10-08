@@ -9,6 +9,7 @@ let state = {
   compareExtraYear: "",
   bankChartMonth: "",
   listFilter: "all",
+  listMonth: "",
 };
 
 function applyBillData(bills) {
@@ -322,11 +323,35 @@ function renderBankChart() {
   container.innerHTML = svg;
 }
 
+// 帳單月份 "2026-09" → "2026年09月"
+function formatBillMonth(m) {
+  const [y, mo] = String(m).split("-");
+  return `${y}年${mo}月`;
+}
+
+// 月份下拉選單：只列目前銀行篩選下有資料的月份（新到舊），選到的月份不存在時退回最新一個月
+function syncMonthFilter(allBills) {
+  const sel = document.getElementById("billListMonth");
+  const months = [...new Set(allBills.map(b => b.billingMonth))].sort().reverse();
+  if (!months.includes(state.listMonth)) state.listMonth = months[0] || "";
+  sel.innerHTML = "";
+  months.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = formatBillMonth(m);
+    sel.appendChild(opt);
+  });
+  sel.value = state.listMonth;
+  sel.classList.toggle("hidden", !months.length);
+}
+
 function renderList() {
   const container = document.getElementById("billList");
-  const bills = state.bills
-    .filter(b => state.listFilter === "all" || b.bank === state.listFilter)
-    .sort((a, b) => b.billingMonth.localeCompare(a.billingMonth) || a.bank.localeCompare(b.bank));
+  const byBank = state.bills.filter(b => state.listFilter === "all" || b.bank === state.listFilter);
+  syncMonthFilter(byBank);
+  const bills = byBank
+    .filter(b => b.billingMonth === state.listMonth)
+    .sort((a, b) => a.bank.localeCompare(b.bank));
 
   container.innerHTML = "";
   if (!bills.length) {
@@ -341,7 +366,7 @@ function renderList() {
     const group = document.createElement("div");
     const heading = document.createElement("h3");
     heading.className = "sub-heading";
-    heading.textContent = month;
+    heading.textContent = formatBillMonth(month);
     group.appendChild(heading);
 
     const ul = document.createElement("ul");
@@ -424,6 +449,11 @@ function renderList() {
 
 document.getElementById("billListFilter").addEventListener("change", (e) => {
   state.listFilter = e.target.value;
+  renderList();
+});
+
+document.getElementById("billListMonth").addEventListener("change", (e) => {
+  state.listMonth = e.target.value;
   renderList();
 });
 
