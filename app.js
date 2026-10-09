@@ -282,8 +282,9 @@ let calSyncTimer = null;
 let calSyncStatus = null;
 
 function calSyncSummary(s) {
+  // 失敗原因優先顯示（失敗時待同步旗標通常還在，先判斷待同步會把原因蓋掉）
+  if (s.lastError) return "⚠️ 同步失敗：" + s.lastError + "\n\n" + (s.dirty ? "約 5 分鐘內排程會自動重試" : "排程會自動重試") + "，也可以按「立即同步」。";
   if (s.dirty) return "☁️ 等待同步到 Google 行事曆（約 5 分鐘內會自動同步）。";
-  if (s.lastError) return "⚠️ 同步失敗：" + s.lastError + "\n\n排程會自動重試，也可以按「立即同步」。";
   if (!s.lastSyncAt) return "☁️ 還沒同步過，可以先按「預覽」看會同步哪些事件。";
   const d = new Date(s.lastSyncAt);
   const same = toDateStr(d) === toDateStr(new Date());

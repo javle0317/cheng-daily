@@ -8,7 +8,7 @@ const PASSWORD_KEY = "dailyhub_password";
 
 // 前端需要的後端最低版本（Code.gs 的 BACKEND_VERSION）。後端比這個舊 = Dean 還沒把新版 Code.gs 部署成新版本，
 // 會跳一次提醒，不用等到畫面出現怪現象才發現。改了後端行為、前端依賴時，兩邊一起加版本。
-const BACKEND_MIN_VERSION = "2026-10-08.4";
+const BACKEND_MIN_VERSION = "2026-10-09.1";
 let backendWarned = false;
 
 function toDateStr(d) {
@@ -289,6 +289,15 @@ function initTimeSelects() {
       get: () => (hour.value && minute.value ? hour.value + ":" + minute.value : ""),
       set: (v) => {
         const m = /^(\d{2}):(\d{2})$/.exec(String(v || ""));
+        // 舊資料可能不是 5 的倍數（08:32、23:59）：臨時補一個分鐘選項，不然讀回會變空字串、編輯儲存後變成全天事件
+        minute.querySelectorAll("option[data-extra]").forEach(o => o.remove());
+        if (m && ![...minute.options].some(o => o.value === m[2])) {
+          const o = document.createElement("option");
+          o.value = o.textContent = m[2];
+          o.dataset.extra = "1";
+          const after = [...minute.options].find(x => x.value && x.value > m[2]);
+          minute.insertBefore(o, after || null);
+        }
         hour.value = m ? m[1] : "";
         minute.value = m ? m[2] : "";
       },

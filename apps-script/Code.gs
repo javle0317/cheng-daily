@@ -220,7 +220,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-08.4";
+var BACKEND_VERSION = "2026-10-09.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1568,8 +1568,9 @@ function reconcileWith_(cal, data, todayStr, dryRun) {
   var desired = desiredCalendarEvents_(data.events, data.rules, data.exceptions, todayStr);
   var existing = readExistingCalendarEvents_(cal, todayStr);
   var plan = planCalendarSync_(desired, existing);
-  // 保險：資料表讀不到（desired 全空）卻要刪掉一堆事件，八成是讀取出問題，中止而不是清空行事曆
-  if (!dryRun && !desired.length && plan.del.length > 5) throw new Error("對帳會刪除全部 " + plan.del.length + " 個事件，疑似資料表讀取異常，已中止");
+  // 保險：沒確認資料表讀取正常（data.verified）、desired 又全空卻要刪掉一堆事件，八成是讀取出問題，中止而不是清空行事曆。
+  // 分頁與表頭都讀到、只是真的沒有事件了（例如刪掉最後一條循環行程）= 正常刪除，data.verified 為 true 時放行。
+  if (!dryRun && !data.verified && !desired.length && plan.del.length > 5) throw new Error("對帳會刪除全部 " + plan.del.length + " 個事件，疑似資料表讀取異常，已中止");
   if (!dryRun) applyCalendarPlan_(cal, plan);
   return summarizePlan_(plan, dryRun);
 }
@@ -1586,6 +1587,10 @@ function reconcileCalendar_(dryRun) {
     rules: sheetToObjects(getSheet("RecurringEvents")),
     exceptions: sheetToObjects(getSheet("RecurringExceptions")),
   };
+  // 三個分頁都找得到、表頭第一格是 id，才算「成功讀到資料」（getSheet 讀不到會直接丟錯，不會走到這裡）
+  data.verified = ["Events", "RecurringEvents", "RecurringExceptions"].every(function (n) {
+    return getSheet(n).getRange(1, 1).getValue() === "id";
+  });
   try {
     var res = reconcileWith_(cal, data, todayStr, dryRun);
     if (!dryRun) {

@@ -265,6 +265,7 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   const alive = calEvents.filter(e => !e.deleted);
   check("App 改標題＋定時改全天（刪掉重建）、刪除事件 → 行事曆跟著變；別人手動加的事件不被動到", res.updated === 1 && res.deleted === 1 && alive.some(e => e.tag === "e:e1" && e.allDay && e.title === "[承承] 看牙醫（改）") && !alive.some(e => e.tag === "e:e2") && !manual.deleted, res);
   check("保險：資料表空卻要刪一大堆事件 → 中止，不清空行事曆", (() => { for (let i = 0; i < 6; i++) { const e = mkEvent("x" + i, new Date("2026-10-20T10:00:00+08:00"), false); e.tag = "z:" + i; calEvents.push(e); } return throws(() => be.reconcileWith_(fakeCal, { events: [], rules: [], exceptions: [] }, today, false)); })());
+  check("已確認讀取正常（verified）、資料表真的沒事件了 → 放行刪除（刪掉最後一條循環行程）", (() => { const live = calEvents.filter(e => !e.deleted).length; const res = be.reconcileWith_(fakeCal, { events: [], rules: [], exceptions: [], verified: true }, today, false); return res.deleted >= 6 && calEvents.filter(e => !e.deleted && e.tag).length === 0 && !manual.deleted && live >= 6; })());
   // 狀態與旗標
   const propStore = {};
   const origProps = be.PropertiesService.getScriptProperties;
