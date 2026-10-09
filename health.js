@@ -435,6 +435,18 @@ function renderPulseChart() {
   container.innerHTML = svg;
 }
 
+// 某天某時段所有備註（去空白、去重）；同一時段量好幾次，備註只寫在其中一筆就夠
+function periodNotes(date, period) {
+  const seen = new Set();
+  const out = [];
+  state.readings.forEach(r => {
+    if (r.date !== date || r.period !== period) return;
+    const t = String(r.note === undefined || r.note === null ? "" : r.note).trim();
+    if (t && !seen.has(t)) { seen.add(t); out.push(t); }
+  });
+  return out;
+}
+
 function renderList() {
   const container = document.getElementById("bpList");
   const readings = getFilteredReadings()
@@ -459,6 +471,7 @@ function renderList() {
 
     const ul = document.createElement("ul");
     ul.className = "item-list";
+    let lastPeriod = null;
     byDate[date].forEach(r => {
       const li = document.createElement("li");
       li.className = "item-row";
@@ -496,6 +509,17 @@ function renderList() {
       li.appendChild(valueSpan);
       li.appendChild(pulseSpan);
       li.appendChild(delBtn);
+      // 同一天同時段會有好幾筆，備註只寫一次就好：整組的備註合併顯示在該時段第一筆底下
+      if (r.period !== lastPeriod) {
+        lastPeriod = r.period;
+        const notes = periodNotes(r.date, r.period);
+        if (notes.length) {
+          const noteEl = document.createElement("div");
+          noteEl.className = "bp-note";
+          noteEl.textContent = "📝 " + notes.join("；");
+          li.appendChild(noteEl);
+        }
+      }
       li.dataset.lockKey = `bp:${r.id}`;
       lockIfPending(li);
       ul.appendChild(li);
@@ -519,11 +543,20 @@ function updateBpFormValidity() {
   document.getElementById("bpSubmitBtn").disabled = !(date && systolic && diastolic && pulse);
 }
 
+// 這個時段已經有備註就提示一下，不用再寫一次
+function syncNoteHint() {
+  const notes = periodNotes(document.getElementById("bpDate").value, document.getElementById("bpPeriod").value);
+  document.getElementById("bpNote").placeholder = notes.length
+    ? `這個時段已有備註：${notes.join("；")}（不用重複寫）`
+    : "備註（選填）：懷疑原因，例如晚餐吃火鍋";
+}
+
 document.getElementById("bpDate").addEventListener("change", syncPeriodLock);
 
 ["bpDate", "bpPeriod", "bpSystolic", "bpDiastolic", "bpPulse"].forEach(id => {
   document.getElementById(id).addEventListener("input", updateBpFormValidity);
   document.getElementById(id).addEventListener("change", updateBpFormValidity);
+  document.getElementById(id).addEventListener("change", syncNoteHint);
 });
 
 document.getElementById("bpForm").addEventListener("submit", async (e) => {
@@ -533,10 +566,12 @@ document.getElementById("bpForm").addEventListener("submit", async (e) => {
   const systolic = document.getElementById("bpSystolic").value;
   const diastolic = document.getElementById("bpDiastolic").value;
   const pulse = document.getElementById("bpPulse").value;
+  const note = document.getElementById("bpNote").value;
   if (!date || !systolic || !diastolic || !pulse) return;
   setFormBusy(e.target, true);
   try {
-    applyBpData(await api("addBloodPressureReading", { date, period, systolic, diastolic, pulse }));
+    applyBpData(await api("addBloodPressureReading", { date, period, systolic, diastolic, pulse, note }));
+    document.getElementById("bpNote").value = "";
     document.getElementById("bpSystolic").value = "";
     document.getElementById("bpDiastolic").value = "";
     document.getElementById("bpPulse").value = "";
@@ -548,6 +583,7 @@ document.getElementById("bpForm").addEventListener("submit", async (e) => {
   } finally {
     setFormBusy(e.target, false);
     syncPeriodLock();
+    syncNoteHint();
     updateBpFormValidity();
   }
 });

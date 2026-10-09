@@ -187,6 +187,17 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mkSheet = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1, getDataRange: () => ({ getValues: () => [headers] }), getRange: (r, c, nr, nc) => ({ getValues: () => [headers], setNumberFormat() {}, setValues: v => rows.push(v[0]) }) }; };
+  const withSheet = (sh, fn) => { const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh }); try { return fn(); } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; } };
+  const H = ["id", "date", "period", "systolic", "diastolic", "pulse", "createdAt", "note"];
+  const sh = mkSheet(H);
+  withSheet(sh, () => { try { be.addBloodPressureReading("2026-10-10", "evening", "135", "88", "70", "晚餐吃火鍋"); } catch (e) {} });
+  check("addBloodPressureReading：備註依表頭名稱寫進 note 欄", sh.rows[0] && sh.rows[0][2] === "evening" && sh.rows[0][5] === 70 && sh.rows[0][7] === "晚餐吃火鍋", sh.rows[0]);
+  const old7 = mkSheet(H.slice(0, 7));
+  check("BloodPressure 還沒有 note 欄：有填備註丟錯且不寫入；沒填備註照常寫入",
+    withSheet(old7, () => throws(() => be.addBloodPressureReading("2026-10-10", "evening", "135", "88", "70", "x")) && old7.rows.length === 0 && (be.addBloodPressureReading("2026-10-10", "evening", "135", "88", "70", ""), old7.rows.length === 1 && old7.rows[0].length === 7)));
+}
 check("setRecipeRating：評分要 0–5 整數", throws(() => be.setRecipeRating("x", "6")) && throws(() => be.setRecipeRating("x", "2.5")) && throws(() => be.setRecipeRating("x", "abc")));
 check("enumArg_：不在清單丟錯；空白可給預設", throws(() => be.enumArg_("x", "對象", ["me"])) && be.enumArg_("", "對象", ["me"], { emptyValue: "" }) === "");
 check("textArg_：必填、長度上限、trim", throws(() => be.textArg_("  ", "標題", { required: true })) && throws(() => be.textArg_("a".repeat(11), "標題", { max: 10 })) && be.textArg_("  hi ", "標題") === "hi");

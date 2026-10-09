@@ -20,7 +20,7 @@
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
- *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt
+ *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt | note（選填，懷疑偏高的原因；note 欄要手動加在最後面）
  *   InBody          欄位: id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass |
  *                         bodyWater | protein | bmr | visceralFat | bodyAge | whr | createdAt
  *   LabResults      欄位: id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt |
@@ -169,7 +169,7 @@ function dispatch_(p) {
       case "addBloodPressureReading":
         return respond({
           ok: true,
-          data: addBloodPressureReading(p.date, p.period, p.systolic, p.diastolic, p.pulse),
+          data: addBloodPressureReading(p.date, p.period, p.systolic, p.diastolic, p.pulse, p.note),
         });
       case "deleteBloodPressureReading":
         return respond({ ok: true, data: deleteBloodPressureReading(p.id) });
@@ -220,7 +220,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-09.1";
+var BACKEND_VERSION = "2026-10-10.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -612,17 +612,22 @@ function getBloodPressureData() {
   return sheetToObjects(getSheet("BloodPressure"));
 }
 
-function addBloodPressureReading(date, period, systolic, diastolic, pulse) {
+function addBloodPressureReading(date, period, systolic, diastolic, pulse, note) {
   var sheet = getSheet("BloodPressure");
-  appendRowSafe_(sheet, [
-    Utilities.getUuid(),
-    dateArg_(date, "血壓"),
-    enumArg_(period, "時段", ["morning", "evening"]),
-    numArg_(systolic, "收縮壓", { int: true, min: 30, max: 300 }),
-    numArg_(diastolic, "舒張壓", { int: true, min: 20, max: 200 }),
-    numArg_(pulse, "脈搏", { emptyValue: "", int: true, min: 20, max: 300 }),
-    new Date(),
-  ]);
+  var vals = {
+    id: Utilities.getUuid(),
+    date: dateArg_(date, "血壓"),
+    period: enumArg_(period, "時段", ["morning", "evening"]),
+    systolic: numArg_(systolic, "收縮壓", { int: true, min: 30, max: 300 }),
+    diastolic: numArg_(diastolic, "舒張壓", { int: true, min: 20, max: 200 }),
+    pulse: numArg_(pulse, "脈搏", { emptyValue: "", int: true, min: 20, max: 300 }),
+    createdAt: new Date(),
+    note: textArg_(note, "備註", { max: 200 }),
+  };
+  // 依表頭名稱放進對應的欄（note 欄是後來手動加在最後面的）；有填備註卻沒有 note 欄就丟錯，不要悄悄丟掉或寫錯位置
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (vals.note && headers.indexOf("note") < 0) throw new Error("BloodPressure 分頁缺少 note 欄，請先在表頭最後面補上 note");
+  appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
   return getBloodPressureData();
 }
 
