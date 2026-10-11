@@ -448,7 +448,7 @@ document.getElementById("petMigrateSubmit").addEventListener("click", async (e) 
   const btn = e.currentTarget;
   btn.disabled = true;
   try {
-    applyPetData(await api("importPetEvents", { items }));
+    applyPetData(await api("importPetEvents", { items: JSON.stringify(items) })); // api() 會把每個參數轉成字串，陣列要先自己轉成 JSON
     renderPetsAll();
     closePetMigrate();
     showToast(`已搬進 ${items.length} 筆`);

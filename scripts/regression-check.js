@@ -167,6 +167,17 @@ console.log("前端：寵物頁（間隔統計、舊事件類型猜測、搬移�
   check("兩隻寵物、各類型、空類型的概況與紀錄列表渲染不丟錯", err === null, err);
 }
 
+console.log("前端：api() 參數一律被轉成字串，陣列／物件要先 JSON.stringify（寵物搬移曾因直接傳陣列變成 [object Object]）");
+{
+  const src = read("pets.js");
+  check("pets.js 的 importPetEvents 送的是 JSON 字串", /api\("importPetEvents",\s*\{\s*items:\s*JSON\.stringify\(items\)/.test(src));
+  const sent = {};
+  const fakeFetch = (url, opts) => { Object.assign(sent, JSON.parse(opts.body)); return Promise.resolve({ json: () => Promise.resolve({ ok: true, data: {} }) }); };
+  const f = loadFrontend(["shared.js"]); f.fetch = fakeFetch;
+  vm.runInContext("apiRequest('x', { items: JSON.stringify([{a:1}]) })", f);
+  check("apiRequest：字串參數原樣送出（後端 JSON.parse 得回陣列）", Array.isArray(JSON.parse(sent.items)));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -211,6 +222,9 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  check("後端 importPetEvents 吃 JSON 字串", (() => { const rows = []; const sh = { getLastColumn: () => 9, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [be.PET_LOG_HEADERS, ...rows] }), getRange: () => ({ getValues: () => [be.PET_LOG_HEADERS], setNumberFormat() {}, setValues: v => rows.push(v[0]) }) }; const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh }); try { be.importPetEvents(JSON.stringify([{ eventId: "e1", pet: "林萌", type: "grooming", date: "2025-05-17", title: "肚肚洗澡", amount: "", note: "" }])); return rows.length === 1; } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; } })());
+}
 {
   const mkSheet = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }), getRange: () => ({ getValues: () => [headers], setNumberFormat() {}, setValues: v => rows.push(v[0]) }) }; };
   const withSheet = (sh, fn) => { const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh }); try { return fn(); } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; } };
