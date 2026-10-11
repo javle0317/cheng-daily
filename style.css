@@ -1222,3 +1222,12 @@ input[type="checkbox"]:checked {
 #petLabModal .modal-card { margin: auto; max-height: none; overflow: visible; }
 /* 項目很多時，「新增」鈕固定在彈窗底部，不用捲到最下面 */
 #petLabModal .modal-actions { position: sticky; bottom: 0; background: var(--card-bg); padding: 10px 0 2px; margin-top: 4px; }
+
+/* 寵物頁：選寵物＝一組連在一起的切換鈕（分段）；紀錄／驗血＝底線分頁。兩組長得不一樣，才不會看成「四選一」 */
+#petSwitch { gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card-bg); }
+#petSwitch .pet-tab { border: 0; border-radius: 0; background: transparent; padding: 12px 8px; }
+#petSwitch .pet-tab + .pet-tab { border-left: 1px solid var(--border); }
+#petSwitch .pet-tab.on { background: var(--accent-soft); }
+.pet-tabs { gap: 20px; margin-top: 0; border-bottom: 1px solid var(--border); justify-content: flex-start; }
+.pet-tabs .pet-tab { flex: 0 0 auto; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; padding: 6px 4px 8px; font-size: 14px; color: var(--text-dim); margin-bottom: -1px; }
+.pet-tabs .pet-tab.on { background: transparent; color: var(--text); border-bottom-color: var(--accent); }
