@@ -1203,3 +1203,4 @@ input[type="checkbox"]:checked {
 .pet-lab-row .x-name { grid-column: 1 / -1; }
 .pet-lab-row input { min-width: 0; box-sizing: border-box; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
 .pet-lab-row .x-remove { grid-column: 5; grid-row: 2; }
+.modal-form .pet-lab-row button.x-remove { background: none; color: var(--text-dim); border: 1px solid var(--border); font-weight: 400; padding: 8px 10px; }
