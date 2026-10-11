@@ -38,7 +38,8 @@ function buildLevelBadge(level, text) {
 }
 
 // points: [{ date: "yyyy-MM-dd", value: number, level?: "good"|... }]
-// opts: { bands?: [{from,to,level,label}], decimals?: number, color?: string, yPad?: number, highlightLast?: boolean }
+// opts: { bands?: [{from,to,level,label}], decimals?: number, color?: string, yPad?: number, highlightLast?: boolean, unit?: string, fmtX?: date => string }
+// point 可帶 label（提示文字用，取代日期）
 function drawTimeChart(container, points, opts = {}) {
   container.innerHTML = "";
   if (!points.length) {
@@ -93,7 +94,7 @@ function drawTimeChart(container, points, opts = {}) {
   const labelIdx = sorted.length <= 6 ? sorted.map((_, i) => i) : [0, Math.floor(sorted.length / 2), sorted.length - 1];
   labelIdx.forEach(i => {
     const anchor = i === 0 ? "start" : i === sorted.length - 1 ? "end" : "middle";
-    svg += `<text x="${xScale(times[i])}" y="${H - 8}" class="bp-axis-label" text-anchor="${anchor}">${sorted[i].date.slice(2).replace(/-/g, "/")}</text>`;
+    svg += `<text x="${xScale(times[i])}" y="${H - 8}" class="bp-axis-label" text-anchor="${anchor}">${opts.fmtX ? escapeHtml(opts.fmtX(sorted[i].date)) : sorted[i].date.slice(2).replace(/-/g, "/")}</text>`;
   });
 
   if (sorted.length > 1) {
@@ -103,7 +104,7 @@ function drawTimeChart(container, points, opts = {}) {
   sorted.forEach((p, i) => {
     const fill = p.level ? LEVEL_VAR[p.level] : color;
     const isLast = opts.highlightLast && i === sorted.length - 1;
-    svg += `<circle cx="${xScale(times[i])}" cy="${yScale(p.value)}" r="${isLast ? 6.5 : 4}" fill="${fill}" stroke="${isLast ? color : "var(--card-bg)"}" stroke-width="${isLast ? 2.5 : 1.5}"><title>${fmtHealthDate(p.date)}：${roundTo(p.value, dec)}${opts.unit ? " " + escapeHtml(opts.unit) : ""}</title></circle>`;
+    svg += `<circle cx="${xScale(times[i])}" cy="${yScale(p.value)}" r="${isLast ? 6.5 : 4}" fill="${fill}" stroke="${isLast ? color : "var(--card-bg)"}" stroke-width="${isLast ? 2.5 : 1.5}"><title>${p.label ? escapeHtml(p.label) : fmtHealthDate(p.date)}：${roundTo(p.value, dec)}${opts.unit ? " " + escapeHtml(opts.unit) : ""}</title></circle>`;
   });
   svg += `</svg>`;
   container.innerHTML = svg;

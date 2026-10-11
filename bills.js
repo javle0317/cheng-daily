@@ -19,6 +19,8 @@ function applyBillData(bills) {
 window.loadPageData = async function () {
   applyBillData(await api("getCreditCardBills"));
   renderBillsAll();
+  // 水電瓦斯（utilities.js）另外載入：它讀不到不影響信用卡帳單
+  if (typeof loadUtilityBills === "function") loadUtilityBills().catch(err => setStatus("水電瓦斯載入失敗：" + err.message, true));
 };
 
 function avg(arr) {

@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261011223318">
+<link rel="stylesheet" href="style.css?v=20261011223736">
 </head>
 <body>
 
@@ -98,6 +98,15 @@
         <div id="billList"></div>
       </section>
 
+      <section class="card utility-card">
+        <h2>水電瓦斯<button id="openUtilForm" type="button" class="ghost-btn add-btn" title="新增帳單" aria-label="新增水電瓦斯帳單">＋</button></h2>
+        <div id="utilTypes" class="seg-switch" role="tablist" aria-label="類型"></div>
+        <p class="progress-line">只看趨勢，不加進上面信用卡帳單的合計（水電多半已經刷卡）。圖上是每月均攤（金額÷計費月數）。</p>
+        <div id="utilChart"></div>
+        <p id="utilStats" class="progress-line"></p>
+        <div id="utilList"></div>
+      </section>
+
     </main>
 
     <p id="statusLine" class="status-line"></p>
@@ -144,6 +153,44 @@
     </div>
   </div>
 
+  <div id="utilModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2 id="utilModalTitle">新增帳單</h2>
+        <button id="utilClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="utilForm" class="entry-form entry-form-rows modal-form">
+        <div class="form-row">
+          <label class="mf">類型
+            <select id="utilType"></select>
+          </label>
+          <label class="mf">帳單月份
+            <input id="utilMonth" type="month" required>
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="mf">金額
+            <input id="utilAmount" type="number" min="0" inputmode="decimal" placeholder="帳單金額" required>
+          </label>
+          <label class="mf">計費月數
+            <select id="utilMonths">
+              <option value="1">1 個月</option>
+              <option value="2">2 個月</option>
+            </select>
+          </label>
+        </div>
+        <label class="mf">備註（選填）
+          <input id="utilNote" type="text" maxlength="100" autocomplete="off">
+        </label>
+        <p id="utilHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="utilSubmit" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <div id="dialogModal" class="modal-overlay hidden">
@@ -157,7 +204,9 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261011223318"></script>
-  <script src="bills.js?v=20261011223318"></script>
+  <script src="shared.js?v=20261011223736"></script>
+  <script src="health-charts.js?v=20261011223736"></script>
+  <script src="bills.js?v=20261011223736"></script>
+  <script src="utilities.js?v=20261011223736"></script>
 </body>
 </html>

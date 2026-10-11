@@ -106,12 +106,16 @@ function guessPetType(title) {
   return "other";
 }
 
-// 可以搬的舊事件：owner 是寵物、還沒搬過（sourceEventId 沒出現過），且有花費或標題看得出類型
-function migrationCandidates(events, log) {
+// 可以搬的事件：owner 是寵物、還沒搬過（sourceEventId 沒出現過）、日期已經到了（還沒發生的預約不能搬），
+// 預設再限定「有花費或標題看得出類型」；all=true 時列出所有寵物事件（標題沒關鍵字的也能手動搬）
+function migrationCandidates(events, log, opts) {
+  const o = opts || {};
+  const today = o.today || toDateStr(new Date());
   const done = new Set(log.map(r => String(r.sourceEventId || "")).filter(Boolean));
   return events
     .filter(e => PET_NAMES.includes(e.owner) && !done.has(String(e.id)))
-    .filter(e => Number(e.amount) > 0 || guessPetType(e.title) !== "other")
+    .filter(e => String(e.date) <= today)
+    .filter(e => o.all || Number(e.amount) > 0 || guessPetType(e.title) !== "other")
     .map(e => ({ event: e, type: guessPetType(e.title) }))
     .sort((a, b) => String(a.event.date).localeCompare(String(b.event.date)));
 }
@@ -491,7 +495,7 @@ function openPetMigrate() {
   const list = document.getElementById("petMigrateList");
   list.innerHTML = "";
   migrateRows = [];
-  migrationCandidates(state.events, state.log).forEach(cand => {
+  migrationCandidates(state.events, state.log, { all: document.getElementById("petMigrateAll").checked }).forEach(cand => {
     const e = cand.event;
     const li = document.createElement("li");
     li.className = "item-row pet-migrate-row";
@@ -518,7 +522,8 @@ function openPetMigrate() {
   document.getElementById("petMigrateModal").classList.remove("hidden");
 }
 function closePetMigrate() { document.getElementById("petMigrateModal").classList.add("hidden"); }
-document.getElementById("openPetMigrate").addEventListener("click", openPetMigrate);
+document.getElementById("openPetMigrate").addEventListener("click", () => { document.getElementById("petMigrateAll").checked = false; openPetMigrate(); });
+document.getElementById("petMigrateAll").addEventListener("change", openPetMigrate); // 切換「顯示全部」就重新列
 document.getElementById("petMigrateClose").addEventListener("click", closePetMigrate);
 document.getElementById("petMigrateModal").addEventListener("click", (e) => { if (e.target.id === "petMigrateModal") closePetMigrate(); });
 

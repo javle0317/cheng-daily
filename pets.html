@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261011223318">
+<link rel="stylesheet" href="style.css?v=20261011223736">
 </head>
 <body>
 
@@ -146,7 +146,8 @@
         <h2>整理舊紀錄</h2>
         <button id="petMigrateClose" class="ghost-btn" type="button">✕</button>
       </div>
-      <p class="progress-line">這些是行事曆裡寵物的舊事件（有花費或看起來是購買／就醫）。確認類型、取消不要的，再按「搬進寵物紀錄」。原本的事件不會被刪除。</p>
+      <p class="progress-line">這些是行事曆裡寵物已經發生的事件（有花費或看起來是購買／就醫）。確認類型、取消不要的，再按「搬進寵物紀錄」。原本的事件不會被刪除。</p>
+      <label class="checkbox-label"><input id="petMigrateAll" type="checkbox"> 顯示全部寵物事件（含標題看不出類型的；還沒到的預約不會列）</label>
       <ul id="petMigrateList" class="item-list pet-migrate-list"></ul>
       <div class="dialog-actions modal-actions">
         <span id="petMigrateCount" class="progress-line"></span>
@@ -232,9 +233,9 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261011223318"></script>
-  <script src="health-charts.js?v=20261011223318"></script>
-  <script src="pets.js?v=20261011223318"></script>
-  <script src="pets-labs.js?v=20261011223318"></script>
+  <script src="shared.js?v=20261011223736"></script>
+  <script src="health-charts.js?v=20261011223736"></script>
+  <script src="pets.js?v=20261011223736"></script>
+  <script src="pets-labs.js?v=20261011223736"></script>
 </body>
 </html>

@@ -1231,3 +1231,17 @@ input[type="checkbox"]:checked {
 .pet-tabs { gap: 20px; margin-top: 0; border-bottom: 1px solid var(--border); justify-content: flex-start; }
 .pet-tabs .pet-tab { flex: 0 0 auto; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; padding: 6px 4px 8px; font-size: 14px; color: var(--text-dim); margin-bottom: -1px; }
 .pet-tabs .pet-tab.on { background: transparent; color: var(--text); border-bottom-color: var(--accent); }
+
+/* ====== 帳單頁：水電瓦斯 ====== */
+.utility-card { grid-column: 1 / -1; }
+.seg-switch { display: flex; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card-bg); margin: 4px 0 8px; }
+.seg-btn { flex: 1; padding: 10px 6px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 15px; cursor: pointer; }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.util-row .spacer { flex: 1; }
+.util-row .item-meta-row { flex-wrap: wrap; }
+.util-row { flex-wrap: wrap; }
+.util-row .spacer { flex: 1; }
+.util-row .util-sub { flex-basis: 100%; margin-top: -4px; white-space: pre-wrap; word-break: break-word; }
+.util-row .util-edit, .util-row .delete-btn { padding: 4px 10px; }
+.util-more { margin-top: 8px; width: 100%; }

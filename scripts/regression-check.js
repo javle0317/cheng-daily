@@ -154,8 +154,11 @@ console.log("前端：寵物頁（間隔統計、舊事件類型猜測、搬移�
   const many = JSON.parse(ev('JSON.stringify(petIntervalStats(["2026-01-01","2026-01-11","2026-01-21","2026-01-31","2026-02-10","2026-02-20","2026-03-02","2026-04-01"], "2026-04-02"))'));
   check("petIntervalStats：最多取最近 6 個間隔（前面 10 天、最後 30 天 → 平均 (10*5+30)/6=13）", many.avgInterval === 13, many);
   check("guessPetType：飼料／貓砂／疫苗／看醫生／美容／其他", ev('["買主食罐","貓砂補貨","打疫苗","看醫生 耳朵","洗澡美容","生日"].map(guessPetType).join()') === "food,litter,medicine,vet,grooming,other");
-  const cands = JSON.parse(ev('JSON.stringify(migrationCandidates([{id:"a",owner:"咪嚕",title:"買飼料",date:"2026-10-01",amount:500},{id:"b",owner:"me",title:"買飼料",date:"2026-10-02",amount:100},{id:"c",owner:"林萌",title:"散步",date:"2026-10-03",amount:""},{id:"d",owner:"林萌",title:"其他花費",date:"2026-10-04",amount:80},{id:"e",owner:"咪嚕",title:"看醫生",date:"2026-10-05",amount:""}], [{sourceEventId:"e"}]).map(c => c.event.id + ":" + c.type))'));
-  check("migrationCandidates：只取寵物事件、有花費或看得出類型、已搬過的不再列", cands.join() === "a:food,d:other", cands);
+  const evs = '[{id:"a",owner:"咪嚕",title:"買飼料",date:"2026-10-01",amount:500},{id:"b",owner:"me",title:"買飼料",date:"2026-10-02",amount:100},{id:"c",owner:"林萌",title:"散步",date:"2026-10-03",amount:""},{id:"d",owner:"林萌",title:"其他花費",date:"2026-10-04",amount:80},{id:"e",owner:"咪嚕",title:"看醫生",date:"2026-10-05",amount:""},{id:"f",owner:"咪嚕",title:"回診看醫生",date:"2026-10-20",amount:""}]';
+  const cands = JSON.parse(ev(`JSON.stringify(migrationCandidates(${evs}, [{sourceEventId:"e"}], {today:"2026-10-11"}).map(c => c.event.id + ":" + c.type))`));
+  check("migrationCandidates：只取寵物事件、有花費或看得出類型、已搬過的不再列、還沒到的預約不列", cands.join() === "a:food,d:other", cands);
+  const all = JSON.parse(ev(`JSON.stringify(migrationCandidates(${evs}, [{sourceEventId:"e"}], {today:"2026-10-11", all:true}).map(c => c.event.id))`));
+  check("migrationCandidates：顯示全部時標題看不出類型的寵物事件也列出（仍不含未來預約與已搬過的）", all.join() === "a,c,d", all);
   const us = JSON.parse(ev('JSON.stringify(petUsageStats([{date:"2026-08-01",finishedAt:"2026-08-21"},{date:"2026-09-01",finishedAt:"2026-09-11"},{date:"2026-10-01",finishedAt:""},{date:"2026-09-20",finishedAt:""}], "2026-10-11"))'));
   check("petUsageStats：已用完的平均天數（20、10 → 15）、未用完件數與最久放了幾天", us.finished === 2 && us.avgUse === 15 && us.open === 2 && us.openMax === 21, us);
   check("petUsageStats：全沒用完／全用完", JSON.parse(ev('JSON.stringify(petUsageStats([{date:"2026-10-01",finishedAt:""}], "2026-10-11"))')).avgUse === null && ev('petUsageStats([{date:"2026-10-01",finishedAt:"2026-10-05"}], "2026-10-11").open') === 0);
@@ -232,6 +235,31 @@ console.log("頁面載入的 script：pets.html 要載入 pets-labs.js 與 healt
   check("pets.html script 順序：shared → health-charts → pets → pets-labs", order.every((n, i) => n > -1 && (i === 0 || n > order[i - 1])), order);
 }
 
+console.log("前端：水電瓦斯（每月均攤、趨勢點、摘要、渲染）與 bills.html 的 script");
+{
+  const u = loadFrontend(["shared.js", "health-charts.js", "utilities.js"]);
+  const ev = code => vm.runInContext(code, u);
+  u.__bills = [
+    { id: "1", type: "electric", billingMonth: "2025-08", months: 2, amount: 3000 },
+    { id: "2", type: "electric", billingMonth: "2026-06", months: 2, amount: 2400 },
+    { id: "3", type: "electric", billingMonth: "2026-08", months: 2, amount: 3600 },
+    { id: "4", type: "gas", billingMonth: "2026-08", months: 1, amount: 450 },
+    { id: "5", type: "water", billingMonth: "2026-08", months: "", amount: 500 },
+  ];
+  const pts = JSON.parse(ev('JSON.stringify(utilPoints(__bills, "electric"))'));
+  check("utilPoints：每月均攤（金額÷計費月數）、依月份排序、label 帶原金額與月數", pts.map(p => p.value).join() === "1500,1200,1800" && pts[0].date === "2025-08-01" && pts[2].label.includes("$3,600") && pts[2].label.includes("2 個月"), pts);
+  check("utilMonthlyAvg：月數缺漏當 1 個月；utilMoney 千分位", ev('utilMonthlyAvg(__bills[4])') === 500 && ev('utilMoney(12345.6)') === "$12,346");
+  const sm = JSON.parse(ev('JSON.stringify(utilSummary(utilPoints(__bills, "electric")))'));
+  check("utilSummary：最近一期、前一期、去年同月、最近平均", sm.last.value === 1800 && sm.prev.value === 1200 && sm.lastYear.value === 1500 && sm.avg6 === 1500, sm);
+  check("utilSummary：沒資料回傳 null；只有一筆沒有前一期", ev('utilSummary([])') === null && ev('utilSummary(utilPoints(__bills, "gas")).prev') === null);
+  let err = null;
+  try { ev('util.bills = __bills; ["water","electric","gas"].forEach(t => { util.type = t; renderUtilities(); }); util.bills = []; renderUtilities();'); } catch (e) { err = String(e); }
+  check("三種類型（含沒有資料）渲染不丟錯", err === null, err);
+  const html = read("bills.html");
+  const order = ["shared.js", "health-charts.js", "bills.js", "utilities.js"].map(f => html.indexOf('src="' + f));
+  check("bills.html 依序載入 shared → health-charts → bills → utilities", order.every((n, i) => n > -1 && (i === 0 || n > order[i - 1])), order);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -276,6 +304,28 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
+    getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
+  const sh = mk(be.UTILITY_HEADERS);
+  const realUuid = be.Utilities.getUuid; let uc = 0; be.Utilities.getUuid = () => "util-" + (++uc); // 其他測試的假 uuid 是固定字串，這裡要每筆不同
+  const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh });
+  try {
+    be.addUtilityBill({ type: "electric", billingMonth: "2026-08", months: "2", amount: "3,600", note: "夏天" });
+    check("addUtilityBill：依欄位寫入（金額 3,600 → 3600、月數轉數字）", sh.rows.length === 1 && sh.rows[0][1] === "electric" && sh.rows[0][3] === 2 && sh.rows[0][4] === 3600 && sh.rows[0][5] === "夏天", sh.rows);
+    be.addUtilityBill({ type: "electric", billingMonth: "2026-08", months: "2", amount: "3800", note: "" });
+    check("addUtilityBill：同類型同月份＝更新那一筆，不重複新增", sh.rows.length === 1 && sh.rows[0][4] === 3800, sh.rows);
+    be.addUtilityBill({ type: "gas", billingMonth: "2026-08", months: "1", amount: "450" });
+    check("同月份不同類型是兩筆", sh.rows.length === 2);
+    const n = sh.rows.length;
+    check("addUtilityBill：不認得的類型／壞月份／壞金額／月數 0 或 13／負金額都丟錯且不寫入",
+      [{ type: "net" }, { billingMonth: "2026-13" }, { amount: "abc" }, { months: "0" }, { months: "13" }, { amount: "-1" }].every(o => throws(() => be.addUtilityBill(Object.assign({ type: "water", billingMonth: "2026-09", months: "2", amount: "100" }, o)))) && sh.rows.length === n);
+    const gasId = sh.rows[1][0];
+    check("updateUtilityBill：改成跟同類型別筆相同月份要丟錯；改自己的月份沒事", throws(() => be.updateUtilityBill({ id: gasId, type: "electric", billingMonth: "2026-08", months: "1", amount: "1" })) && (be.updateUtilityBill({ id: gasId, type: "gas", billingMonth: "2026-09", months: "1", amount: "500" }), sh.rows[1][4] === 500));
+    be.deleteUtilityBill(gasId);
+    check("deleteUtilityBill：刪掉那一筆", sh.rows.length === 1 && sh.rows[0][1] === "electric");
+  } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; be.Utilities.getUuid = realUuid; }
+}
 {
   const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
