@@ -3,7 +3,7 @@
 // 一個項目一列、每筆自帶報告上的參考範圍；分級用那個範圍判斷。
 // 個人化設定（PetLabPrefs）：mode=ok「醫師說無妨」→ 超出範圍時不當警示；mode=range 自訂這隻的範圍。
 
-const labState = { key: "" };
+const labState = { key: "", showAll: false };
 
 // ====== 純邏輯（regression-check 會測）======
 function petLabPref(pet, name) {
@@ -119,13 +119,33 @@ function renderLabsAll() {
   renderLabNames();
 }
 
+// 這個項目目前是不是需要注意（偏高偏低且沒有被標成醫師說無妨）
+function labNeedsAttention(item) {
+  const h = item.history();
+  const c = item.classifyPoint(h[h.length - 1]);
+  return !!c && LAB_RANK[c.level] > 0;
+}
+
 function renderLabLatest(items) {
   const grid = document.getElementById("petLabLatest");
+  const info = document.getElementById("petLabLatestInfo");
+  const toggle = document.getElementById("petLabShowAll");
   grid.innerHTML = "";
   if (!items.length) {
+    info.textContent = "";
+    toggle.classList.add("hidden");
     grid.innerHTML = `<p class="empty-hint">${escapeHtml(state.pet)} 還沒有驗血紀錄，按「＋ 新增驗血」（或貼上匯入）</p>`;
     return;
   }
+  // 項目很多（一次抽血三、四十項）時預設只列需要注意的，其他收起來，要看再展開
+  const attention = items.filter(labNeedsAttention);
+  const shown = labState.showAll ? items : attention;
+  info.textContent = attention.length
+    ? `共 ${items.length} 項，其中 ${attention.length} 項需要注意（偏高或偏低）`
+    : `共 ${items.length} 項，目前沒有需要注意的項目 🟢`;
+  toggle.classList.toggle("hidden", items.length === attention.length);
+  toggle.textContent = labState.showAll ? "只看需要注意的" : `顯示全部 ${items.length} 項`;
+  items = shown;
   items.forEach(item => {
     const hist = item.history();
     const last = hist[hist.length - 1];
@@ -162,10 +182,17 @@ function renderLabLatest(items) {
     tile.addEventListener("click", () => {
       labState.key = item.key;
       renderLabsAll();
+      // 趨勢圖在上面：選了之後捲回去看
+      document.getElementById("petLabTrendCard").scrollIntoView({ behavior: "smooth", block: "start" });
     });
     grid.appendChild(tile);
   });
 }
+
+document.getElementById("petLabShowAll").addEventListener("click", () => {
+  labState.showAll = !labState.showAll;
+  renderLabsAll();
+});
 
 function renderLabChartOptions(items) {
   const select = document.getElementById("petLabItem");
@@ -430,7 +457,6 @@ document.getElementById("petLabImportBtn").addEventListener("click", () => {
   if (state.labs.some(r => r.pet === pet && String(r.date) === date)) notes.push("⚠️ 這隻這一天已經有驗血紀錄，按「新增」會更新同名項目");
   msg.textContent = notes.join("；");
   updateLabFormValidity();
-  msg.scrollIntoView({ block: "nearest" });
 });
 
 document.getElementById("petLabForm").addEventListener("submit", async (e) => {

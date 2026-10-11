@@ -1209,3 +1209,16 @@ input[type="checkbox"]:checked {
 .more-fields button.ghost-btn { border-color: var(--accent); color: var(--accent); font-weight: 600; padding: 8px 14px; }
 .import-msg:empty { display: none; }
 .import-msg { margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.5; background: var(--accent-soft); color: var(--text); border-left: 3px solid var(--accent); }
+
+/* 寵物頁：每張卡都佔滿整列（桌機上不要左右各擺一半，留下一大片空白） */
+.pets-main > * { grid-column: 1 / -1; }
+/* 驗血項目很多：方塊縮小、一排放更多 */
+.pet-lab-latest { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.pet-lab-latest .lab-tile { padding: 8px 4px; }
+.pet-lab-latest .bp-stat-value { font-size: 17px; }
+.pet-lab-latest .tile-delta { font-size: 10px; }
+/* 新增驗血這種很長的彈窗：整個遮罩可以捲動、從上面開始排，頂端不會被切掉（原本垂直置中，內容比視窗高時上面會看不到） */
+#petLabModal { overflow-y: auto; align-items: flex-start; }
+#petLabModal .modal-card { margin: auto; max-height: none; overflow: visible; }
+/* 項目很多時，「新增」鈕固定在彈窗底部，不用捲到最下面 */
+#petLabModal .modal-actions { position: sticky; bottom: 0; background: var(--card-bg); padding: 10px 0 2px; margin-top: 4px; }

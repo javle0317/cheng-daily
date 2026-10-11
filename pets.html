@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261011221843">
+<link rel="stylesheet" href="style.css?v=20261011222212">
 </head>
 <body>
 
@@ -44,7 +44,7 @@
       </div>
     </header>
 
-    <main class="grid dense">
+    <main class="grid dense pets-main">
       <div class="pet-switch" id="petSwitch" role="tablist" aria-label="選擇寵物"></div>
       <div class="pet-switch pet-tabs" id="petTabs" role="tablist" aria-label="分頁">
         <button type="button" class="pet-tab on" data-tabbtn="log" role="tab">紀錄</button>
@@ -73,13 +73,7 @@
         <button id="openPetLabForm" type="button" class="add-primary">＋ 新增驗血</button>
       </div>
 
-      <section class="card hidden" data-tab="labs">
-        <h2>最近一次</h2>
-        <div id="petLabLatest" class="lab-latest"></div>
-        <p class="health-disclaimer">標示依每份報告上印的參考範圍判斷；你和醫師確認過「這隻沒關係」的項目，可以在趨勢圖旁的「個人化設定」調整。分級僅供參考，請以醫師診斷為準。</p>
-      </section>
-
-      <section class="card hidden" data-tab="labs">
+      <section id="petLabTrendCard" class="card hidden" data-tab="labs">
         <div class="bp-list-header">
           <h2>趨勢</h2>
           <select id="petLabItem" aria-label="項目"></select>
@@ -90,6 +84,16 @@
           <button id="petLabPrefBtn" type="button" class="ghost-btn hidden">個人化設定</button>
         </div>
         <div id="petLabExplain" class="lab-explain"></div>
+      </section>
+
+      <section class="card hidden" data-tab="labs">
+        <div class="bp-list-header">
+          <h2>最近一次</h2>
+          <button id="petLabShowAll" type="button" class="ghost-btn hidden"></button>
+        </div>
+        <p id="petLabLatestInfo" class="progress-line"></p>
+        <div id="petLabLatest" class="lab-latest pet-lab-latest"></div>
+        <p class="health-disclaimer">標示依每份報告上印的參考範圍判斷；你和醫師確認過「這隻沒關係」的項目，可以在趨勢圖旁的「個人化設定」調整。分級僅供參考，請以醫師診斷為準。</p>
       </section>
 
       <section class="card hidden" data-tab="labs">
@@ -228,9 +232,9 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261011221843"></script>
-  <script src="health-charts.js?v=20261011221843"></script>
-  <script src="pets.js?v=20261011221843"></script>
-  <script src="pets-labs.js?v=20261011221843"></script>
+  <script src="shared.js?v=20261011222212"></script>
+  <script src="health-charts.js?v=20261011222212"></script>
+  <script src="pets.js?v=20261011222212"></script>
+  <script src="pets-labs.js?v=20261011222212"></script>
 </body>
 </html>
