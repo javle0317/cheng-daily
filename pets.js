@@ -11,6 +11,7 @@ let state = {
   editingId: null,
   labs: [],
   prefs: [],
+  skipped: [],
   tab: "log",
 };
 
@@ -24,6 +25,12 @@ function applyPetData(data) {
   state.log = (data && data.log) || [];
   state.labs = (data && data.labs) || [];
   state.prefs = (data && data.prefs) || [];
+  state.skipped = (data && data.skipped) || [];
+}
+
+// 已經登記過（PetLog 的 sourceEventId）或按過「略過」的事件 id
+function petDoneIds() {
+  return [...state.log.map(r => r.sourceEventId).filter(Boolean), ...state.skipped.map(r => r.eventId).filter(Boolean)];
 }
 
 window.loadPageData = async function () {
@@ -80,20 +87,6 @@ function petUsageStats(rows, today) {
   };
 }
 
-// 可以搬的事件：owner 是寵物、還沒搬過（sourceEventId 沒出現過）、日期已經到了（還沒發生的預約不能搬），
-// 預設再限定「有花費或標題看得出類型」；all=true 時列出所有寵物事件（標題沒關鍵字的也能手動搬）
-function migrationCandidates(events, log, opts) {
-  const o = opts || {};
-  const today = o.today || toDateStr(new Date());
-  const done = new Set(log.map(r => String(r.sourceEventId || "")).filter(Boolean));
-  return events
-    .filter(e => PET_NAMES.includes(e.owner) && !done.has(String(e.id)))
-    .filter(e => String(e.date) <= today)
-    .filter(e => o.all || Number(e.amount) > 0 || guessPetType(e.title) !== "other")
-    .map(e => ({ event: e, type: guessPetType(e.title) }))
-    .sort((a, b) => String(a.event.date).localeCompare(String(b.event.date)));
-}
-
 function monthOf(dateStr) {
   return String(dateStr).slice(0, 7);
 }
@@ -137,10 +130,10 @@ function renderPetsAll() {
   renderSummary();
   renderLogList();
   if (typeof renderLabsAll === "function") renderLabsAll();
-  const cands = migrationCandidates(state.events, state.log);
+  const cands = migrationCandidates(state.events, petDoneIds());
   const btn = document.getElementById("openPetMigrate");
   btn.classList.toggle("hidden", !cands.length);
-  btn.textContent = `整理舊紀錄（${cands.length}）`;
+  btn.textContent = `待登記（${cands.length}）`;
   updatePetFormValidity();
 }
 
@@ -463,13 +456,14 @@ function updateMigrateCount() {
   const n = migrateRows.filter(r => r.check.checked).length;
   document.getElementById("petMigrateCount").textContent = `已選 ${n} / ${migrateRows.length} 筆`;
   document.getElementById("petMigrateSubmit").disabled = n === 0;
+  document.getElementById("petMigrateSkip").disabled = n === 0;
 }
 
 function openPetMigrate() {
   const list = document.getElementById("petMigrateList");
   list.innerHTML = "";
   migrateRows = [];
-  migrationCandidates(state.events, state.log, { all: document.getElementById("petMigrateAll").checked }).forEach(cand => {
+  migrationCandidates(state.events, petDoneIds(), { all: document.getElementById("petMigrateAll").checked }).forEach(cand => {
     const e = cand.event;
     const li = document.createElement("li");
     li.className = "item-row pet-migrate-row";
@@ -520,6 +514,25 @@ document.getElementById("petMigrateSubmit").addEventListener("click", async (e) 
     showToast(`已搬進 ${items.length} 筆`);
   } catch (err) {
     setStatus("搬移失敗：" + err.message, true);
+  } finally {
+    updateMigrateCount();
+  }
+});
+
+// 不用登記的（例如已經自己手動記過、或只是提醒）：略過後不再出現在待登記
+document.getElementById("petMigrateSkip").addEventListener("click", async (e) => {
+  const btn = e.currentTarget; // 要在第一個 await 之前取：await 之後事件已經結束，currentTarget 會變成 null
+  const picked = migrateRows.filter(r => r.check.checked);
+  if (!picked.length) return;
+  if (!(await showConfirm(`確定這 ${picked.length} 筆不用登記到寵物紀錄嗎？略過後就不會再出現在待登記（原事件不受影響）。`))) return;
+  btn.disabled = true;
+  try {
+    applyPetData(await api("skipPetEvents", { ids: JSON.stringify(picked.map(r => r.cand.event.id)) })); // api() 會把參數轉成字串，陣列要先轉成 JSON
+    renderPetsAll();
+    if (!migrationCandidates(state.events, petDoneIds(), { all: document.getElementById("petMigrateAll").checked }).length) closePetMigrate(); else openPetMigrate();
+    showToast(`已略過 ${picked.length} 筆`);
+  } catch (err) {
+    setStatus("略過失敗：" + err.message, true);
   } finally {
     updateMigrateCount();
   }

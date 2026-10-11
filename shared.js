@@ -37,7 +37,7 @@ function guessPetType(title) {
 
 // 前端需要的後端最低版本（Code.gs 的 BACKEND_VERSION）。後端比這個舊 = Dean 還沒把新版 Code.gs 部署成新版本，
 // 會跳一次提醒，不用等到畫面出現怪現象才發現。改了後端行為、前端依賴時，兩邊一起加版本。
-const BACKEND_MIN_VERSION = "2026-10-12.5";
+const BACKEND_MIN_VERSION = "2026-10-12.6";
 let backendWarned = false;
 
 function toDateStr(d) {
@@ -385,3 +385,18 @@ document.getElementById("dialogCancelBtn").addEventListener("click", () => resol
 document.getElementById("dialogModal").addEventListener("click", (e) => {
   if (e.target.id === "dialogModal") resolveDialog(false);
 });
+
+// 待登記的寵物事件：owner 是寵物、還沒登記或略過（doneIds 是 PetLog 的 sourceEventId 加上 PetSkipped 的 eventId）、
+// 日期已經到了（還沒到的預約不能登記），預設再限定「有花費或標題看得出類型」；all=true 時列出所有寵物事件。
+// 寵物頁的「待登記」清單與首頁寵物圖示上的紅點共用。
+function migrationCandidates(events, doneIds, opts) {
+  const o = opts || {};
+  const today = o.today || toDateStr(new Date());
+  const done = new Set([...doneIds].map(String));
+  return events
+    .filter(e => PET_NAMES.includes(e.owner) && !done.has(String(e.id)))
+    .filter(e => String(e.date) <= today)
+    .filter(e => o.all || Number(e.amount) > 0 || guessPetType(e.title) !== "other")
+    .map(e => ({ event: e, type: guessPetType(e.title) }))
+    .sort((a, b) => String(a.event.date).localeCompare(String(b.event.date)));
+}

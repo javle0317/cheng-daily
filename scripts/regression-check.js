@@ -155,9 +155,9 @@ console.log("前端：寵物頁（間隔統計、舊事件類型猜測、搬移�
   check("petIntervalStats：最多取最近 6 個間隔（前面 10 天、最後 30 天 → 平均 (10*5+30)/6=13）", many.avgInterval === 13, many);
   check("guessPetType：飼料／貓砂／疫苗／看醫生／美容／其他", ev('["買主食罐","貓砂補貨","打疫苗","看醫生 耳朵","洗澡美容","生日"].map(guessPetType).join()') === "food,litter,medicine,vet,grooming,other");
   const evs = '[{id:"a",owner:"咪嚕",title:"買飼料",date:"2026-10-01",amount:500},{id:"b",owner:"me",title:"買飼料",date:"2026-10-02",amount:100},{id:"c",owner:"林萌",title:"散步",date:"2026-10-03",amount:""},{id:"d",owner:"林萌",title:"其他花費",date:"2026-10-04",amount:80},{id:"e",owner:"咪嚕",title:"看醫生",date:"2026-10-05",amount:""},{id:"f",owner:"咪嚕",title:"回診看醫生",date:"2026-10-20",amount:""}]';
-  const cands = JSON.parse(ev(`JSON.stringify(migrationCandidates(${evs}, [{sourceEventId:"e"}], {today:"2026-10-11"}).map(c => c.event.id + ":" + c.type))`));
-  check("migrationCandidates：只取寵物事件、有花費或看得出類型、已搬過的不再列、還沒到的預約不列", cands.join() === "a:food,d:other", cands);
-  const all = JSON.parse(ev(`JSON.stringify(migrationCandidates(${evs}, [{sourceEventId:"e"}], {today:"2026-10-11", all:true}).map(c => c.event.id))`));
+  const cands = JSON.parse(ev(`JSON.stringify(migrationCandidates(${evs}, ["e"], {today:"2026-10-11"}).map(c => c.event.id + ":" + c.type))`));
+  check("migrationCandidates（在 shared.js，首頁紅點與寵物頁共用）：只取寵物事件、有花費或看得出類型、已登記或略過的不再列、還沒到的預約不列", cands.join() === "a:food,d:other", cands);
+  const all = JSON.parse(ev(`JSON.stringify(migrationCandidates(${evs}, ["e"], {today:"2026-10-11", all:true}).map(c => c.event.id))`));
   check("migrationCandidates：顯示全部時標題看不出類型的寵物事件也列出（仍不含未來預約與已搬過的）", all.join() === "a,c,d", all);
   const us = JSON.parse(ev('JSON.stringify(petUsageStats([{date:"2026-08-01",finishedAt:"2026-08-21"},{date:"2026-09-01",finishedAt:"2026-09-11"},{date:"2026-10-01",finishedAt:""},{date:"2026-09-20",finishedAt:""}], "2026-10-11"))'));
   check("petUsageStats：已用完的平均天數（20、10 → 15）、未用完件數與最久放了幾天", us.finished === 2 && us.avgUse === 15 && us.open === 2 && us.openMax === 21, us);
@@ -265,7 +265,15 @@ console.log("前端：事件彈窗的「登記到寵物紀錄」與循環行程�
   const h = read("index.html"), a = read("app.js");
   check("index.html 有 emPetLog／emPetType／emPetAmount／petQuickModal", ["emPetLog", "emPetType", "emPetAmount", "petQuickModal", "pqType"].every(id => h.includes(`id="${id}"`)));
   check("app.js 送出事件時帶 petLogType／petLogAmount，且只有寵物對象且勾選時才帶", /params\.petLogType\s*=/.test(a) && /const petLog = !\$id\("emPetBox"\)\.classList\.contains\("hidden"\) && \$id\("emPetLog"\)\.checked/.test(a));
+  check("首頁有待登記紅點（petPendingDot）且載入後更新、新增／刪除事件後也更新", h.includes('id="petPendingDot"') && /refreshPetPending\(\);\s*\/\/ 寵物圖示/.test(a) && (a.match(/refreshPetPending\(\);\n    showToast\(/g) || []).length >= 2);
   check("循環行程的那一次記進寵物紀錄時帶 sourceEventId（rec_規則id_日期）", /sourceEventId: `rec_\$\{petQuickEv\.ruleId\}_\$\{petQuickEv\.date\}`/.test(a));
+}
+
+console.log("前端：事件處理函式在 await 之後不能再用 e.currentTarget（會是 null，按鈕會壞掉）");
+{
+  const src = read("pets.js");
+  const h = src.slice(src.indexOf('document.getElementById("petMigrateSkip").addEventListener'));
+  check("略過鈕在 await showConfirm 之前就取好 e.currentTarget", h.indexOf("e.currentTarget") > -1 && h.indexOf("e.currentTarget") < h.indexOf("await showConfirm"));
 }
 
 console.log("後端：數字解析、驗血項目驗證、公式防護");
@@ -316,7 +324,7 @@ check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.t
   const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
   const EV = ["id", "date", "owner", "time", "title", "notes", "createdAt", "amount", "hideFromCalendar", "endTime"];
-  const sheets = { Events: mk(EV), PetLog: mk(be.PET_LOG_HEADERS), PetLabs: mk(be.PET_LAB_HEADERS), PetLabPrefs: mk(be.PET_LAB_PREF_HEADERS) };
+  const sheets = { Events: mk(EV), PetLog: mk(be.PET_LOG_HEADERS), PetLabs: mk(be.PET_LAB_HEADERS), PetLabPrefs: mk(be.PET_LAB_PREF_HEADERS), PetSkipped: mk(be.PET_SKIP_HEADERS) };
   const realUuid = be.Utilities.getUuid; let uc = 0; be.Utilities.getUuid = () => "ev-" + (++uc);
   const realToday = be.todayStr_, realDirty = be.markCalendarDirty_; be.todayStr_ = () => "2026-10-11"; be.markCalendarDirty_ = () => {};
   const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: n => sheets[n] });
@@ -335,6 +343,10 @@ check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.t
     check("updateEventWithPetLog_：編輯舊事件時登記（created），同一個事件再登記不會重複（exists）", up1.petLogged === "created" && up2.petLogged === "exists" && sheets.PetLog.rows.filter(r => r[7] === plainId).length === 1);
     be.addPetLog(Object.assign({}, { pet: "咪嚕", type: "medicine", date: "2026-10-10", title: "點藥", amount: "", note: "", sourceEventId: "rec_r1_2026-10-10" }));
     check("addPetLog：帶 sourceEventId（循環行程某一次）同一次不能記兩遍", throws(() => be.addPetLog({ pet: "咪嚕", type: "medicine", date: "2026-10-10", title: "點藥", amount: "", note: "", sourceEventId: "rec_r1_2026-10-10" })));
+    be.skipPetEvents(JSON.stringify(["ev-a", "ev-b"]));
+    be.skipPetEvents(["ev-b", "ev-c"]);
+    const info = be.getPetPendingInfo();
+    check("skipPetEvents：記下事件 id、重複的不重複記；getPetPendingInfo 回傳已登記與已略過的 id", sheets.PetSkipped.rows.length === 3 && info.skipped.join() === "ev-a,ev-b,ev-c" && info.done.includes(plainId) && throws(() => be.skipPetEvents([])), { skipped: info.skipped, done: info.done });
   } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; be.Utilities.getUuid = realUuid; be.todayStr_ = realToday; be.markCalendarDirty_ = realDirty; }
 }
 {
@@ -362,7 +374,7 @@ check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.t
 {
   const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
-  const sheets = { PetLabs: mk(be.PET_LAB_HEADERS), PetLabPrefs: mk(be.PET_LAB_PREF_HEADERS), PetLog: mk(be.PET_LOG_HEADERS) };
+  const sheets = { PetLabs: mk(be.PET_LAB_HEADERS), PetLabPrefs: mk(be.PET_LAB_PREF_HEADERS), PetLog: mk(be.PET_LOG_HEADERS), PetSkipped: mk(be.PET_SKIP_HEADERS) };
   const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: n => sheets[n] });
   try {
     const items = [{ name: "ALT", value: "45", unit: "U/L", refLow: "10", refHigh: "100" }, { name: "BUN", value: "12", unit: "mg/dL", refLow: "", refHigh: "" }];

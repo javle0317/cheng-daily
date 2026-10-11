@@ -271,6 +271,7 @@ window.loadPageData = async function () {
   applyData(await api("getData", { keys: "goals,events,habits,habitLogs,recurringEvents,recurringExceptions,holidays" }));
   renderAll();
   refreshCalSync(); // Google 行事曆同步狀態（沒設定 CALENDAR_ID 就不顯示），不擋登入
+  refreshPetPending(); // 寵物圖示上的「待登記」紅點，同樣不擋登入
 };
 
 // ====== Google 行事曆同步狀態（單向 App → Google，對帳邏輯在 Code.gs）======
@@ -1066,6 +1067,20 @@ const openModalEl = (id) => $id(id).classList.remove("hidden");
 const closeModalEl = (id) => $id(id).classList.add("hidden");
 const modalError = (hintId, msg) => { const el = $id(hintId); el.textContent = msg; el.classList.toggle("modal-error", !!msg); };
 
+// ====== 寵物「待登記」紅點：已經發生、還沒登記到寵物紀錄的寵物事件（清單在寵物頁）======
+async function refreshPetPending() {
+  const dot = document.getElementById("petPendingDot"), link = document.getElementById("petLink");
+  try {
+    const info = await api("getPetPendingInfo");
+    const n = migrationCandidates(state.events, [...info.done, ...info.skipped]).length;
+    dot.textContent = n > 9 ? "9+" : String(n);
+    dot.classList.toggle("hidden", n === 0);
+    link.title = n ? `寵物（${n} 個事件待登記）` : "寵物";
+  } catch (err) {
+    dot.classList.add("hidden"); // 後端還沒更新或讀不到就不顯示，不打擾
+  }
+}
+
 // ====== 循環行程的某一次 → 記到寵物紀錄 ======
 let petQuickEv = null;
 function openPetQuick(ev) {
@@ -1187,6 +1202,7 @@ $id("eventModalForm").addEventListener("submit", async (e) => {
     renderEvents();
     renderCalendar();
     renderPetExpenses();
+    refreshPetPending();
     showToast(petLog ? (res.petLogged === "exists" ? "已儲存（這個事件之前已登記過寵物紀錄）" : "已儲存，並登記到寵物紀錄") : (wasEdit ? "已儲存" : "已新增"));
   } catch (err) {
     modalError("emHint", (wasEdit ? "儲存失敗：" : "新增失敗：") + err.message);
@@ -1206,6 +1222,7 @@ $id("emDeleteBtn").addEventListener("click", async () => {
     renderEvents();
     renderCalendar();
     renderPetExpenses();
+    refreshPetPending();
     showToast("已刪除");
   } catch (err) {
     modalError("emHint", "刪除失敗：" + err.message);

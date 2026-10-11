@@ -11,7 +11,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這十七個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這十八個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -33,6 +33,8 @@
  *   UtilityBills    欄位: id | type | billingMonth | months | amount | note | createdAt
  *                   （水電瓦斯分項追蹤，ensureSheet 自動建立，寫死在 UTILITY_HEADERS；type 是 water/electric/gas，months 是計費月數，
  *                   趨勢用「每月均攤＝amount÷months」；同 type+billingMonth 只有一筆）
+ *   PetSkipped      欄位: id | eventId | createdAt
+ *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
  *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
  *                   （寵物驗血，一個項目一列、自帶報告上的參考範圍；ensureSheet 自動建立，寫死在 PET_LAB_HEADERS）
  *   PetLabPrefs     欄位: id | pet | name | mode | refLow | refHigh | note | createdAt
@@ -215,6 +217,10 @@ function dispatch_(p) {
         return respond({ ok: true, data: deleteCreditCardBill(p.id) });
       case "getPetData":
         return respond({ ok: true, data: getPetData() });
+      case "getPetPendingInfo":
+        return respond({ ok: true, data: getPetPendingInfo() });
+      case "skipPetEvents":
+        return respond({ ok: true, data: skipPetEvents(p.ids) });
       case "addPetLog":
         return respond({ ok: true, data: addPetLog(p) });
       case "updatePetLog":
@@ -261,7 +267,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.5";
+var BACKEND_VERSION = "2026-10-12.6";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1802,6 +1808,7 @@ function deleteRecipe(id) {
 // 新分頁，用 ensureSheet 自動建立。欄位與順序寫死，不能改名或調整。
 var PET_LOG_HEADERS = ["id", "pet", "type", "date", "title", "amount", "note", "sourceEventId", "createdAt", "finishedAt"];
 var PET_LOG_TYPES = ["food", "litter", "vet", "medicine", "grooming", "other"];
+var PET_SKIP_HEADERS = ["id", "eventId", "createdAt"];
 
 function petLogSheet_() {
   return ensureSheet("PetLog", PET_LOG_HEADERS);
@@ -1812,7 +1819,42 @@ function getPetData() {
     log: sheetToObjects(petLogSheet_()),
     labs: sheetToObjects(ensureSheet("PetLabs", PET_LAB_HEADERS)),
     prefs: sheetToObjects(ensureSheet("PetLabPrefs", PET_LAB_PREF_HEADERS)),
+    skipped: sheetToObjects(ensureSheet("PetSkipped", PET_SKIP_HEADERS)),
   };
+}
+
+// 首頁判斷「有幾個寵物事件待登記」只需要這兩份 id（比整份 getPetData 輕）：已登記的來源事件 id、按過「略過」的事件 id
+function getPetPendingInfo() {
+  var done = [];
+  var logValues = petLogSheet_().getDataRange().getValues();
+  var srcCol = logValues[0].indexOf("sourceEventId");
+  if (srcCol >= 0) for (var i = 1; i < logValues.length; i++) if (logValues[i][srcCol]) done.push(String(logValues[i][srcCol]));
+  var skipValues = ensureSheet("PetSkipped", PET_SKIP_HEADERS).getDataRange().getValues();
+  var evCol = skipValues[0].indexOf("eventId");
+  var skipped = [];
+  if (evCol >= 0) for (var j = 1; j < skipValues.length; j++) if (skipValues[j][evCol]) skipped.push(String(skipValues[j][evCol]));
+  return { done: done, skipped: skipped };
+}
+
+// 待登記清單裡「這些不用登記」：記下事件 id，之後不再列出（原事件不動）
+function skipPetEvents(ids) {
+  if (typeof ids === "string") {
+    try { ids = JSON.parse(ids); } catch (e) { throw new Error("略過清單格式錯誤"); }
+  }
+  if (!ids || !ids.length) throw new Error("沒有要略過的項目");
+  if (ids.length > 300) throw new Error("一次最多略過 300 筆");
+  var clean = ids.map(function (id) { return textArg_(id, "事件", { required: true, max: 100 }); });
+  var sheet = ensureSheet("PetSkipped", PET_SKIP_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  var evCol = values[0].indexOf("eventId");
+  var have = {};
+  for (var i = 1; i < values.length; i++) have[String(values[i][evCol])] = true;
+  clean.forEach(function (id) {
+    if (have[id]) return;
+    have[id] = true;
+    appendRowSafe_(sheet, [Utilities.getUuid(), id, new Date()]);
+  });
+  return getPetData();
 }
 
 function petLogFields_(p) {
