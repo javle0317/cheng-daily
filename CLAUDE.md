@@ -6,6 +6,7 @@
 - 送出期間鎖控制項：表單用 `setFormBusy`，列表項目用 `withRowLock`。
 - 改了 js/css，commit 前要更新 HTML 的 `?v=`（pre-commit hook 會做；hook 不跟著 repo，新環境先跑 `sh scripts/install-hooks.sh`）。
 - 改了 `Code.gs`：要手動貼進 Apps Script 重新部署新版本，並同步 `BACKEND_VERSION` 與 `shared.js` 的 `BACKEND_MIN_VERSION`。
+- 新增頁面：在 `shared.js` 的 `APP_NAV` 加一筆並在該頁 `<body>` 加 `data-page`（全站共用導覽；不要每頁自己手寫連結）。
 - 純邏輯有回歸檢查：`node scripts/regression-check.js`。
 - 本機預覽：`python3 -m http.server 8791`（`.claude/launch.json`）。
 - 做完一項改動：**直接 commit 並 push 到 main**，不用再問（Dean 直接在線上檢查）。commit 前先跑 `node scripts/regression-check.js`。
@@ -73,6 +74,6 @@
 ```
 - `type` 只能是 `water`（水費）、`electric`（電費）、`gas`（瓦斯）；網路、電信、訂閱先不記。
 - `billingMonth` 是帳單上的**計費期間結束的月份**（yyyy-MM）；沒寫清楚就問，不要猜。
-- `months` 計費月數（1–12）：台灣水電通常兩個月一期（2）、瓦斯多半一個月（1）；帳單上有寫計費期間就以它為準，沒給時前端會用預設（水電 2、瓦斯 1）。
+- `months` 計費月數（1–12）：台灣水電與台北瓦斯都是兩個月一期（2）；帳單上有寫計費期間就以它為準，沒給時前端會用預設（三種都是 2）。
 - `amount` 是帳單上的應繳總金額（純數字）；`usage` 是用量（度，純數字，沒印就省略）；`note` 選填，不要編造。
 - 同一類型同一個月份不能出現兩次；已經記過的月份會被更新。數字看不清楚的列出來問，不要猜。

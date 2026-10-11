@@ -1254,3 +1254,13 @@ input[type="checkbox"]:checked {
 .has-badge { position: relative; }
 .notify-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--status-critical); color: #fff; font-size: 10px; line-height: 16px; text-align: center; font-weight: 700; box-sizing: border-box; }
 .seg-small .seg-btn { font-size: 13px; padding: 7px 4px; }
+
+/* ====== 全站功能導覽（shared.js 的 APP_NAV）====== */
+.nav-icons { display: contents; }
+.app-nav { position: sticky; top: 0; z-index: 50; display: flex; gap: 6px; margin: 0 0 14px; padding: 6px 0; background: var(--bg); border-bottom: 1px solid var(--border); }
+.app-nav-link { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 10px; color: var(--text-dim); text-decoration: none; font-size: 11px; letter-spacing: 0.06em; position: relative; }
+.app-nav-link svg { width: 20px; height: 20px; }
+.app-nav-link:hover { color: var(--text); background: var(--accent-soft); }
+.app-nav-link.on { color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+.app-nav-link .notify-dot { top: 0; right: 14px; }
+.pet-lab-latest .empty-hint { grid-column: 1 / -1; }

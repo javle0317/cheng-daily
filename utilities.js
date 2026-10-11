@@ -5,7 +5,7 @@
 const UTIL_TYPES = [
   { key: "water", label: "水費", icon: "💧", months: 2 },
   { key: "electric", label: "電費", icon: "⚡", months: 2 },
-  { key: "gas", label: "瓦斯", icon: "🔥", months: 1 },
+  { key: "gas", label: "瓦斯", icon: "🔥", months: 2 }, // 台北瓦斯也是兩個月一期
 ];
 
 const UTIL_LIST_LIMIT = 12;

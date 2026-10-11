@@ -260,7 +260,7 @@ console.log("前端：水電瓦斯（每月均攤、趨勢點、摘要、渲染�
   check("utilPoints：用量模式＝用量÷計費月數（每月），只算有填用量的；單價模式＝金額÷用量", JSON.stringify(JSON.parse(ev('JSON.stringify(utilPoints(__ubills, "electric", "usage").map(p => p.value))'))) === "[300,400]" && JSON.stringify(JSON.parse(ev('JSON.stringify(utilPoints(__ubills, "electric", "price").map(p => p.value))'))) === "[4,4.5]" && ev('utilPoints(__ubills, "electric", "amount").length') === 3);
   check("utilHasUsage／utilUsage：沒填或 0 視為沒有；label 帶用量", ev('utilHasUsage(__ubills, "electric")') === true && ev('utilHasUsage(__bills, "electric")') === false && ev('utilUsage({usage: 0})') === null && ev('utilUsage({usage: ""})') === null && ev('utilPoints(__ubills, "electric", "usage")[1].label').includes("用量 800 度"));
   const imp = JSON.parse(ev('JSON.stringify(parseUtilImport(\'{"items":[{"type":"electric","billingMonth":"2026-08","amount":"3,600","usage":800},{"type":"water","billingMonth":"2026-08","months":2,"amount":500,"note":"x"},{"type":"gas","billingMonth":"2026-08","amount":450,"months":1}]}\'))'));
-  check("parseUtilImport：數字解析（3,600）、缺月數用類型預設（電 2、瓦斯 1）、沒填用量留空", imp && imp.problems.length === 0 && imp.items.length === 3 && imp.items[0].amount === 3600 && imp.items[0].months === 2 && imp.items[0].usage === 800 && imp.items[1].usage === "" && imp.items[2].months === 1, imp);
+  check("parseUtilImport：數字解析（3,600）、缺月數用類型預設（水電瓦斯都是 2）、沒填用量留空", imp && imp.problems.length === 0 && imp.items.length === 3 && imp.items[0].amount === 3600 && imp.items[0].months === 2 && imp.items[0].usage === 800 && imp.items[1].usage === "" && imp.items[2].months === 1, imp);
   const impBad = JSON.parse(ev('JSON.stringify(parseUtilImport(\'[{"type":"net","billingMonth":"2026-08","amount":1},{"type":"gas","billingMonth":"2026-13","amount":1},{"type":"gas","billingMonth":"2026-08","amount":"x"},{"type":"gas","billingMonth":"2026-08","amount":1,"months":3.5},{"type":"gas","billingMonth":"2026-07","amount":1},{"type":"gas","billingMonth":"2026-07","amount":2}]\'))'));
   check("parseUtilImport：壞類型／壞月份／壞金額／壞月數／同批次重複都列入 problems（整批不匯入）", impBad.problems.length === 5 && impBad.items.length === 1, impBad);
   check("parseUtilImport：壞 JSON／沒有陣列回傳 null；批次匯入鈕在 await 前取 e.currentTarget", ev('parseUtilImport("abc")') === null && ev('parseUtilImport("{}")') === null && read("utilities.js").indexOf("const btn = e.currentTarget") < read("utilities.js").indexOf("await showConfirm(`確定匯入"));
@@ -277,7 +277,7 @@ console.log("前端：事件彈窗的「登記到寵物紀錄」與循環行程�
   const h = read("index.html"), a = read("app.js");
   check("index.html 有 emPetLog／emPetType／emPetAmount／petQuickModal", ["emPetLog", "emPetType", "emPetAmount", "petQuickModal", "pqType"].every(id => h.includes(`id="${id}"`)));
   check("app.js 送出事件時帶 petLogType／petLogAmount，且只有寵物對象且勾選時才帶", /params\.petLogType\s*=/.test(a) && /const petLog = !\$id\("emPetBox"\)\.classList\.contains\("hidden"\) && \$id\("emPetLog"\)\.checked/.test(a));
-  check("首頁有待登記紅點（petPendingDot）且載入後更新、新增／刪除事件後也更新", h.includes('id="petPendingDot"') && /refreshPetPending\(\);\s*\/\/ 寵物圖示/.test(a) && (a.match(/refreshPetPending\(\);\n    showToast\(/g) || []).length >= 2);
+  check("首頁有待登記紅點（petPendingDot，由 shared.js 的導覽產生）且載入後更新、新增／刪除事件後也更新", read("shared.js").includes('badge: "petPendingDot"') && /refreshPetPending\(\);\s*\/\/ 寵物圖示/.test(a) && (a.match(/refreshPetPending\(\);\n    showToast\(/g) || []).length >= 2);
   check("循環行程的那一次記進寵物紀錄時帶 sourceEventId（rec_規則id_日期）", /sourceEventId: `rec_\$\{petQuickEv\.ruleId\}_\$\{petQuickEv\.date\}`/.test(a));
 }
 
@@ -286,6 +286,16 @@ console.log("前端：事件處理函式在 await 之後不能再用 e.currentTa
   const src = read("pets.js");
   const h = src.slice(src.indexOf('document.getElementById("petMigrateSkip").addEventListener'));
   check("略過鈕在 await showConfirm 之前就取好 e.currentTarget", h.indexOf("e.currentTarget") > -1 && h.indexOf("e.currentTarget") < h.indexOf("await showConfirm"));
+}
+
+console.log("全站導覽：每個頁面都有 data-page、APP_NAV 涵蓋所有頁面、首頁有 navIcons、子頁不再有「← 返回」");
+{
+  const nav = loadFrontend(["shared.js"]);
+  const items = JSON.parse(vm.runInContext("JSON.stringify(APP_NAV.map(i => [i.key, i.href]))", nav));
+  const pages = ["index.html", "health.html", "bills.html", "pets.html", "recipes.html"];
+  check("APP_NAV 的每個 href 都對應一個存在的頁面，且 5 個頁面都在裡面", items.length === 5 && items.every(([k, href]) => fs.existsSync(path.join(root, href))) && pages.every(p => items.some(([, href]) => href === p)), items);
+  check("每個頁面 body 有 data-page，且值是 APP_NAV 的 key", pages.every(p => { const m = /<body data-page="([a-z]+)"/.exec(read(p)); return m && items.some(([k]) => k === m[1]); }));
+  check("首頁有 navIcons 容器、不再手寫四個功能連結；子頁拿掉「← 返回」", read("index.html").includes('id="navIcons"') && !/<a href="(health|bills|pets|recipes)\.html"/.test(read("index.html")) && pages.slice(1).every(p => !read(p).includes("back-link")));
 }
 
 console.log("後端：數字解析、驗血項目驗證、公式防護");

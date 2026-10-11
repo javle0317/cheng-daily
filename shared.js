@@ -400,3 +400,54 @@ function migrationCandidates(events, doneIds, opts) {
     .map(e => ({ event: e, type: guessPetType(e.title) }))
     .sort((a, b) => String(a.event.date).localeCompare(String(b.event.date)));
 }
+
+// ====== 全站共用的功能導覽（每頁 <body data-page="…">）======
+// 首頁的表頭是只有圖示的一排（跟「清單」「登出」放一起）；其他頁面在表頭下面多一列「圖示＋文字」的導覽，
+// 目前所在的那一頁反白。新增頁面時只要在這裡加一筆、該頁 body 加 data-page，所有頁面就同步多一個入口。
+const APP_NAV = [
+  { key: "home", href: "index.html", label: "首頁", title: "首頁", svg: '<path d="M4 11.5 12 4.5l8 7M6 10.5V20h4.5v-5.5h3V20H18v-9.5"/>' },
+  { key: "health", href: "health.html", label: "健康", title: "健康記錄", svg: '<path d="M2.8 12.5h4.2l2.2-5.5 4.2 10.5 2.4-6.2 1.2 1.2h4.2"/>' },
+  { key: "bills", href: "bills.html", label: "帳單", title: "信用卡帳單與水電瓦斯", svg: '<rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M6.5 15h3.5"/>' },
+  { key: "pets", href: "pets.html", label: "寵物", title: "寵物", badge: "petPendingDot", linkId: "petLink", svg: '<circle cx="6.5" cy="10.5" r="1.8"/><circle cx="10" cy="6.5" r="1.8"/><circle cx="14" cy="6.5" r="1.8"/><circle cx="17.5" cy="10.5" r="1.8"/><path d="M12 12.5c-2.8 0-5 2.2-5 4.4 0 1.5 1.2 2.1 2.6 2.1.9 0 1.5-.4 2.4-.4s1.5.4 2.4.4c1.4 0 2.6-.6 2.6-2.1 0-2.2-2.2-4.4-5-4.4z"/>' },
+  { key: "recipes", href: "recipes.html", label: "食譜", title: "食譜", svg: '<path d="M6 3v5a2 2 0 0 0 4 0V3M8 3v18"/><ellipse cx="16.5" cy="7.5" rx="2.6" ry="4.5"/><path d="M16.5 12v9"/>' },
+];
+
+function navAnchor(item, withLabel, current) {
+  const a = document.createElement("a");
+  a.href = item.href;
+  a.className = withLabel ? "app-nav-link" : "ghost-btn";
+  if (item.linkId) a.id = item.linkId;
+  a.title = item.title;
+  a.setAttribute("aria-label", item.title);
+  if (item.key === current) { a.classList.add("on"); a.setAttribute("aria-current", "page"); }
+  a.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${item.svg}</svg>`
+    + (withLabel ? `<span>${item.label}</span>` : "");
+  if (item.badge) {
+    a.classList.add("has-badge");
+    const dot = document.createElement("span");
+    dot.id = item.badge;
+    dot.className = "notify-dot hidden";
+    dot.setAttribute("aria-hidden", "true");
+    a.appendChild(dot);
+  }
+  return a;
+}
+
+function initAppNav() {
+  const page = document.body && document.body.dataset ? document.body.dataset.page : "";
+  if (typeof page !== "string" || !page) return;
+  if (page === "home") {
+    // 首頁：表頭裡只有圖示（不含首頁自己）
+    const host = document.getElementById("navIcons");
+    if (host) APP_NAV.filter(i => i.key !== "home").forEach(i => host.appendChild(navAnchor(i, false, page)));
+    return;
+  }
+  const header = document.querySelector("#app > .app-header");
+  if (!header) return;
+  const nav = document.createElement("nav");
+  nav.className = "app-nav";
+  nav.setAttribute("aria-label", "功能");
+  APP_NAV.forEach(i => nav.appendChild(navAnchor(i, true, page)));
+  header.insertAdjacentElement("afterend", nav);
+}
+initAppNav();
