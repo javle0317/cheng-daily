@@ -3,12 +3,12 @@
 // Sheet 分頁 PetLog 由後端 ensureSheet 自動建立；type 與後端 PET_LOG_TYPES 一致。
 
 const PET_TYPES = [
-  { key: "food", label: "飼料", icon: "🍖", predict: true, titleLabel: "品項（例如：主食罐 12 入）" },
-  { key: "litter", label: "貓砂", icon: "🧺", predict: true, titleLabel: "品項" },
-  { key: "vet", label: "看醫生", icon: "🏥", titleLabel: "看什麼（例如：耳朵發炎）" },
-  { key: "medicine", label: "用藥／疫苗", icon: "💊", titleLabel: "藥品或疫苗名稱" },
-  { key: "grooming", label: "美容", icon: "✂️", titleLabel: "項目" },
-  { key: "other", label: "其他", icon: "📝", titleLabel: "項目" },
+  { key: "food", label: "飼料", icon: "🍖", predict: true, finishable: true, titleLabel: "品項（例如：主食罐 12 入）", noteLabel: "備註（例如：到期日 2027/03）" },
+  { key: "litter", label: "貓砂", icon: "🧺", predict: true, finishable: true, titleLabel: "品項", noteLabel: "備註（選填）" },
+  { key: "vet", label: "看醫生", icon: "🏥", titleLabel: "看什麼（例如：耳朵發炎）", noteLabel: "醫囑／重要事項（選填）" },
+  { key: "medicine", label: "用藥／疫苗", icon: "💊", titleLabel: "藥品或疫苗名稱", noteLabel: "備註（用法、劑量、下次施打日）" },
+  { key: "grooming", label: "美容", icon: "✂️", titleLabel: "項目", noteLabel: "備註（選填）" },
+  { key: "other", label: "其他", icon: "📝", titleLabel: "項目", noteLabel: "備註（選填）" },
 ];
 const PET_ICON = { "林萌": "🐕", "咪嚕": "🐈" };
 
@@ -70,6 +70,22 @@ function petIntervalStats(dates, today) {
     stats.next = addDaysStr(last, stats.avgInterval);
   }
   return stats;
+}
+
+// 飼料／貓砂的使用狀況：沒有 finishedAt 的算「使用中／未用完」；有的算「用了幾天」（用完日 − 購買日）。
+// avgUse 是已用完那些的平均天數，openMax 是未用完的當中最久的已經放了幾天。
+function petUsageStats(rows, today) {
+  const t = dayNum(today);
+  const done = rows.filter(r => r.finishedAt && dayNum(r.finishedAt) !== null && dayNum(r.date) !== null);
+  const open = rows.filter(r => !r.finishedAt);
+  const uses = done.map(r => dayNum(r.finishedAt) - dayNum(r.date)).filter(n => n >= 0);
+  const openAges = open.map(r => (t === null || dayNum(r.date) === null) ? null : t - dayNum(r.date)).filter(n => n !== null);
+  return {
+    open: open.length,
+    openMax: openAges.length ? Math.max(...openAges) : null,
+    finished: uses.length,
+    avgUse: uses.length ? Math.round(uses.reduce((a, b) => a + b, 0) / uses.length) : null,
+  };
 }
 
 // 舊事件標題猜類型（搬移時當預設值，使用者可以改）
@@ -169,6 +185,11 @@ function renderSummary() {
     if (st.avgInterval !== null) lines.push(`平均每 ${st.avgInterval} 天一次`);
     else lines.push("資料還不夠算間隔");
     if (t.predict && st.next) lines.push(`下次約 ${st.next}`);
+    if (t.finishable) {
+      const u = petUsageStats(mine, today);
+      lines.push(u.open ? `未用完 ${u.open} 件（最久放了 ${u.openMax} 天）` : "目前都用完了");
+      if (u.avgUse !== null) lines.push(`平均 ${u.avgUse} 天用完（${u.finished} 筆）`);
+    }
     if (t.key === "vet") {
       const lastRow = [...mine].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
       if (lastRow) lines.push(`最近：${lastRow.title}`);
@@ -240,6 +261,38 @@ function renderLogList() {
   container.appendChild(ul);
 }
 
+// 飼料／貓砂：「用完了」記用完日；已用完的顯示「✅ 用完於 … （用了 N 天）」，點了可以改日期或清除
+function buildFinishBtn(r) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pay-btn";
+  if (r.finishedAt) {
+    const days = dayNum(r.finishedAt) - dayNum(r.date);
+    btn.textContent = `✅ 用完於 ${String(r.finishedAt).slice(5).replace("-", "/")}（用了 ${days} 天）`;
+    btn.title = "點一下修改用完日；清空日期＝改回還沒用完";
+  } else {
+    btn.textContent = "用完了";
+    btn.title = "記下用完的日期";
+  }
+  btn.addEventListener("click", async () => {
+    const input = await showPrompt(r.finishedAt ? "用完日（yyyy-MM-dd，留空＝改回還沒用完）：" : "用完日（yyyy-MM-dd）：", r.finishedAt || toDateStr(new Date()));
+    if (input === null) return;
+    const day = input.trim();
+    if (day !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(day)) { setStatus("日期格式要 yyyy-MM-dd", true); return; }
+    if (day !== "" && day < String(r.date)) { setStatus(`用完日不能早於購買日（${r.date}）`, true); return; }
+    await withRowLock(btn, async () => {
+      try {
+        applyPetData(await api("setPetLogFinished", { id: r.id, finishedAt: day }));
+        releasePending(btn);
+        renderPetsAll();
+      } catch (err) {
+        setStatus("更新失敗：" + err.message, true);
+      }
+    });
+  });
+  return btn;
+}
+
 function buildLogRow(r) {
   const meta = typeMeta(r.type);
   const li = document.createElement("li");
@@ -271,6 +324,7 @@ function buildLogRow(r) {
     note.textContent = "📝 " + r.note;
     row2.appendChild(note);
   }
+  if (meta.finishable) row2.appendChild(buildFinishBtn(r));
   const spacer = document.createElement("span");
   spacer.className = "spacer";
   const editBtn = document.createElement("button");
@@ -337,8 +391,14 @@ function initPetFormOptions() {
 }
 initPetFormOptions();
 document.getElementById("petLogType").addEventListener("change", (e) => {
-  document.getElementById("petLogTitleLabel").textContent = typeMeta(e.target.value).titleLabel;
+  syncTypeLabels(e.target.value);
 });
+
+function syncTypeLabels(type) {
+  const meta = typeMeta(type);
+  document.getElementById("petLogTitleLabel").textContent = meta.titleLabel;
+  document.getElementById("petLogNoteLabel").textContent = meta.noteLabel;
+}
 
 // r 有值＝編輯，沒有＝新增（預設目前選的寵物、今天）
 function openPetLogForm(r) {
@@ -351,7 +411,7 @@ function openPetLogForm(r) {
   document.getElementById("petLogItem").value = r ? r.title : "";
   document.getElementById("petLogAmount").value = r && r.amount !== "" && r.amount != null ? String(r.amount) : "";
   document.getElementById("petLogNote").value = r ? r.note || "" : "";
-  document.getElementById("petLogTitleLabel").textContent = typeMeta(document.getElementById("petLogType").value).titleLabel;
+  syncTypeLabels(document.getElementById("petLogType").value);
   updatePetFormValidity();
   document.getElementById("petLogModal").classList.remove("hidden");
 }

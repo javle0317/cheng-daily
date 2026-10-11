@@ -30,9 +30,10 @@
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *   Recipes         欄位: id | name | tags | ingredients | steps | notes | rating | cookCount | lastCookedAt | createdAt
  *                   （用 ensureSheet 自動建立，欄位與順序寫死在 RECIPE_HEADERS；tags 是逗號分隔、rating 0–5（0=未評分））
- *   PetLog          欄位: id | pet | type | date | title | amount | note | sourceEventId | createdAt
+ *   PetLog          欄位: id | pet | type | date | title | amount | note | sourceEventId | createdAt | finishedAt
  *                   （寵物購買／就醫紀錄，用 ensureSheet 自動建立，寫死在 PET_LOG_HEADERS；pet 是 PET_NAMES 之一，
- *                   type 是 PET_LOG_TYPES 之一；sourceEventId 是從舊 Events 搬來時的來源事件 id，用來避免重複搬）
+ *                   type 是 PET_LOG_TYPES 之一；sourceEventId 是從舊 Events 搬來時的來源事件 id，用來避免重複搬；
+ *                   finishedAt 是飼料／罐罐／貓砂「用完日」（空白=還沒用完），這欄是後來加的，已存在的 PetLog 要手動在表頭最後面補上 finishedAt）
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -209,6 +210,8 @@ function dispatch_(p) {
         return respond({ ok: true, data: addPetLog(p) });
       case "updatePetLog":
         return respond({ ok: true, data: updatePetLog(p) });
+      case "setPetLogFinished":
+        return respond({ ok: true, data: setPetLogFinished(p.id, p.finishedAt) });
       case "deletePetLog":
         return respond({ ok: true, data: deletePetLog(p.id) });
       case "importPetEvents":
@@ -233,7 +236,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.1";
+var BACKEND_VERSION = "2026-10-12.2";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -299,7 +302,7 @@ function sheetToObjects(sheet) {
       if (Object.prototype.toString.call(v) === "[object Date]") {
         if (h === "time" || h === "endTime") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
-        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt") {
+        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt" || h === "finishedAt") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
           // Google Sheets 常會把這種格子自動判斷成日期型態存，讀回來要轉回純
           // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
@@ -1765,7 +1768,7 @@ function deleteRecipe(id) {
 
 // ====== 寵物頁（pets.html）======
 // 新分頁，用 ensureSheet 自動建立。欄位與順序寫死，不能改名或調整。
-var PET_LOG_HEADERS = ["id", "pet", "type", "date", "title", "amount", "note", "sourceEventId", "createdAt"];
+var PET_LOG_HEADERS = ["id", "pet", "type", "date", "title", "amount", "note", "sourceEventId", "createdAt", "finishedAt"];
 var PET_LOG_TYPES = ["food", "litter", "vet", "medicine", "grooming", "other"];
 
 function petLogSheet_() {
@@ -1787,13 +1790,19 @@ function petLogFields_(p) {
   };
 }
 
-function petLogRow_(f, sourceEventId) {
-  return [Utilities.getUuid(), f.pet, f.type, f.date, f.title, f.amount, f.note, sourceEventId || "", new Date()];
+// 依表頭名稱放進對應的欄（舊的 PetLog 還沒有 finishedAt 欄也能照常寫入）
+function appendPetLogRow_(sheet, f, sourceEventId) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var vals = {
+    id: Utilities.getUuid(), pet: f.pet, type: f.type, date: f.date, title: f.title, amount: f.amount,
+    note: f.note, sourceEventId: sourceEventId || "", createdAt: new Date(), finishedAt: "",
+  };
+  appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
 }
 
 function addPetLog(p) {
   var f = petLogFields_(p);
-  appendRowSafe_(petLogSheet_(), petLogRow_(f, ""));
+  appendPetLogRow_(petLogSheet_(), f, "");
   return getPetData();
 }
 
@@ -1801,6 +1810,26 @@ function updatePetLog(p) {
   petLogSheet_(); // 確保分頁存在（updateRowByHeaders_ 用 getSheet）
   updateRowByHeaders_("PetLog", textArg_(p.id, "紀錄", { required: true, max: 100 }), petLogFields_(p));
   return getPetData();
+}
+
+// 標記用完日（飼料、罐罐、貓砂用）；空白＝清除（還沒用完）。用完日不能早於購買日
+function setPetLogFinished(id, finishedAt) {
+  id = textArg_(id, "紀錄", { required: true, max: 100 });
+  var day = dateArg_(finishedAt, "用完", { optional: true });
+  var sheet = petLogSheet_();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var col = headers.indexOf("finishedAt");
+  if (col < 0) throw new Error("PetLog 分頁缺少 finishedAt 欄，請先在表頭最後面補上 finishedAt");
+  var dateCol = headers.indexOf("date");
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] !== id) continue;
+    var bought = normalizeDateCell_(values[i][dateCol]);
+    if (day && day < bought) throw new Error("用完日不能早於購買日（" + bought + "）");
+    sheet.getRange(i + 1, col + 1).setNumberFormat("@").setValue(day);
+    return getPetData();
+  }
+  throw new Error("找不到這筆紀錄（可能已經被刪除），請重新整理");
 }
 
 function deletePetLog(id) {
@@ -1835,7 +1864,7 @@ function importPetEvents(items) {
   parsed.forEach(function (x) {
     if (have[x.eventId]) return;
     have[x.eventId] = true;
-    appendRowSafe_(sheet, petLogRow_(x.fields, x.eventId));
+    appendPetLogRow_(sheet, x.fields, x.eventId);
   });
   return getPetData();
 }

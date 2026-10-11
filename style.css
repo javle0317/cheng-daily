@@ -1190,3 +1190,4 @@ input[type="checkbox"]:checked {
 .pet-migrate-row .item-text { min-width: 0; word-break: break-word; font-size: 13px; }
 .pet-migrate-row select { flex: 0 0 auto; max-width: 42%; }
 .pet-tiles .empty-hint { grid-column: 1 / -1; }
+.pet-log-row .item-meta-row { flex-wrap: wrap; }
