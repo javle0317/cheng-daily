@@ -143,6 +143,30 @@ console.log("前端：食譜頁（標籤、搜尋、排序、貼上匯入、每�
   check("每張食譜卡（含空白欄位、展開）渲染不丟錯", err === null, err);
 }
 
+console.log("前端：寵物頁（間隔統計、舊事件類型猜測、搬移候選、每個類型都能渲染）");
+{
+  const pets = loadFrontend(["shared.js", "pets.js"], "// ====== Boot ======");
+  const ev = code => vm.runInContext(code, pets);
+  const st = JSON.parse(ev('JSON.stringify(petIntervalStats(["2026-08-01","2026-09-01","2026-09-01","2026-10-01"], "2026-10-11"))'));
+  check("petIntervalStats：同日去重、平均間隔（31 與 30 天 → 31）、上次幾天前、下次日期", st.count === 3 && st.last === "2026-10-01" && st.daysSince === 10 && st.avgInterval === 31 && st.next === "2026-11-01", st);
+  const one = JSON.parse(ev('JSON.stringify(petIntervalStats(["2026-10-01"], "2026-10-11"))'));
+  check("petIntervalStats：只有 1 筆沒有間隔與下次；0 筆 count 為 0", one.avgInterval === null && one.next === null && one.daysSince === 10 && ev('petIntervalStats([], "2026-10-11").count') === 0);
+  const many = JSON.parse(ev('JSON.stringify(petIntervalStats(["2026-01-01","2026-01-11","2026-01-21","2026-01-31","2026-02-10","2026-02-20","2026-03-02","2026-04-01"], "2026-04-02"))'));
+  check("petIntervalStats：最多取最近 6 個間隔（前面 10 天、最後 30 天 → 平均 (10*5+30)/6=13）", many.avgInterval === 13, many);
+  check("guessPetType：飼料／貓砂／疫苗／看醫生／美容／其他", ev('["買主食罐","貓砂補貨","打疫苗","看醫生 耳朵","洗澡美容","生日"].map(guessPetType).join()') === "food,litter,medicine,vet,grooming,other");
+  const cands = JSON.parse(ev('JSON.stringify(migrationCandidates([{id:"a",owner:"咪嚕",title:"買飼料",date:"2026-10-01",amount:500},{id:"b",owner:"me",title:"買飼料",date:"2026-10-02",amount:100},{id:"c",owner:"林萌",title:"散步",date:"2026-10-03",amount:""},{id:"d",owner:"林萌",title:"其他花費",date:"2026-10-04",amount:80},{id:"e",owner:"咪嚕",title:"看醫生",date:"2026-10-05",amount:""}], [{sourceEventId:"e"}]).map(c => c.event.id + ":" + c.type))'));
+  check("migrationCandidates：只取寵物事件、有花費或看得出類型、已搬過的不再列", cands.join() === "a:food,d:other", cands);
+  pets.__log = [
+    { id: "1", pet: "咪嚕", type: "food", date: "2026-09-01", title: "主食罐", amount: 500, note: "", sourceEventId: "" },
+    { id: "2", pet: "咪嚕", type: "food", date: "2026-10-01", title: "主食罐", amount: 520, note: "n", sourceEventId: "a" },
+    { id: "3", pet: "咪嚕", type: "vet", date: "2026-10-05", title: "耳朵發炎", amount: "", note: "", sourceEventId: "" },
+    { id: "4", pet: "林萌", type: "other", date: "2026-10-06", title: "項圈", amount: 300, note: "", sourceEventId: "" },
+  ];
+  let err = null;
+  try { ev('state.log = __log; state.events = []; ["咪嚕","林萌"].forEach(p => { state.pet = p; state.month = ""; renderSummary(); renderLogList(); }); state.pet = "咪嚕"; state.typeFilter = "vet"; renderLogList();'); } catch (e) { err = String(e); }
+  check("兩隻寵物、各類型、空類型的概況與紀錄列表渲染不丟錯", err === null, err);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -187,6 +211,23 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mkSheet = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }), getRange: () => ({ getValues: () => [headers], setNumberFormat() {}, setValues: v => rows.push(v[0]) }) }; };
+  const withSheet = (sh, fn) => { const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh }); try { return fn(); } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; } };
+  const good = { pet: "咪嚕", type: "food", date: "2026-10-10", title: "主食罐", amount: "520", note: "" };
+  const sh = mkSheet(be.PET_LOG_HEADERS);
+  withSheet(sh, () => { be.addPetLog(good); });
+  check("addPetLog：依欄位寫入（寵物、類型、金額轉數字、sourceEventId 空）", sh.rows[0] && sh.rows[0][1] === "咪嚕" && sh.rows[0][2] === "food" && sh.rows[0][5] === 520 && sh.rows[0][7] === "", sh.rows[0]);
+  check("addPetLog：不認得的寵物／類型、壞日期、空品項、負金額都丟錯且不寫入",
+    withSheet(sh, () => { const n = sh.rows.length; return [{ pet: "旺財" }, { type: "xx" }, { date: "2026/10/10" }, { title: " " }, { amount: "-5" }].every(o => throws(() => be.addPetLog(Object.assign({}, good, o)))) && sh.rows.length === n; }));
+  const sh2 = mkSheet(be.PET_LOG_HEADERS);
+  withSheet(sh2, () => {
+    be.importPetEvents([{ eventId: "e1", pet: "林萌", type: "vet", date: "2026-09-01", title: "洗牙", amount: 3000, note: "" }, { eventId: "e2", pet: "咪嚕", type: "litter", date: "2026-09-02", title: "貓砂", amount: "", note: "" }]);
+    be.importPetEvents([{ eventId: "e1", pet: "林萌", type: "vet", date: "2026-09-01", title: "洗牙", amount: 3000, note: "" }]);
+  });
+  check("importPetEvents：寫入 sourceEventId、重複的來源事件不重複搬", sh2.rows.length === 2 && sh2.rows[0][7] === "e1" && sh2.rows[1][7] === "e2", sh2.rows);
+  check("importPetEvents：有一筆壞整批不寫", withSheet(sh2, () => { const n = sh2.rows.length; return throws(() => be.importPetEvents([{ eventId: "e3", pet: "咪嚕", type: "food", date: "2026-09-03", title: "ok", amount: "", note: "" }, { eventId: "e4", pet: "咪嚕", type: "bad", date: "2026-09-03", title: "x", amount: "", note: "" }])) && sh2.rows.length === n; }));
+}
 {
   const E = (title, time, owner = "me") => ({ title, time, owner });
   const sorted = be.sortEventsByTime_([E("晚", "19:00"), E("全天", ""), E("早", "08:30"), E("同時間 A", "10:00"), E("同時間 B", "10:00"), E("午", "12:00")]).map(e => e.title).join();

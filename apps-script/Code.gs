@@ -11,7 +11,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這十三個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這十四個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -30,6 +30,9 @@
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *   Recipes         欄位: id | name | tags | ingredients | steps | notes | rating | cookCount | lastCookedAt | createdAt
  *                   （用 ensureSheet 自動建立，欄位與順序寫死在 RECIPE_HEADERS；tags 是逗號分隔、rating 0–5（0=未評分））
+ *   PetLog          欄位: id | pet | type | date | title | amount | note | sourceEventId | createdAt
+ *                   （寵物購買／就醫紀錄，用 ensureSheet 自動建立，寫死在 PET_LOG_HEADERS；pet 是 PET_NAMES 之一，
+ *                   type 是 PET_LOG_TYPES 之一；sourceEventId 是從舊 Events 搬來時的來源事件 id，用來避免重複搬）
  *
  * Events 的 owner 是 "me" / "wife" / "shared" / 寵物名字（PET_NAMES 陣列裡列的）
  * 其中一個——寵物照護紀錄跟人的行程現在是同一張表，用 owner 分辨這筆是誰的。
@@ -200,6 +203,16 @@ function dispatch_(p) {
         return respond({ ok: true, data: setCreditCardBillPaid(p.id, p.paidAmount) });
       case "deleteCreditCardBill":
         return respond({ ok: true, data: deleteCreditCardBill(p.id) });
+      case "getPetData":
+        return respond({ ok: true, data: getPetData() });
+      case "addPetLog":
+        return respond({ ok: true, data: addPetLog(p) });
+      case "updatePetLog":
+        return respond({ ok: true, data: updatePetLog(p) });
+      case "deletePetLog":
+        return respond({ ok: true, data: deletePetLog(p.id) });
+      case "importPetEvents":
+        return respond({ ok: true, data: importPetEvents(p.items) });
       case "getRecipes":
         return respond({ ok: true, data: getRecipes() });
       case "addRecipe":
@@ -220,7 +233,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-11.1";
+var BACKEND_VERSION = "2026-10-12.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1748,4 +1761,81 @@ function deleteRecipe(id) {
   var r = findRecipeRow_(id);
   r.sheet.deleteRow(r.row);
   return getRecipes();
+}
+
+// ====== 寵物頁（pets.html）======
+// 新分頁，用 ensureSheet 自動建立。欄位與順序寫死，不能改名或調整。
+var PET_LOG_HEADERS = ["id", "pet", "type", "date", "title", "amount", "note", "sourceEventId", "createdAt"];
+var PET_LOG_TYPES = ["food", "litter", "vet", "medicine", "grooming", "other"];
+
+function petLogSheet_() {
+  return ensureSheet("PetLog", PET_LOG_HEADERS);
+}
+
+function getPetData() {
+  return { log: sheetToObjects(petLogSheet_()) };
+}
+
+function petLogFields_(p) {
+  return {
+    pet: enumArg_(p.pet, "寵物", PET_NAMES),
+    type: enumArg_(p.type, "類型", PET_LOG_TYPES),
+    date: dateArg_(p.date, "紀錄"),
+    title: textArg_(p.title, "品項／原因", { required: true, max: 100 }),
+    amount: numArg_(p.amount, "金額", { emptyValue: "", min: 0 }),
+    note: textArg_(p.note, "備註", { max: 500 }),
+  };
+}
+
+function petLogRow_(f, sourceEventId) {
+  return [Utilities.getUuid(), f.pet, f.type, f.date, f.title, f.amount, f.note, sourceEventId || "", new Date()];
+}
+
+function addPetLog(p) {
+  var f = petLogFields_(p);
+  appendRowSafe_(petLogSheet_(), petLogRow_(f, ""));
+  return getPetData();
+}
+
+function updatePetLog(p) {
+  petLogSheet_(); // 確保分頁存在（updateRowByHeaders_ 用 getSheet）
+  updateRowByHeaders_("PetLog", textArg_(p.id, "紀錄", { required: true, max: 100 }), petLogFields_(p));
+  return getPetData();
+}
+
+function deletePetLog(id) {
+  id = textArg_(id, "紀錄", { required: true, max: 100 });
+  var sheet = petLogSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getPetData();
+}
+
+// 舊寵物事件搬進 PetLog：前端把使用者確認過的項目送來 [{eventId, pet, type, date, title, amount, note}]。
+// 全部驗證過才寫（有一筆壞就整批不寫）；sourceEventId 已存在的略過，所以重複送不會重複搬。原事件不動。
+function importPetEvents(items) {
+  if (typeof items === "string") {
+    try { items = JSON.parse(items); } catch (e) { throw new Error("搬移資料格式錯誤"); }
+  }
+  if (!items || !items.length) throw new Error("沒有要搬移的項目");
+  if (items.length > 300) throw new Error("一次最多搬 300 筆");
+  var parsed = items.map(function (it) {
+    return { eventId: textArg_(it.eventId, "來源事件", { required: true, max: 100 }), fields: petLogFields_(it) };
+  });
+  var sheet = petLogSheet_();
+  var values = sheet.getDataRange().getValues();
+  var srcCol = PET_LOG_HEADERS.indexOf("sourceEventId");
+  var have = {};
+  for (var i = 1; i < values.length; i++) if (values[i][srcCol]) have[String(values[i][srcCol])] = true;
+  parsed.forEach(function (x) {
+    if (have[x.eventId]) return;
+    have[x.eventId] = true;
+    appendRowSafe_(sheet, petLogRow_(x.fields, x.eventId));
+  });
+  return getPetData();
 }

@@ -1171,3 +1171,22 @@ input[type="checkbox"]:checked {
 .recipe-text { margin: 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
 
 .bp-note { flex-basis: 100%; font-size: 12px; color: var(--text-dim); white-space: pre-wrap; word-break: break-word; }
+
+/* ====== 寵物頁 ====== */
+.pet-switch { display: flex; gap: 8px; }
+.pet-tab { flex: 1; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font: inherit; font-size: 15px; cursor: pointer; }
+.pet-tab.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 700; }
+.pet-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pet-toolbar .add-primary { flex: 1; }
+.pet-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.pet-tile { padding: 12px; border-radius: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pet-tile-head { font-size: 13px; color: var(--text-dim); }
+.pet-tile-big { font-family: "Noto Serif TC", serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.pet-tile .tile-delta { word-break: break-word; }
+.pet-log-row .spacer { flex: 1; }
+.pet-note { white-space: pre-wrap; word-break: break-word; }
+.pet-migrate-list { max-height: 50vh; overflow-y: auto; margin: 8px 0; }
+.pet-migrate-row { flex-wrap: nowrap; }
+.pet-migrate-row .item-text { min-width: 0; word-break: break-word; font-size: 13px; }
+.pet-migrate-row select { flex: 0 0 auto; max-width: 42%; }
+.pet-tiles .empty-hint { grid-column: 1 / -1; }

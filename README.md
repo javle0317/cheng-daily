@@ -165,6 +165,16 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 - 編輯（`updateRecipe`）只改名稱／標籤／食材／步驟／備註，不動評分與煮過次數；評分（`setRecipeRating`）與「煮過 +1」（`markRecipeCooked`，同時記 `lastCookedAt`）各自獨立
 - 這張表不會出現在主頁面的 `getData()` 回傳裡，用 `getRecipes`；欄位名稱與順序寫死在 `Code.gs` 的 `RECIPE_HEADERS`，不能改
 
+**PetLog**（寵物購買／就醫紀錄，獨立頁面 `pets.html`；分頁由後端 `ensureSheet` 自動建立，不用手動建）
+
+| id | pet | type | date | title | amount | note | sourceEventId | createdAt |
+|----|-----|------|------|-------|--------|------|---------------|-----------|
+
+- `pet`：`PET_NAMES` 其中之一（前端在 `shared.js`、後端在 `Code.gs`，兩邊都要加）；`type`：`food` 飼料／`litter` 貓砂／`vet` 看醫生／`medicine` 用藥疫苗／`grooming` 美容／`other`（寫死在 `PET_LOG_TYPES`）
+- `title` 是品項或就醫原因（「主食罐 12 入」「耳朵發炎」）；`amount` 選填；`sourceEventId` 是從舊 Events 搬來時的來源事件 id，用來避免重複搬
+- 跟 Events 的分工：Events 的寵物事件是**行事曆預約／提醒**（會同步到 Google 行事曆與 LINE），PetLog 是**實際發生的歷史**（買了什麼、看了什麼），用來算間隔
+- 欄位名稱與順序寫死在 `PET_LOG_HEADERS`，不能改
+
 **ShoppingList**（「清單」，不綁日期、處理完就勾掉再清除；分購物/想法兩個分類）
 
 | id | item | done | createdAt | category |
@@ -325,6 +335,12 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 - 進頁面是搜尋框（比對名稱與食材）＋標籤下拉（資料中實際出現的標籤，有新標籤自動多一個選項）＋排序（最近新增／評分高到低／煮最多次），下面是食譜卡片，點名稱展開食材、步驟、備註。
 - 卡片上：★ 評分（再點同一顆清除）、「煮過 +1」、✏️ 編輯（同一個彈窗 `#recipeFormModal`）、✕ 刪除。
 - **貼上匯入**（只在新增時出現，跟健康頁同一個做法）：把整理好的 JSON 填進表單，不送出，核對後再按「新增」。格式見 CLAUDE.md。
+
+## 寵物頁的版面
+
+- 頂端切換寵物（記在 localStorage `petSel`），「概況」每個有紀錄的類型一塊：上次幾天前、共幾次、**平均間隔**（相鄰兩次日期差的平均，最多取最近 6 個間隔；少於 2 個不同日期不算）、飼料／貓砂另有「下次約幾月幾日」，看醫生顯示最近一次原因（`petIntervalStats`）。
+- 「紀錄」依月份（有資料的月份，新到舊）與類型篩選，顯示該月與該年合計；新增／編輯同一個彈窗 `#petLogModal`。
+- **整理舊紀錄**：把行事曆裡寵物的舊事件（有花費，或標題看得出飼料／貓砂／醫／藥…）搬進 PetLog。`#petMigrateModal` 列出候選、依標題猜好類型（`guessPetType`，可改、可取消勾選），確認後 `importPetEvents`（全部驗證過才寫、已搬過的 `sourceEventId` 略過）。原事件不刪。候選清空後按鈕自動消失。
 
 ## 事件／循環行程的新增與編輯（彈窗）
 

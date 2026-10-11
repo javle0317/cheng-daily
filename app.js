@@ -10,8 +10,6 @@ const OWNER_META = {
   shared: { label: "一起", icon: "🤝", color: "#2a7d5c" },
 };
 
-const PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡跟 Code.gs 的 PET_NAMES 都要加
-
 // ====== State ======
 let state = {
   goals: [],
