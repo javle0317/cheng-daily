@@ -188,6 +188,13 @@ check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
 {
+  const E = (title, time, owner = "me") => ({ title, time, owner });
+  const sorted = be.sortEventsByTime_([E("晚", "19:00"), E("全天", ""), E("早", "08:30"), E("同時間 A", "10:00"), E("同時間 B", "10:00"), E("午", "12:00")]).map(e => e.title).join();
+  check("sortEventsByTime_：全天排最前、其餘由早到晚、同時間保持原順序", sorted === "全天,早,同時間 A,同時間 B,午,晚", sorted);
+  const src = [E("b", "09:00"), E("a", "08:00")];
+  check("sortEventsByTime_：不改動傳入的陣列", (be.sortEventsByTime_(src), src[0].title === "b"));
+}
+{
   const mkSheet = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1, getDataRange: () => ({ getValues: () => [headers] }), getRange: (r, c, nr, nc) => ({ getValues: () => [headers], setNumberFormat() {}, setValues: v => rows.push(v[0]) }) }; };
   const withSheet = (sh, fn) => { const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh }); try { return fn(); } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; } };
   const H = ["id", "date", "period", "systolic", "diastolic", "pulse", "createdAt", "note"];

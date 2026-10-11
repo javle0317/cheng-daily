@@ -220,7 +220,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-10.1";
+var BACKEND_VERSION = "2026-10-11.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1315,24 +1315,17 @@ function sendDailyNotifications() {
     });
   events = events.concat(recurringToday);
 
-  var petLines = events
-    .filter(function (e) { return PET_NAMES.indexOf(e.owner) !== -1; })
-    .map(formatEventLine_);
-  var sharedLines = events
-    .filter(function (e) { return e.owner === "shared"; })
-    .map(formatEventLine_);
-  var meLines = events
-    .filter(function (e) { return e.owner === "me"; })
-    .map(formatEventLine_);
-  var wifeLines = events
-    .filter(function (e) { return e.owner === "wife"; })
-    .map(formatEventLine_);
+  // 發送前先照時間排序（全天事件排最前面，之後由早到晚；同一時間維持原本順序）。
+  // 寵物與共同事件是合併成同一則訊息，所以合併後再排，不是各排各的。
+  var isShared = function (e) { return PET_NAMES.indexOf(e.owner) !== -1 || e.owner === "shared"; };
+  var sharedLines = sortEventsByTime_(events.filter(isShared)).map(formatEventLine_);
+  var meLines = sortEventsByTime_(events.filter(function (e) { return e.owner === "me"; })).map(formatEventLine_);
+  var wifeLines = sortEventsByTime_(events.filter(function (e) { return e.owner === "wife"; })).map(formatEventLine_);
 
   var header = "【每日提醒】\n日期：" + todayStr + "\n\n";
 
-  var sharedAll = petLines.concat(sharedLines);
-  if (sharedAll.length > 0) {
-    var sharedMsg = header + sharedAll.join("\n\n");
+  if (sharedLines.length > 0) {
+    var sharedMsg = header + sharedLines.join("\n\n");
     [myId, wifeId].forEach(function (id) {
       sendLinePush_(token, id, sharedMsg);
     });
@@ -1345,6 +1338,14 @@ function sendDailyNotifications() {
   if (wifeLines.length > 0) {
     sendLinePush_(token, wifeId, "【個人提醒】\n日期：" + todayStr + "\n\n" + wifeLines.join("\n\n"));
   }
+}
+
+// 依 time（HH:mm）由早到晚排；沒有 time 的（全天）排最前面。穩定排序：同一時間保持原本順序，不改動傳入的陣列。
+function sortEventsByTime_(events) {
+  return events
+    .map(function (e, i) { return { e: e, i: i, t: e.time ? String(e.time) : "" }; })
+    .sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : a.i - b.i; })
+    .map(function (x) { return x.e; });
 }
 
 function matchesRecurringRule_(rule, dateObj, dateStr) {
