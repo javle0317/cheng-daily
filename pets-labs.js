@@ -430,6 +430,7 @@ document.getElementById("petLabImportBtn").addEventListener("click", () => {
   if (state.labs.some(r => r.pet === pet && String(r.date) === date)) notes.push("⚠️ 這隻這一天已經有驗血紀錄，按「新增」會更新同名項目");
   msg.textContent = notes.join("；");
   updateLabFormValidity();
+  msg.scrollIntoView({ block: "nearest" });
 });
 
 document.getElementById("petLabForm").addEventListener("submit", async (e) => {
