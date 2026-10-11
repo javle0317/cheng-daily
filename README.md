@@ -381,7 +381,7 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 
 ## 水電瓦斯卡片的版面（帳單頁）
 
-- 在「帳單紀錄」下面，三個切換（水費／電費／瓦斯，記在 localStorage `utilType`）、每月均攤趨勢圖（`drawTimeChart`，tooltip 顯示原金額與月數）、摘要（最近一期、比前一期、**去年同月**、最近 6 期平均）、帳單列表（最近 12 筆，更早的按鈕展開）。新增／編輯同一個彈窗 `#utilModal`；換類型時新增會帶入常見月數。程式在 `utilities.js`，由 `bills.js` 的 `loadPageData` 呼叫 `loadUtilityBills()`（水電瓦斯讀不到不影響信用卡帳單）。
+- 在「帳單紀錄」**上面**（年度圖表之後；帳單紀錄會一直變長，放下面會被推到看不到），三個切換（水費／電費／瓦斯，記在 localStorage `utilType`）、每月均攤趨勢圖（`drawTimeChart`，tooltip 顯示原金額與月數）、摘要（最近一期、比前一期、**去年同月**、最近 6 期平均）、帳單列表（最近 12 筆，更早的按鈕展開）。新增／編輯同一個彈窗 `#utilModal`；換類型時新增會帶入常見月數。程式在 `utilities.js`，由 `bills.js` 的 `loadPageData` 呼叫 `loadUtilityBills()`（水電瓦斯讀不到不影響信用卡帳單）。
 
 ## 事件／循環行程的新增與編輯（彈窗）
 
