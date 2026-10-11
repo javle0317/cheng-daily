@@ -71,24 +71,6 @@
   // 每筆自帶報告上的參考範圍；分級就用那個範圍判斷（醫學意義不用我們懂，報告怎麼標就怎麼標）。
   const state = { results: [], extras: [], chartKey: "glucose", version: 0 };
 
-  function classifyRange(v, low, high) {
-    let over = 0;
-    let dir = "";
-    if (high !== null && v > high) { over = high === 0 ? 1 : (v - high) / Math.abs(high); dir = "偏高"; }
-    else if (low !== null && v < low) { over = low === 0 ? 1 : (low - v) / Math.abs(low); dir = "偏低"; }
-    if (!dir) return (low === null && high === null) ? null : R("good", "正常");
-    if (over <= 0.15) return R("warning", dir);
-    if (over <= 0.5) return R("serious", dir);
-    return R("critical", "明顯" + dir);
-  }
-
-  function refText(low, high) {
-    if (low !== null && high !== null) return `${low}-${high}`;
-    if (high !== null) return `<${high}`;
-    if (low !== null) return `>${low}`;
-    return "未填";
-  }
-
   function extraHistory(name) {
     return state.extras
       .filter(e => e.name === name)
@@ -217,7 +199,7 @@
     const item = allItems().find(i => i.key === state.chartKey);
     if (!item) {
       container.innerHTML = `<p class="empty-hint">還沒有資料可以畫圖</p>`;
-      renderExplain(null);
+      renderLabExplain(document.getElementById("labExplain"), null);
       return;
     }
     const points = item.history().map(p => {
@@ -225,92 +207,7 @@
       return c ? { date: p.date, value: p.value, level: c.level } : { date: p.date, value: p.value };
     });
     drawTimeChart(container, points, { unit: item.unit, decimals: item.dec, bands: item.bandList() });
-    renderExplain(item);
-  }
-
-  // ====== 趨勢說明（圖表下方）：這個指標是越高/越低越好、趨勢是變好還是變壞、各級切點 ======
-  const LEVEL_RANK = { good: 0, warning: 1, serious: 2, critical: 3 };
-  const BETTER_TEXT = { lower: "越低越好", higher: "越高越好", range: "落在參考範圍內最好" };
-
-  // 比較兩個點：往好、往壞、或持平。先比分級（燈號），同燈號再看數值方向。
-  function compareHealth(item, from, to) {
-    const cf = item.classifyPoint(from), ct = item.classifyPoint(to);
-    if (cf && ct && cf.level !== ct.level) {
-      return LEVEL_RANK[ct.level] < LEVEL_RANK[cf.level]
-        ? { icon: "✅", text: "往好的方向（燈號變好）" }
-        : { icon: "⚠️", text: "往壞的方向（燈號變差）" };
-    }
-    if (cf && ct && ct.level === "good") return { icon: "✅", text: "維持在正常範圍" };
-    if (from.value === to.value) return { icon: "➖", text: "沒有變化" };
-    // 有「正常」區間時，一律用「離正常區間多遠」比：原本 lower 類只看大小，
-    // 已經低於正常下限（如血糖 60）卻繼續下降，會被誤判成「變好」
-    const goodBand = item.bandList().find(b => b.level === "good");
-    if (goodBand) {
-      const dist = v => v < goodBand.from ? goodBand.from - v : v > goodBand.to ? v - goodBand.to : 0;
-      const df = dist(from.value), dt = dist(to.value);
-      if (df === dt) return { icon: "➖", text: from.value < to.value ? "上升（離正常範圍的距離沒變）" : "下降（離正常範圍的距離沒變）" };
-      return dt < df
-        ? { icon: "✅", text: "往好的方向（燈號沒變，數值更接近正常範圍）" }
-        : { icon: "⚠️", text: "往壞的方向（燈號沒變，數值離正常範圍更遠）" };
-    }
-    let improved;
-    if (item.better === "lower") improved = to.value < from.value;
-    else if (item.better === "higher") improved = to.value > from.value;
-    else {
-      const good = item.bandList().find(b => b.level === "good");
-      const center = good ? (good.from + good.to) / 2 : null;
-      improved = center === null ? null : Math.abs(to.value - center) < Math.abs(from.value - center);
-    }
-    if (improved === null) return { icon: "➖", text: from.value < to.value ? "上升" : "下降" };
-    return improved ? { icon: "✅", text: "往好的方向（燈號沒變，數值朝好的方向）" } : { icon: "⚠️", text: "往壞的方向（燈號沒變，數值朝不好的方向）" };
-  }
-
-  function renderExplain(item) {
-    const box = document.getElementById("labExplain");
-    box.innerHTML = "";
-    if (!item) return;
-    const hist = item.history();
-    const addLine = (html) => {
-      const p = document.createElement("p");
-      p.className = "explain-line";
-      p.innerHTML = html;
-      box.appendChild(p);
-    };
-    const esc = escapeHtml;
-
-    const head = document.createElement("div");
-    head.className = "explain-head";
-    head.textContent = `${item.label}：${BETTER_TEXT[item.better] || ""}`;
-    box.appendChild(head);
-
-    if (hist.length >= 2) {
-      const last = hist[hist.length - 1];
-      const prev = hist[hist.length - 2];
-      const first = hist[0];
-      const a = compareHealth(item, prev, last);
-      addLine(`<b>與上次（${fmtHealthDate(prev.date)}）</b>：${roundTo(prev.value, item.dec)} → ${roundTo(last.value, item.dec)}　${a.icon} ${esc(a.text)}`);
-      if (hist.length > 2) {
-        const b = compareHealth(item, first, last);
-        addLine(`<b>整體（${fmtHealthDate(first.date)} 起）</b>：${roundTo(first.value, item.dec)} → ${roundTo(last.value, item.dec)}　${b.icon} ${esc(b.text)}`);
-      }
-    } else {
-      addLine("只有一筆紀錄，還看不出趨勢。");
-    }
-
-    addLine(`<b>參考範圍</b>：${esc(item.refLabel())}${item.unit ? "（" + esc(item.unit) + "）" : ""}`);
-    const bands = item.bandList();
-    if (bands.length) {
-      const fmt = n => (Math.abs(n) >= 1e8 ? "∞" : roundTo(n, item.dec));
-      const parts = bands.map((b, i) => {
-        // 第一段視為「小於上界」、最後一段視為「大於等於下界」（資料裡的 300、600 只是畫圖用的上限）
-        const from = i === 0 ? "" : fmt(b.from);
-        const to = i === bands.length - 1 ? "" : fmt(b.to);
-        const range = !from ? `< ${to}` : !to ? `≥ ${from}` : `${from}–${to}`;
-        return `${LEVEL_ICON[b.level]} ${esc(b.label || "")} ${range}`;
-      });
-      addLine(`<b>燈號切點</b>：${parts.join("　")}`);
-    }
-    if (item.desc) addLine(esc(item.desc));
+    renderLabExplain(document.getElementById("labExplain"), item);
   }
 
   // ====== 歷史列表（一天一塊，固定項目 + 其他項目都顯示）======

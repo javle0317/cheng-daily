@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261011215502">
+<link rel="stylesheet" href="style.css?v=20261011220244">
 </head>
 <body>
 
@@ -46,17 +46,21 @@
 
     <main class="grid dense">
       <div class="pet-switch" id="petSwitch" role="tablist" aria-label="選擇寵物"></div>
-      <div class="health-toolbar pet-toolbar">
+      <div class="pet-switch pet-tabs" id="petTabs" role="tablist" aria-label="分頁">
+        <button type="button" class="pet-tab on" data-tabbtn="log" role="tab">紀錄</button>
+        <button type="button" class="pet-tab" data-tabbtn="labs" role="tab">驗血</button>
+      </div>
+      <div class="health-toolbar pet-toolbar" data-tab="log">
         <button id="openPetLogForm" type="button" class="add-primary">＋ 新增紀錄</button>
         <button id="openPetMigrate" type="button" class="ghost-btn hidden">整理舊紀錄</button>
       </div>
 
-      <section class="card pet-summary-card">
+      <section class="card pet-summary-card" data-tab="log">
         <h2>概況</h2>
         <div id="petSummary" class="pet-tiles"></div>
       </section>
 
-      <section class="card pet-log-card">
+      <section class="card pet-log-card" data-tab="log">
         <div class="bp-list-header">
           <h2>紀錄</h2>
           <select id="petMonthFilter" class="hidden" aria-label="月份"></select>
@@ -64,6 +68,33 @@
         </div>
         <p id="petMonthTotal" class="progress-line"></p>
         <div id="petLogList"></div>
+      </section>
+      <div class="health-toolbar pet-toolbar hidden" data-tab="labs">
+        <button id="openPetLabForm" type="button" class="add-primary">＋ 新增驗血</button>
+      </div>
+
+      <section class="card hidden" data-tab="labs">
+        <h2>最近一次</h2>
+        <div id="petLabLatest" class="lab-latest"></div>
+        <p class="health-disclaimer">標示依每份報告上印的參考範圍判斷；你和醫師確認過「這隻沒關係」的項目，可以在趨勢圖旁的「個人化設定」調整。分級僅供參考，請以醫師診斷為準。</p>
+      </section>
+
+      <section class="card hidden" data-tab="labs">
+        <div class="bp-list-header">
+          <h2>趨勢</h2>
+          <select id="petLabItem" aria-label="項目"></select>
+        </div>
+        <div id="petLabChart"></div>
+        <div class="pet-pref-line">
+          <span id="petLabPrefLine" class="progress-line"></span>
+          <button id="petLabPrefBtn" type="button" class="ghost-btn hidden">個人化設定</button>
+        </div>
+        <div id="petLabExplain" class="lab-explain"></div>
+      </section>
+
+      <section class="card hidden" data-tab="labs">
+        <h2>歷史紀錄</h2>
+        <div id="petLabList"></div>
       </section>
     </main>
 
@@ -121,6 +152,69 @@
     </div>
   </div>
 
+  <div id="petLabModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增驗血紀錄</h2>
+        <button id="petLabClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petLabForm" class="entry-form entry-form-rows modal-form">
+        <details class="more-fields">
+          <summary>貼上匯入（從報告照片）</summary>
+          <textarea id="petLabImportText" rows="4" placeholder="貼上對話裡給你的驗血資料（JSON）…"></textarea>
+          <button id="petLabImportBtn" type="button" class="ghost-btn">填入表單</button>
+          <p id="petLabImportMsg" class="progress-line"></p>
+        </details>
+        <div class="form-row">
+          <label class="mf">寵物
+            <select id="petLabPet"></select>
+          </label>
+          <label class="mf">日期
+            <input id="petLabDate" type="date" required>
+          </label>
+        </div>
+        <div id="petLabRows"></div>
+        <datalist id="petLabNames"></datalist>
+        <button id="petLabAddRow" type="button" class="ghost-btn">＋ 加一個項目</button>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="petLabSubmit" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="petPrefModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>個人化設定</h2>
+        <button id="petPrefClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petPrefForm" class="entry-form entry-form-rows modal-form">
+        <p id="petPrefItem" class="sub-heading"></p>
+        <label class="checkbox-label"><input type="radio" name="petPrefMode" value="ok" checked> 醫師說無妨：照樣顯示偏高／偏低，但不用紅黃燈警示</label>
+        <label class="checkbox-label"><input type="radio" name="petPrefMode" value="range"> 自訂這隻的範圍（取代報告上的範圍）</label>
+        <div class="form-row">
+          <label class="mf">範圍下限
+            <input id="petPrefLow" type="text" inputmode="decimal" placeholder="可留空">
+          </label>
+          <label class="mf">範圍上限
+            <input id="petPrefHigh" type="text" inputmode="decimal" placeholder="可留空">
+          </label>
+        </div>
+        <label class="mf">備註（選填）
+          <input id="petPrefNote" type="text" maxlength="200" placeholder="例如：2026/10 醫師說這隻本來就偏低" autocomplete="off">
+        </label>
+        <p id="petPrefHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="petPrefClear" type="button" class="ghost-btn danger-btn hidden">取消設定</button>
+          <span class="spacer"></span>
+          <button id="petPrefSave" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <div id="dialogModal" class="modal-overlay hidden">
@@ -134,7 +228,9 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261011215502"></script>
-  <script src="pets.js?v=20261011215502"></script>
+  <script src="shared.js?v=20261011220244"></script>
+  <script src="health-charts.js?v=20261011220244"></script>
+  <script src="pets.js?v=20261011220244"></script>
+  <script src="pets-labs.js?v=20261011220244"></script>
 </body>
 </html>

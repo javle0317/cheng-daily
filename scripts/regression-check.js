@@ -188,6 +188,50 @@ console.log("前端：事件彈窗已拿掉花費／只記帳欄位，編輯舊�
   check("app.js 編輯事件時沿用 editingEvent.amount 與 hideFromCalendar", /params\.amount\s*=\s*editingEvent\.amount/.test(a) && /params\.hideFromCalendar\s*=\s*isTruthy\(editingEvent\.hideFromCalendar\)/.test(a));
 }
 
+console.log("前端：寵物驗血（高低標示、個人化設定、貼上匯入、渲染）");
+{
+  const labs = loadFrontend(["shared.js", "health-charts.js", "pets.js", "pets-labs.js"], "// ====== Boot ======");
+  const ev = code => vm.runInContext(code, labs);
+  const lv = (v, lo, hi) => JSON.parse(ev(`JSON.stringify(classifyRange(${v}, ${lo}, ${hi}))`));
+  check("classifyRange（搬到 health-charts.js）：範圍內正常、超出 15% 以內 warning、50% 以內 serious、更多 critical", lv(50, 10, 100).level === "good" && lv(110, 10, 100).level === "warning" && lv(140, 10, 100).level === "serious" && lv(250, 10, 100).level === "critical" && lv(8, 10, 100).text === "偏低" && lv(5, null, null) === null);
+  labs.__labs = [
+    { id: "1", pet: "咪嚕", date: "2025-03-01", name: "ALT", value: 60, unit: "U/L", refLow: 10, refHigh: 100 },
+    { id: "2", pet: "咪嚕", date: "2026-03-01", name: "ALT", value: 120, unit: "U/L", refLow: 10, refHigh: 100 },
+    { id: "3", pet: "咪嚕", date: "2026-03-01", name: "BUN", value: 12, unit: "mg/dL", refLow: 16, refHigh: 36 },
+    { id: "4", pet: "林萌", date: "2026-03-01", name: "ALT", value: 30, unit: "U/L", refLow: 10, refHigh: 100 },
+  ];
+  ev('state.labs = __labs; state.prefs = []; state.pet = "咪嚕"; state.events = []; state.log = [];');
+  const it0 = ev('petLabItems("咪嚕").map(i => i.key).join()');
+  check("petLabItems：狀況差的排前面（ALT 偏高、BUN 偏低同為 serious，同級照名稱）", it0 === "ALT,BUN", it0);
+  const hist = JSON.parse(ev('JSON.stringify(petLabHistory("咪嚕", "ALT"))'));
+  check("petLabHistory：只取該寵物該項目、依日期排序", hist.length === 2 && hist[0].date === "2025-03-01" && hist[1].value === 120);
+  const raw = ev('(() => { const it = petLabItem("咪嚕", "BUN"); return it.classifyPoint(it.history()[0]); })()');
+  check("沒設定：BUN 12（範圍 16–36，低於下限 25%）→ 偏低（serious）", raw.level === "serious" && raw.text === "偏低", raw);
+  ev('state.prefs = [{ pet: "咪嚕", name: "BUN", mode: "ok", refLow: "", refHigh: "", note: "醫師說無妨" }];');
+  const okc = ev('(() => { const it = petLabItem("咪嚕", "BUN"); return it.classifyPoint(it.history()[0]); })()');
+  check("醫師說無妨：仍標偏低，但等級是中性的 ok、文字有「醫師說無妨」；不影響範圍內的點", okc.level === "ok" && okc.text.includes("醫師說無妨") && ev('classifyPetLabPoint({ value: 20, low: 16, high: 36 }, { mode: "ok" }).level') === "good");
+  ev('state.prefs = [{ pet: "咪嚕", name: "BUN", mode: "range", refLow: 10, refHigh: 30, note: "" }];');
+  const rc = ev('(() => { const it = petLabItem("咪嚕", "BUN"); return { c: it.classifyPoint(it.history()[0]), ref: it.refLabel() }; })()');
+  check("自訂範圍：BUN 12 在 10–30 內 → 正常，參考範圍文字標示個人設定", rc.c.level === "good" && rc.ref.startsWith("個人設定"), rc);
+  check("設定只套用在這隻：林萌的 BUN 設定不影響咪嚕的 ALT", ev('petLabPref("咪嚕", "ALT")') === null);
+  const lvl = ev('Object.keys(LEVEL_RANK).sort().join()');
+  check("health-charts 的 LEVEL_RANK 含 ok", lvl.includes("ok"));
+  const impP = JSON.parse(ev('JSON.stringify(parsePetLabImport(\'{"pet":"咪嚕","date":"2026-03-01","items":[{"name":"ALT","value":"45","unit":"U/L","refLow":10,"refHigh":100},{"name":"BAD","value":"x"},{"value":5}],"extra":1}\'))'));
+  check("parsePetLabImport：數字解析、壞項目列入 problems、不認得的欄位列出", impP.items.length === 1 && impP.items[0].value === 45 && impP.problems.length === 2 && impP.unknown.join() === "extra", impP);
+  check("parsePetLabImport：壞 JSON／沒有 items 回傳 null", ev('parsePetLabImport("abc")') === null && ev('parsePetLabImport(\'{"pet":"咪嚕"}\')') === null);
+  let err = null;
+  try { ev('state.prefs = [{ pet: "咪嚕", name: "ALT", mode: "ok", refLow: "", refHigh: "", note: "n" }]; ["咪嚕","林萌"].forEach(p => { state.pet = p; labState.key = ""; renderLabsAll(); }); state.pet = "咪嚕"; state.labs = []; renderLabsAll();'); } catch (e) { err = String(e); }
+  check("兩隻寵物（含有／沒有驗血紀錄、有個人化設定）渲染不丟錯", err === null, err);
+}
+
+console.log("頁面載入的 script：pets.html 要載入 pets-labs.js 與 health-charts.js（漏載入時驗血分頁整個是空的，語法檢查看不出來）");
+{
+  const html = read("pets.html");
+  ["shared.js", "health-charts.js", "pets.js", "pets-labs.js"].forEach(f => check("pets.html 載入 " + f, new RegExp('<script src="' + f.replace(".", "\\.") + '\\?v=').test(html)));
+  const order = ["shared.js", "health-charts.js", "pets.js", "pets-labs.js"].map(f => html.indexOf('src="' + f));
+  check("pets.html script 順序：shared → health-charts → pets → pets-labs", order.every((n, i) => n > -1 && (i === 0 || n > order[i - 1])), order);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -232,6 +276,33 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
+    getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
+  const sheets = { PetLabs: mk(be.PET_LAB_HEADERS), PetLabPrefs: mk(be.PET_LAB_PREF_HEADERS), PetLog: mk(be.PET_LOG_HEADERS) };
+  const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: n => sheets[n] });
+  try {
+    const items = [{ name: "ALT", value: "45", unit: "U/L", refLow: "10", refHigh: "100" }, { name: "BUN", value: "12", unit: "mg/dL", refLow: "", refHigh: "" }];
+    be.addPetLabEntry({ pet: "咪嚕", date: "2026-03-01", items: JSON.stringify(items) });
+    check("addPetLabEntry：一個項目一列，依欄位寫入（數值轉數字、範圍空白留空）", sheets.PetLabs.rows.length === 2 && sheets.PetLabs.rows[0][3] === "ALT" && sheets.PetLabs.rows[0][4] === 45 && sheets.PetLabs.rows[0][6] === 10 && sheets.PetLabs.rows[1][6] === "", sheets.PetLabs.rows);
+    be.addPetLabEntry({ pet: "咪嚕", date: "2026-03-01", items: [{ name: "ALT", value: 50, unit: "U/L", refLow: 10, refHigh: 100 }] });
+    check("addPetLabEntry：同寵物同日同名稱更新那一列，不重複新增", sheets.PetLabs.rows.length === 2 && sheets.PetLabs.rows[0][4] === 50);
+    const n = sheets.PetLabs.rows.length;
+    check("addPetLabEntry：壞寵物／壞日期／空名稱／重複名稱／壞數字／下限大於上限／空陣列都丟錯且不寫入",
+      [{ pet: "旺財" }, { date: "2026/03/01" }, { items: [{ name: " ", value: 1 }] }, { items: [{ name: "A", value: 1 }, { name: "A", value: 2 }] }, { items: [{ name: "A", value: "x" }] }, { items: [{ name: "A", value: 1, refLow: 10, refHigh: 5 }] }, { items: [] }]
+        .every(o => throws(() => be.addPetLabEntry(Object.assign({ pet: "咪嚕", date: "2026-03-02", items: [{ name: "ok", value: 1 }] }, o)))) && sheets.PetLabs.rows.length === n);
+    be.addPetLabEntry({ pet: "林萌", date: "2026-03-01", items: [{ name: "ALT", value: 30 }] });
+    be.deletePetLabDay("咪嚕", "2026-03-01");
+    check("deletePetLabDay：只刪該寵物該天，不動別隻", sheets.PetLabs.rows.length === 1 && sheets.PetLabs.rows[0][1] === "林萌");
+    be.setPetLabPref({ pet: "咪嚕", name: "BUN", mode: "ok", refLow: "5", refHigh: "", note: "醫師說無妨" });
+    check("setPetLabPref：ok 模式範圍清空、備註寫入", sheets.PetLabPrefs.rows.length === 1 && sheets.PetLabPrefs.rows[0][3] === "ok" && sheets.PetLabPrefs.rows[0][4] === "" && sheets.PetLabPrefs.rows[0][6] === "醫師說無妨", sheets.PetLabPrefs.rows);
+    be.setPetLabPref({ pet: "咪嚕", name: "BUN", mode: "range", refLow: "10", refHigh: "30", note: "" });
+    check("setPetLabPref：同寵物同項目只有一筆，重設是更新", sheets.PetLabPrefs.rows.length === 1 && sheets.PetLabPrefs.rows[0][3] === "range" && sheets.PetLabPrefs.rows[0][4] === 10 && sheets.PetLabPrefs.rows[0][5] === 30);
+    check("setPetLabPref：range 沒填任何範圍／下限大於上限／壞 mode 丟錯", throws(() => be.setPetLabPref({ pet: "咪嚕", name: "X", mode: "range", refLow: "", refHigh: "" })) && throws(() => be.setPetLabPref({ pet: "咪嚕", name: "X", mode: "range", refLow: "9", refHigh: "3" })) && throws(() => be.setPetLabPref({ pet: "咪嚕", name: "X", mode: "zzz" })));
+    be.clearPetLabPref("咪嚕", "BUN");
+    check("clearPetLabPref：刪掉設定", sheets.PetLabPrefs.rows.length === 0);
+  } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; }
+}
 {
   const mk = (headers, rows) => ({ rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }) });

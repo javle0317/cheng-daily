@@ -19,15 +19,21 @@ let state = {
   month: "",
   typeFilter: "all",
   editingId: null,
+  labs: [],
+  prefs: [],
+  tab: "log",
 };
 
 try {
   const saved = localStorage.getItem("petSel");
   if (PET_NAMES.includes(saved)) state.pet = saved;
+  if (localStorage.getItem("petTab") === "labs") state.tab = "labs";
 } catch (e) { /* 讀不到就用預設 */ }
 
 function applyPetData(data) {
   state.log = (data && data.log) || [];
+  state.labs = (data && data.labs) || [];
+  state.prefs = (data && data.prefs) || [];
 }
 
 window.loadPageData = async function () {
@@ -128,10 +134,31 @@ function petRows() {
 }
 
 // ====== 渲染 ======
+function renderTabs() {
+  document.querySelectorAll("[data-tabbtn]").forEach(b => {
+    const on = b.dataset.tabbtn === state.tab;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.querySelectorAll("[data-tab]").forEach(el => {
+    if (el.dataset.tab !== state.tab) { el.classList.add("hidden"); return; }
+    // 「整理舊紀錄」鈕自己決定要不要顯示，這裡只處理分頁容器
+    el.classList.remove("hidden");
+  });
+}
+
+document.querySelectorAll("[data-tabbtn]").forEach(b => b.addEventListener("click", () => {
+  state.tab = b.dataset.tabbtn;
+  try { localStorage.setItem("petTab", state.tab); } catch (e) { /* 存不了就算了 */ }
+  renderTabs();
+}));
+
 function renderPetsAll() {
+  renderTabs();
   renderPetSwitch();
   renderSummary();
   renderLogList();
+  if (typeof renderLabsAll === "function") renderLabsAll();
   const cands = migrationCandidates(state.events, state.log);
   const btn = document.getElementById("openPetMigrate");
   btn.classList.toggle("hidden", !cands.length);

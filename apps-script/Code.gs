@@ -11,7 +11,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這十四個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這十六個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -30,6 +30,10 @@
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *   Recipes         欄位: id | name | tags | ingredients | steps | notes | rating | cookCount | lastCookedAt | createdAt
  *                   （用 ensureSheet 自動建立，欄位與順序寫死在 RECIPE_HEADERS；tags 是逗號分隔、rating 0–5（0=未評分））
+ *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
+ *                   （寵物驗血，一個項目一列、自帶報告上的參考範圍；ensureSheet 自動建立，寫死在 PET_LAB_HEADERS）
+ *   PetLabPrefs     欄位: id | pet | name | mode | refLow | refHigh | note | createdAt
+ *                   （某隻寵物某個驗血項目的個人化設定：mode=ok 醫師說無妨／range 自訂範圍；ensureSheet 自動建立）
  *   PetLog          欄位: id | pet | type | date | title | amount | note | sourceEventId | createdAt | finishedAt
  *                   （寵物購買／就醫紀錄，用 ensureSheet 自動建立，寫死在 PET_LOG_HEADERS；pet 是 PET_NAMES 之一，
  *                   type 是 PET_LOG_TYPES 之一；sourceEventId 是從舊 Events 搬來時的來源事件 id，用來避免重複搬；
@@ -212,6 +216,14 @@ function dispatch_(p) {
         return respond({ ok: true, data: updatePetLog(p) });
       case "setPetLogFinished":
         return respond({ ok: true, data: setPetLogFinished(p.id, p.finishedAt) });
+      case "addPetLabEntry":
+        return respond({ ok: true, data: addPetLabEntry(p) });
+      case "deletePetLabDay":
+        return respond({ ok: true, data: deletePetLabDay(p.pet, p.date) });
+      case "setPetLabPref":
+        return respond({ ok: true, data: setPetLabPref(p) });
+      case "clearPetLabPref":
+        return respond({ ok: true, data: clearPetLabPref(p.pet, p.name) });
       case "deletePetLog":
         return respond({ ok: true, data: deletePetLog(p.id) });
       case "importPetEvents":
@@ -236,7 +248,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.2";
+var BACKEND_VERSION = "2026-10-12.3";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1776,7 +1788,11 @@ function petLogSheet_() {
 }
 
 function getPetData() {
-  return { log: sheetToObjects(petLogSheet_()) };
+  return {
+    log: sheetToObjects(petLogSheet_()),
+    labs: sheetToObjects(ensureSheet("PetLabs", PET_LAB_HEADERS)),
+    prefs: sheetToObjects(ensureSheet("PetLabPrefs", PET_LAB_PREF_HEADERS)),
+  };
 }
 
 function petLogFields_(p) {
@@ -1866,5 +1882,115 @@ function importPetEvents(items) {
     have[x.eventId] = true;
     appendPetLogRow_(sheet, x.fields, x.eventId);
   });
+  return getPetData();
+}
+
+// ====== 寵物驗血（PetLabs／PetLabPrefs）======
+// 一個項目一列，自帶那份報告上印的參考範圍（寵物的範圍依物種與檢驗所不同，不寫死）。
+var PET_LAB_HEADERS = ["id", "pet", "date", "name", "value", "unit", "refLow", "refHigh", "createdAt"];
+var PET_LAB_PREF_HEADERS = ["id", "pet", "name", "mode", "refLow", "refHigh", "note", "createdAt"];
+var PET_LAB_PREF_MODES = ["ok", "range"];
+
+// 整批驗證（任何一筆不合格就丟錯，呼叫端要在寫入任何東西之前先呼叫）。回傳 [{name, value, unit, low, high}]
+function normalizePetLabItems_(items) {
+  if (typeof items === "string") {
+    try { items = JSON.parse(items); } catch (e) { throw new Error("驗血項目格式錯誤"); }
+  }
+  if (!items || !items.length) throw new Error("至少要有一個項目");
+  if (items.length > 80) throw new Error("一次最多 80 個項目");
+  var seen = {};
+  return items.map(function (it) {
+    var name = textArg_(it.name, "項目名稱", { required: true, max: 40 });
+    if (seen[name]) throw new Error("項目「" + name + "」重複了");
+    seen[name] = true;
+    var low = numArg_(it.refLow, name + " 參考下限", { emptyValue: "" });
+    var high = numArg_(it.refHigh, name + " 參考上限", { emptyValue: "" });
+    if (low !== "" && high !== "" && low > high) throw new Error(name + " 的參考下限不能大於上限");
+    return { name: name, value: numArg_(it.value, name + " 的數值"), unit: textArg_(it.unit, name + " 的單位", { max: 20 }), low: low, high: high };
+  });
+}
+
+function addPetLabEntry(p) {
+  var pet = enumArg_(p.pet, "寵物", PET_NAMES);
+  var date = dateArg_(p.date, "驗血");
+  var items = normalizePetLabItems_(p.items);
+  var sheet = ensureSheet("PetLabs", PET_LAB_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var col = function (h) { return headers.indexOf(h); };
+  ["pet", "date", "name", "value", "unit", "refLow", "refHigh"].forEach(function (h) {
+    if (col(h) < 0) throw new Error("PetLabs 缺少欄位 " + h + "，請先在表頭補上");
+  });
+  items.forEach(function (x) {
+    // 同一隻同一天同名稱：更新那一列（同一份報告重貼不會重複）
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][col("pet")]) === pet && normalizeDateCell_(values[i][col("date")]) === date && String(values[i][col("name")]) === x.name) {
+        sheet.getRange(i + 1, col("value") + 1).setValue(x.value);
+        setTextSafe_(sheet.getRange(i + 1, col("unit") + 1), x.unit);
+        sheet.getRange(i + 1, col("refLow") + 1).setValue(x.low);
+        sheet.getRange(i + 1, col("refHigh") + 1).setValue(x.high);
+        return;
+      }
+    }
+    var vals = { id: Utilities.getUuid(), pet: pet, date: date, name: x.name, value: x.value, unit: x.unit, refLow: x.low, refHigh: x.high, createdAt: new Date() };
+    appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
+  });
+  return getPetData();
+}
+
+function deletePetLabDay(pet, date) {
+  pet = enumArg_(pet, "寵物", PET_NAMES);
+  date = dateArg_(date, "驗血");
+  var sheet = ensureSheet("PetLabs", PET_LAB_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var petCol = headers.indexOf("pet"), dateCol = headers.indexOf("date");
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][petCol]) === pet && normalizeDateCell_(values[i][dateCol]) === date) sheet.deleteRow(i + 1);
+  }
+  return getPetData();
+}
+
+// 個人化設定：mode=ok「醫師說無妨」（照樣顯示偏高／偏低，但不當警示）、mode=range 自訂這隻的範圍（取代報告上的範圍）。
+// 同一隻同一個項目只有一筆，重設就更新。
+function setPetLabPref(p) {
+  var pet = enumArg_(p.pet, "寵物", PET_NAMES);
+  var name = textArg_(p.name, "項目名稱", { required: true, max: 40 });
+  var mode = enumArg_(p.mode, "設定類型", PET_LAB_PREF_MODES);
+  var low = numArg_(p.refLow, "範圍下限", { emptyValue: "" });
+  var high = numArg_(p.refHigh, "範圍上限", { emptyValue: "" });
+  if (mode === "range" && low === "" && high === "") throw new Error("自訂範圍至少要填下限或上限");
+  if (low !== "" && high !== "" && low > high) throw new Error("範圍下限不能大於上限");
+  if (mode === "ok") { low = ""; high = ""; }
+  var note = textArg_(p.note, "備註", { max: 200 });
+  var sheet = ensureSheet("PetLabPrefs", PET_LAB_PREF_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var vals = { pet: pet, name: name, mode: mode, refLow: low, refHigh: high, note: note };
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][headers.indexOf("pet")]) === pet && String(values[i][headers.indexOf("name")]) === name) {
+      Object.keys(vals).forEach(function (h) {
+        if (headers.indexOf(h) < 0) return;
+        var r = sheet.getRange(i + 1, headers.indexOf(h) + 1);
+        if (typeof vals[h] === "string") setTextSafe_(r, vals[h]); else r.setValue(vals[h]);
+      });
+      return getPetData();
+    }
+  }
+  vals.id = Utilities.getUuid();
+  vals.createdAt = new Date();
+  appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
+  return getPetData();
+}
+
+function clearPetLabPref(pet, name) {
+  pet = enumArg_(pet, "寵物", PET_NAMES);
+  name = textArg_(name, "項目名稱", { required: true, max: 40 });
+  var sheet = ensureSheet("PetLabPrefs", PET_LAB_PREF_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][headers.indexOf("pet")]) === pet && String(values[i][headers.indexOf("name")]) === name) sheet.deleteRow(i + 1);
+  }
   return getPetData();
 }

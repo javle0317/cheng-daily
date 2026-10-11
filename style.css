@@ -1191,3 +1191,15 @@ input[type="checkbox"]:checked {
 .pet-migrate-row select { flex: 0 0 auto; max-width: 42%; }
 .pet-tiles .empty-hint { grid-column: 1 / -1; }
 .pet-log-row .item-meta-row { flex-wrap: wrap; }
+
+/* ====== 寵物驗血（醫師說無妨的中性等級）====== */
+.bp-band-ok { fill: var(--text-dim); }
+.level-badge.level-ok { background: color-mix(in srgb, var(--text-dim) 18%, var(--card-bg)); }
+.level-text.level-ok { color: var(--text-dim); }
+.lab-tile-ok { box-shadow: inset 0 0 0 1px var(--text-dim); }
+.pet-tabs { margin-top: -4px; }
+.pet-pref-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+.pet-lab-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 6px; margin-bottom: 10px; align-items: center; }
+.pet-lab-row .x-name { grid-column: 1 / -1; }
+.pet-lab-row input { min-width: 0; box-sizing: border-box; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
+.pet-lab-row .x-remove { grid-column: 5; grid-row: 2; }
