@@ -1058,9 +1058,9 @@ const modalError = (hintId, msg) => { const el = $id(hintId); el.textContent = m
 
 let editingEvent = null;
 
-function openEventModal({ event = null, date = null, hide = false } = {}) {
+function openEventModal({ event = null, date = null } = {}) {
   editingEvent = event;
-  $id("emHeading").textContent = event ? "編輯事件" : (hide ? "記一筆花費" : "新增事件");
+  $id("emHeading").textContent = event ? "編輯事件" : "新增事件";
   $id("emTitle").value = event ? (event.title || "") : "";
   $id("emDate").value = event ? String(event.date) : (date || state.selectedDate);
   $id("emOwner").value = (event && event.owner) || "shared";
@@ -1068,8 +1068,6 @@ function openEventModal({ event = null, date = null, hide = false } = {}) {
   $id("emTime").value = event && event.time ? String(event.time) : "";
   $id("emEndTime").value = event && event.endTime ? String(event.endTime) : "";
   $id("emNote").value = event ? (event.notes || "") : "";
-  $id("emAmount").value = event && event.amount !== "" && event.amount != null ? String(event.amount) : "";
-  $id("emHide").checked = event ? isTruthy(event.hideFromCalendar) : !!hide;
   modalError("emHint", "");
   $id("emDeleteBtn").classList.toggle("hidden", !event);
   openModalEl("eventModal");
@@ -1082,7 +1080,6 @@ $id("emCloseBtn").addEventListener("click", closeEventModal);
 $id("emCancelBtn").addEventListener("click", closeEventModal);
 $id("eventModal").addEventListener("click", (e) => { if (e.target.id === "eventModal") closeEventModal(); });
 $id("addEventBtn").addEventListener("click", () => openEventModal({ date: state.selectedDate }));
-$id("addExpenseBtn").addEventListener("click", () => openEventModal({ date: toDateStr(new Date()), hide: true }));
 
 $id("eventModalForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1090,18 +1087,17 @@ $id("eventModalForm").addEventListener("submit", async (e) => {
   const date = $id("emDate").value;
   const time = $id("emTime").value;
   const endTime = $id("emEndTime").value;
-  const amountRaw = $id("emAmount").value.trim();
-  const amount = amountRaw === "" ? "" : parseStrictNumber(amountRaw);
-  const hide = $id("emHide").checked;
   const problem = !title ? "請填標題"
     : !date ? "請選日期"
-    : amount === null ? `花費金額「${amountRaw}」不是有效數字`
-    : (amount !== "" && amount < 0) ? "花費不能是負數"
-    : (hide && !(amount > 0)) ? "「只記帳」的事件要填花費金額"
     : checkTimeRange(time, endTime);
   if (problem) { modalError("emHint", problem); return; }
-  const params = { date, time, endTime, title, notes: $id("emNote").value.trim(), owner: $id("emOwner").value, amount, hideFromCalendar: hide ? "true" : "false" };
-  if (editingEvent) params.id = editingEvent.id;
+  // 花費金額與「只記帳」已不在畫面上（寵物花費改記在寵物頁）：編輯舊事件要把原值原樣帶回去，不然後端會當成清空
+  const params = { date, time, endTime, title, notes: $id("emNote").value.trim(), owner: $id("emOwner").value, amount: "", hideFromCalendar: "false" };
+  if (editingEvent) {
+    params.id = editingEvent.id;
+    params.amount = editingEvent.amount === undefined || editingEvent.amount === null ? "" : editingEvent.amount;
+    params.hideFromCalendar = isTruthy(editingEvent.hideFromCalendar) ? "true" : "false";
+  }
   const wasEdit = !!editingEvent;
   setFormBusy(e.target, true);
   try {

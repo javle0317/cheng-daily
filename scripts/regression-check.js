@@ -178,6 +178,13 @@ console.log("前端：api() 參數一律被轉成字串，陣列／物件要先 
   check("apiRequest：字串參數原樣送出（後端 JSON.parse 得回陣列）", Array.isArray(JSON.parse(sent.items)));
 }
 
+console.log("前端：事件彈窗已拿掉花費／只記帳欄位，編輯舊事件要把原本的 amount、hideFromCalendar 帶回去（不然後端當成清空）");
+{
+  const a = read("app.js"), h = read("index.html");
+  check("index.html 沒有 emAmount／emHide／addExpenseBtn", !/id="emAmount"|id="emHide"|id="addExpenseBtn"/.test(h));
+  check("app.js 編輯事件時沿用 editingEvent.amount 與 hideFromCalendar", /params\.amount\s*=\s*editingEvent\.amount/.test(a) && /params\.hideFromCalendar\s*=\s*isTruthy\(editingEvent\.hideFromCalendar\)/.test(a));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
