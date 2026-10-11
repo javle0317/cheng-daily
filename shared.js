@@ -8,9 +8,36 @@ const PASSWORD_KEY = "dailyhub_password";
 
 const PET_NAMES = ["林萌", "咪嚕"]; // 之後又養新寵物，這裡跟 Code.gs 的 PET_NAMES 都要加（首頁與寵物頁共用）
 
+// ====== 寵物紀錄的類型（寵物頁、首頁事件彈窗、首頁循環行程「記到寵物紀錄」共用；跟 Code.gs 的 PET_LOG_TYPES 一致）======
+const PET_TYPES = [
+  { key: "food", label: "飼料", icon: "🍖", predict: true, finishable: true, titleLabel: "品項（例如：主食罐 12 入）", noteLabel: "備註（例如：到期日 2027/03）" },
+  { key: "litter", label: "貓砂", icon: "🧺", predict: true, finishable: true, titleLabel: "品項", noteLabel: "備註（選填）" },
+  { key: "vet", label: "看醫生", icon: "🏥", titleLabel: "看什麼（例如：耳朵發炎）", noteLabel: "醫囑／重要事項（選填）" },
+  { key: "medicine", label: "用藥／疫苗", icon: "💊", titleLabel: "藥品或疫苗名稱", noteLabel: "備註（用法、劑量、下次施打日）" },
+  { key: "grooming", label: "美容", icon: "✂️", titleLabel: "項目", noteLabel: "備註（選填）" },
+  { key: "other", label: "其他", icon: "📝", titleLabel: "項目", noteLabel: "備註（選填）" },
+];
+const PET_ICON = { "林萌": "🐕", "咪嚕": "🐈" };
+
+function typeMeta(key) {
+  return PET_TYPES.find(t => t.key === key) || PET_TYPES[PET_TYPES.length - 1];
+}
+
+// 舊事件標題猜類型（搬移時當預設值，使用者可以改）
+function guessPetType(title) {
+  const t = String(title || "");
+  if (/美容|洗澡|剪毛|剪甲|SPA/i.test(t)) return "grooming";
+  if (/砂/.test(t)) return "litter";
+  if (/飼料|罐|主食|肉泥|零食|凍乾|糧|餐包/.test(t)) return "food";
+  if (/疫苗|驅蟲|除蚤|心絲蟲|預防針/.test(t)) return "medicine";
+  if (/醫|診|檢查|手術|洗牙|看病|急診|住院|健檢|回診|抽血|超音波/.test(t)) return "vet";
+  if (/藥/.test(t)) return "medicine";
+  return "other";
+}
+
 // 前端需要的後端最低版本（Code.gs 的 BACKEND_VERSION）。後端比這個舊 = Dean 還沒把新版 Code.gs 部署成新版本，
 // 會跳一次提醒，不用等到畫面出現怪現象才發現。改了後端行為、前端依賴時，兩邊一起加版本。
-const BACKEND_MIN_VERSION = "2026-10-12.4";
+const BACKEND_MIN_VERSION = "2026-10-12.5";
 let backendWarned = false;
 
 function toDateStr(d) {

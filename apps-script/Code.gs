@@ -126,6 +126,7 @@ function dispatch_(p) {
       case "deleteGoal":
         return respond({ ok: true, data: deleteGoal(p.id) });
       case "addEvent":
+        if (p.petLogType) return respond({ ok: true, data: addEventWithPetLog_(p) });
         return respond({
           ok: true,
           data: addEvent(p.date, p.time, p.title, p.notes, p.owner, p.amount, p.hideFromCalendar, p.endTime),
@@ -133,6 +134,7 @@ function dispatch_(p) {
       case "deleteEvent":
         return respond({ ok: true, data: deleteEvent(p.id) });
       case "updateEvent":
+        if (p.petLogType) return respond({ ok: true, data: updateEventWithPetLog_(p) });
         return respond({ ok: true, data: updateEvent(p) });
       case "updateRecurringEvent":
         return respond({ ok: true, data: updateRecurringEvent(p) });
@@ -259,7 +261,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.4";
+var BACKEND_VERSION = "2026-10-12.5";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -409,11 +411,13 @@ function endTimeArg_(time, endTime, label) {
   return end;
 }
 
-function addEvent(date, time, title, notes, owner, amount, hideFromCalendar, endTime) {
+// 寫入一筆事件並回傳它的 id（addEvent 與「同時登記到寵物紀錄」共用）
+function addEventRow_(date, time, title, notes, owner, amount, hideFromCalendar, endTime) {
   var sheet = getSheet("Events");
   var end = endTimeArg_(time, endTime, "事件");
+  var id = Utilities.getUuid();
   appendRowSafe_(sheet, [
-    Utilities.getUuid(),
+    id,
     dateArg_(date, "事件"),
     enumArg_(owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES), { emptyValue: "" }),
     timeArg_(time, "事件"),
@@ -425,6 +429,11 @@ function addEvent(date, time, title, notes, owner, amount, hideFromCalendar, end
     end,
   ]);
   markCalendarDirty_();
+  return id;
+}
+
+function addEvent(date, time, title, notes, owner, amount, hideFromCalendar, endTime) {
+  addEventRow_(date, time, title, notes, owner, amount, hideFromCalendar, endTime);
   return getData(["events"]);
 }
 
@@ -1829,7 +1838,10 @@ function appendPetLogRow_(sheet, f, sourceEventId) {
 
 function addPetLog(p) {
   var f = petLogFields_(p);
-  appendPetLogRow_(petLogSheet_(), f, "");
+  // 從循環行程的某一次記進來時帶 sourceEventId（rec_規則id_日期），同一次不能記兩遍
+  var src = textArg_(p.sourceEventId, "來源", { max: 100 });
+  if (src && petLogHasSource_(src)) throw new Error("這一次已經登記到寵物紀錄了");
+  appendPetLogRow_(petLogSheet_(), f, src);
   return getPetData();
 }
 
@@ -2081,4 +2093,50 @@ function deleteUtilityBill(id) {
     }
   }
   return getUtilityBills();
+}
+
+// ====== 事件 → 寵物紀錄（新增／編輯寵物事件時勾「登記到寵物紀錄」）======
+function todayStr_() {
+  return Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
+}
+
+function petLogHasSource_(sourceEventId) {
+  var values = petLogSheet_().getDataRange().getValues();
+  var col = values[0].indexOf("sourceEventId");
+  if (col < 0) return false;
+  for (var i = 1; i < values.length; i++) if (String(values[i][col]) === sourceEventId) return true;
+  return false;
+}
+
+// 把事件的欄位整理成 PetLog 的欄位並驗證（在寫入事件之前先呼叫，驗證不過整筆都不寫）。
+// 還沒到的預約不能登記（PetLog 記的是實際發生的）。
+function petLogFieldsFromEvent_(p) {
+  var owner = String(p.owner === undefined || p.owner === null ? "" : p.owner).trim();
+  if (PET_NAMES.indexOf(owner) < 0) throw new Error("只有寵物的事件可以登記到寵物紀錄");
+  var date = dateArg_(p.date, "事件");
+  if (date > todayStr_()) throw new Error("這個事件還沒到（" + date + "），等發生之後再登記到寵物紀錄");
+  return petLogFields_({ pet: owner, type: p.petLogType, date: date, title: p.title, amount: p.petLogAmount, note: p.notes });
+}
+
+// 同一個事件只登記一次：已經有 sourceEventId 就略過。回傳 "created" 或 "exists"
+function registerPetLogForEvent_(eventId, fields) {
+  if (petLogHasSource_(eventId)) return "exists";
+  appendPetLogRow_(petLogSheet_(), fields, eventId);
+  return "created";
+}
+
+function addEventWithPetLog_(p) {
+  var fields = petLogFieldsFromEvent_(p); // 先驗證
+  var id = addEventRow_(p.date, p.time, p.title, p.notes, p.owner, p.amount, p.hideFromCalendar, p.endTime);
+  var out = getData(["events"]);
+  out.petLogged = registerPetLogForEvent_(id, fields);
+  return out;
+}
+
+function updateEventWithPetLog_(p) {
+  var fields = petLogFieldsFromEvent_(p); // 先驗證
+  updateEvent(p);
+  var out = getData(["events"]);
+  out.petLogged = registerPetLogForEvent_(textArg_(p.id, "事件", { required: true, max: 100 }), fields);
+  return out;
 }

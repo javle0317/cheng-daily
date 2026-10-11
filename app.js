@@ -802,6 +802,16 @@ function renderEvents() {
       appendTextAndLink(metaRow, ev.notes, { textPrefix: "📝", linkIcon: "📍" });
     }
 
+    // 寵物的循環行程（例如每月點藥）：發生之後可以一鍵記到寵物紀錄（還沒到的日子不顯示）
+    if (ev.recurring && PET_NAMES.includes(ev.owner) && ev.date <= toDateStr(new Date())) {
+      const petBtn = document.createElement("button");
+      petBtn.type = "button";
+      petBtn.className = "pay-btn pet-log-btn";
+      petBtn.textContent = "🐾 記到寵物紀錄";
+      petBtn.addEventListener("click", () => openPetQuick(ev));
+      metaRow.appendChild(petBtn);
+    }
+
     // 點一筆事件 = 開編輯視窗（改、刪除都在裡面）；循環行程那一列開的是整條規則的編輯視窗
     li.classList.add("clickable");
     li.addEventListener("click", (e) => {
@@ -1056,6 +1066,44 @@ const openModalEl = (id) => $id(id).classList.remove("hidden");
 const closeModalEl = (id) => $id(id).classList.add("hidden");
 const modalError = (hintId, msg) => { const el = $id(hintId); el.textContent = msg; el.classList.toggle("modal-error", !!msg); };
 
+// ====== 循環行程的某一次 → 記到寵物紀錄 ======
+let petQuickEv = null;
+function openPetQuick(ev) {
+  petQuickEv = ev;
+  $id("pqInfo").textContent = `${PET_ICON[ev.owner] || "🐾"} ${ev.owner}　${ev.title}　${ev.date}`;
+  $id("pqType").value = guessPetType(ev.title);
+  $id("pqAmount").value = "";
+  $id("pqNote").value = ev.notes || "";
+  $id("pqHint").textContent = "";
+  openModalEl("petQuickModal");
+}
+(function initPetQuick() {
+  PET_TYPES.forEach(t => { const o = document.createElement("option"); o.value = t.key; o.textContent = `${t.icon} ${t.label}`; $id("pqType").appendChild(o); });
+  $id("pqClose").addEventListener("click", () => closeModalEl("petQuickModal"));
+  $id("petQuickModal").addEventListener("click", (e) => { if (e.target.id === "petQuickModal") closeModalEl("petQuickModal"); });
+  $id("petQuickForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!petQuickEv) return;
+    const amountRaw = $id("pqAmount").value.trim();
+    const amount = amountRaw === "" ? "" : parseStrictNumber(amountRaw);
+    if (amount === null || (amount !== "" && amount < 0)) { $id("pqHint").textContent = `金額「${amountRaw}」不是有效數字`; return; }
+    setFormBusy(e.target, true);
+    try {
+      await api("addPetLog", {
+        pet: petQuickEv.owner, type: $id("pqType").value, date: petQuickEv.date, title: petQuickEv.title,
+        amount, note: $id("pqNote").value, sourceEventId: `rec_${petQuickEv.ruleId}_${petQuickEv.date}`,
+      });
+      closeModalEl("petQuickModal");
+      showToast("已記到寵物紀錄");
+    } catch (err) {
+      $id("pqHint").textContent = err.message;
+    } finally {
+      setFormBusy(e.target, false);
+    }
+  });
+})();
+
+
 let editingEvent = null;
 
 function openEventModal({ event = null, date = null } = {}) {
@@ -1069,10 +1117,34 @@ function openEventModal({ event = null, date = null } = {}) {
   $id("emEndTime").value = event && event.endTime ? String(event.endTime) : "";
   $id("emNote").value = event ? (event.notes || "") : "";
   modalError("emHint", "");
+  $id("emPetLog").checked = false;
+  $id("emPetAmount").value = "";
+  $id("emPetType").value = guessPetType($id("emTitle").value);
+  syncPetLogBox();
   $id("emDeleteBtn").classList.toggle("hidden", !event);
   openModalEl("eventModal");
   if (!event) setTimeout(() => $id("emTitle").focus(), 0);
 }
+
+// 事件對象是寵物時，才出現「要登記到寵物紀錄嗎？」；還沒到的日期（預約）不能登記，勾選鎖住並提示
+function syncPetLogBox() {
+  const isPet = PET_NAMES.includes($id("emOwner").value);
+  $id("emPetBox").classList.toggle("hidden", !isPet);
+  if (!isPet) { $id("emPetLog").checked = false; $id("emPetFields").classList.add("hidden"); return; }
+  const future = $id("emDate").value > toDateStr(new Date());
+  $id("emPetLog").disabled = future;
+  if (future) $id("emPetLog").checked = false;
+  $id("emPetHint").textContent = future ? "這是還沒到的預約，等發生之後再編輯這個事件來登記。" : "登記後會記在寵物頁（已登記過的不會重複）。";
+  $id("emPetFields").classList.toggle("hidden", !$id("emPetLog").checked);
+}
+(function initPetLogBox() {
+  PET_TYPES.forEach(t => { const o = document.createElement("option"); o.value = t.key; o.textContent = `${t.icon} ${t.label}`; $id("emPetType").appendChild(o); });
+  ["emOwner", "emDate"].forEach(id => $id(id).addEventListener("change", syncPetLogBox));
+  $id("emPetLog").addEventListener("change", () => {
+    if ($id("emPetLog").checked) $id("emPetType").value = guessPetType($id("emTitle").value);
+    syncPetLogBox();
+  });
+})();
 
 function closeEventModal() { closeModalEl("eventModal"); editingEvent = null; }
 
@@ -1099,14 +1171,23 @@ $id("eventModalForm").addEventListener("submit", async (e) => {
     params.hideFromCalendar = isTruthy(editingEvent.hideFromCalendar) ? "true" : "false";
   }
   const wasEdit = !!editingEvent;
+  const petLog = !$id("emPetBox").classList.contains("hidden") && $id("emPetLog").checked;
+  if (petLog) {
+    const amountRaw = $id("emPetAmount").value.trim();
+    const amount = amountRaw === "" ? "" : parseStrictNumber(amountRaw);
+    if (amount === null || (amount !== "" && amount < 0)) { modalError("emHint", `寵物紀錄的金額「${amountRaw}」不是有效數字`); return; }
+    params.petLogType = $id("emPetType").value;
+    params.petLogAmount = amount;
+  }
   setFormBusy(e.target, true);
   try {
-    applyData(await api(wasEdit ? "updateEvent" : "addEvent", params));
+    const res = await api(wasEdit ? "updateEvent" : "addEvent", params);
+    applyData(res);
     closeEventModal();
     renderEvents();
     renderCalendar();
     renderPetExpenses();
-    showToast(wasEdit ? "已儲存" : "已新增");
+    showToast(petLog ? (res.petLogged === "exists" ? "已儲存（這個事件之前已登記過寵物紀錄）" : "已儲存，並登記到寵物紀錄") : (wasEdit ? "已儲存" : "已新增"));
   } catch (err) {
     modalError("emHint", (wasEdit ? "儲存失敗：" : "新增失敗：") + err.message);
   } finally {

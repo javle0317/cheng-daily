@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261011223736">
+<link rel="stylesheet" href="style.css?v=20261011224251">
 </head>
 <body>
 
@@ -202,12 +202,42 @@
           </span>
         </div>
         <label class="mf">備註／地點<input id="emNote" type="text" placeholder="備註/地點…" maxlength="2000"></label>
+        <div id="emPetBox" class="em-pet-box hidden">
+          <label class="checkbox-label"><input id="emPetLog" type="checkbox"> 要登記到寵物紀錄嗎？</label>
+          <p id="emPetHint" class="progress-line"></p>
+          <div id="emPetFields" class="form-row hidden">
+            <label class="mf">類型<select id="emPetType"></select></label>
+            <label class="mf">金額（選填）<input id="emPetAmount" type="text" inputmode="decimal" placeholder="金額"></label>
+          </div>
+        </div>
         <p id="emHint" class="progress-line"></p>
         <div class="dialog-actions modal-actions">
           <button id="emDeleteBtn" class="ghost-btn danger-btn hidden" type="button">刪除</button>
           <span class="spacer"></span>
           <button id="emCancelBtn" class="ghost-btn" type="button">取消</button>
           <button id="emSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="petQuickModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>記到寵物紀錄</h2>
+        <button id="pqClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petQuickForm" class="entry-form entry-form-rows modal-form">
+        <p id="pqInfo" class="sub-heading"></p>
+        <div class="form-row">
+          <label class="mf">類型<select id="pqType"></select></label>
+          <label class="mf">金額（選填）<input id="pqAmount" type="text" inputmode="decimal" placeholder="金額"></label>
+        </div>
+        <label class="mf">備註（選填）<input id="pqNote" type="text" maxlength="500" autocomplete="off"></label>
+        <p id="pqHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="pqSubmit" type="submit">記下來</button>
         </div>
       </form>
     </div>
@@ -332,7 +362,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261011223736"></script>
-  <script src="app.js?v=20261011223736"></script>
+  <script src="shared.js?v=20261011224251"></script>
+  <script src="app.js?v=20261011224251"></script>
 </body>
 </html>

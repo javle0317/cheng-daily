@@ -260,6 +260,14 @@ console.log("前端：水電瓦斯（每月均攤、趨勢點、摘要、渲染�
   check("bills.html 依序載入 shared → health-charts → bills → utilities", order.every((n, i) => n > -1 && (i === 0 || n > order[i - 1])), order);
 }
 
+console.log("前端：事件彈窗的「登記到寵物紀錄」與循環行程「記到寵物紀錄」");
+{
+  const h = read("index.html"), a = read("app.js");
+  check("index.html 有 emPetLog／emPetType／emPetAmount／petQuickModal", ["emPetLog", "emPetType", "emPetAmount", "petQuickModal", "pqType"].every(id => h.includes(`id="${id}"`)));
+  check("app.js 送出事件時帶 petLogType／petLogAmount，且只有寵物對象且勾選時才帶", /params\.petLogType\s*=/.test(a) && /const petLog = !\$id\("emPetBox"\)\.classList\.contains\("hidden"\) && \$id\("emPetLog"\)\.checked/.test(a));
+  check("循環行程的那一次記進寵物紀錄時帶 sourceEventId（rec_規則id_日期）", /sourceEventId: `rec_\$\{petQuickEv\.ruleId\}_\$\{petQuickEv\.date\}`/.test(a));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -304,6 +312,31 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
+    getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
+  const EV = ["id", "date", "owner", "time", "title", "notes", "createdAt", "amount", "hideFromCalendar", "endTime"];
+  const sheets = { Events: mk(EV), PetLog: mk(be.PET_LOG_HEADERS), PetLabs: mk(be.PET_LAB_HEADERS), PetLabPrefs: mk(be.PET_LAB_PREF_HEADERS) };
+  const realUuid = be.Utilities.getUuid; let uc = 0; be.Utilities.getUuid = () => "ev-" + (++uc);
+  const realToday = be.todayStr_, realDirty = be.markCalendarDirty_; be.todayStr_ = () => "2026-10-11"; be.markCalendarDirty_ = () => {};
+  const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: n => sheets[n] });
+  try {
+    const base = { date: "2026-10-10", time: "", endTime: "", title: "買飼料", notes: "主食罐", owner: "咪嚕", amount: "", hideFromCalendar: "false", petLogType: "food", petLogAmount: "520" };
+    const res = be.addEventWithPetLog_(base);
+    check("addEventWithPetLog_：事件與寵物紀錄一起寫入，寵物紀錄的 sourceEventId＝事件 id、金額／備註／日期帶過去",
+      sheets.Events.rows.length === 1 && sheets.PetLog.rows.length === 1 && sheets.PetLog.rows[0][7] === sheets.Events.rows[0][0] && sheets.PetLog.rows[0][1] === "咪嚕" && sheets.PetLog.rows[0][2] === "food" && sheets.PetLog.rows[0][5] === 520 && sheets.PetLog.rows[0][6] === "主食罐" && res.petLogged === "created", { ev: sheets.Events.rows, pl: sheets.PetLog.rows });
+    const nE = sheets.Events.rows.length, nP = sheets.PetLog.rows.length;
+    check("addEventWithPetLog_：還沒到的預約、不是寵物、不認得的類型、壞金額都丟錯，事件也不會寫（驗證在寫入之前）",
+      [{ date: "2026-10-12" }, { owner: "me" }, { petLogType: "xx" }, { petLogAmount: "abc" }].every(o => throws(() => be.addEventWithPetLog_(Object.assign({}, base, o)))) && sheets.Events.rows.length === nE && sheets.PetLog.rows.length === nP);
+    be.addEvent("2026-10-09", "", "看醫生", "", "林萌", "", "false", "");
+    const plainId = sheets.Events.rows[sheets.Events.rows.length - 1][0];
+    const up1 = be.updateEventWithPetLog_(Object.assign({}, base, { id: plainId, date: "2026-10-09", title: "看醫生", owner: "林萌", petLogType: "vet", petLogAmount: "" }));
+    const up2 = be.updateEventWithPetLog_(Object.assign({}, base, { id: plainId, date: "2026-10-09", title: "看醫生", owner: "林萌", petLogType: "vet", petLogAmount: "" }));
+    check("updateEventWithPetLog_：編輯舊事件時登記（created），同一個事件再登記不會重複（exists）", up1.petLogged === "created" && up2.petLogged === "exists" && sheets.PetLog.rows.filter(r => r[7] === plainId).length === 1);
+    be.addPetLog(Object.assign({}, { pet: "咪嚕", type: "medicine", date: "2026-10-10", title: "點藥", amount: "", note: "", sourceEventId: "rec_r1_2026-10-10" }));
+    check("addPetLog：帶 sourceEventId（循環行程某一次）同一次不能記兩遍", throws(() => be.addPetLog({ pet: "咪嚕", type: "medicine", date: "2026-10-10", title: "點藥", amount: "", note: "", sourceEventId: "rec_r1_2026-10-10" })));
+  } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; be.Utilities.getUuid = realUuid; be.todayStr_ = realToday; be.markCalendarDirty_ = realDirty; }
+}
 {
   const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
@@ -495,7 +528,7 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   check("設定 CALENDAR_ID 後：寫入會設待同步旗標，狀態可讀", propStore.CAL_DIRTY === "1" && be.getCalendarSyncStatus().enabled && be.getCalendarSyncStatus().dirty);
   const codeGs = read("apps-script/Code.gs");
   const bodyOf = (fn) => { const i = codeGs.indexOf("function " + fn + "("); return codeGs.slice(i, codeGs.indexOf("\n}\n", i)); };
-  check("寫入 Events／循環行程／跳過日的 7 個函式都會標記待同步（改花費金額不用）", ["addEvent", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"].every(fn => bodyOf(fn).includes("markCalendarDirty_();")) && !bodyOf("setEventAmount").includes("markCalendarDirty_"));
+  check("寫入 Events／循環行程／跳過日的 7 個函式都會標記待同步（addEvent 走 addEventRow_；改花費金額不用）", ["addEventRow_", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"].every(fn => bodyOf(fn).includes("markCalendarDirty_();")) && !bodyOf("setEventAmount").includes("markCalendarDirty_"));
   be.PropertiesService.getScriptProperties = origProps; // 後面的傳輸測試要用原本的密碼屬性
 }
 

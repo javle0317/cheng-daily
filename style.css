@@ -1245,3 +1245,7 @@ input[type="checkbox"]:checked {
 .util-row .util-sub { flex-basis: 100%; margin-top: -4px; white-space: pre-wrap; word-break: break-word; }
 .util-row .util-edit, .util-row .delete-btn { padding: 4px 10px; }
 .util-more { margin-top: 8px; width: 100%; }
+
+/* 事件彈窗：寵物事件的「登記到寵物紀錄」區塊 */
+.em-pet-box { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 10px; background: var(--accent-soft); }
+.pet-log-btn { margin-left: auto; }

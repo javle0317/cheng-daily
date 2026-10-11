@@ -2,16 +2,6 @@
 // WEBAPP_URL / api() / 登入流程 / showConfirm / PET_NAMES 等共用邏輯在 shared.js。
 // Sheet 分頁 PetLog 由後端 ensureSheet 自動建立；type 與後端 PET_LOG_TYPES 一致。
 
-const PET_TYPES = [
-  { key: "food", label: "飼料", icon: "🍖", predict: true, finishable: true, titleLabel: "品項（例如：主食罐 12 入）", noteLabel: "備註（例如：到期日 2027/03）" },
-  { key: "litter", label: "貓砂", icon: "🧺", predict: true, finishable: true, titleLabel: "品項", noteLabel: "備註（選填）" },
-  { key: "vet", label: "看醫生", icon: "🏥", titleLabel: "看什麼（例如：耳朵發炎）", noteLabel: "醫囑／重要事項（選填）" },
-  { key: "medicine", label: "用藥／疫苗", icon: "💊", titleLabel: "藥品或疫苗名稱", noteLabel: "備註（用法、劑量、下次施打日）" },
-  { key: "grooming", label: "美容", icon: "✂️", titleLabel: "項目", noteLabel: "備註（選填）" },
-  { key: "other", label: "其他", icon: "📝", titleLabel: "項目", noteLabel: "備註（選填）" },
-];
-const PET_ICON = { "林萌": "🐕", "咪嚕": "🐈" };
-
 let state = {
   log: [],
   events: [], // 只用在「整理舊紀錄」
@@ -45,10 +35,6 @@ window.loadPageData = async function () {
 };
 
 // ====== 純邏輯（regression-check 會測）======
-function typeMeta(key) {
-  return PET_TYPES.find(t => t.key === key) || PET_TYPES[PET_TYPES.length - 1];
-}
-
 function dayNum(dateStr) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr));
   return m ? Math.round(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000) : null;
@@ -92,18 +78,6 @@ function petUsageStats(rows, today) {
     finished: uses.length,
     avgUse: uses.length ? Math.round(uses.reduce((a, b) => a + b, 0) / uses.length) : null,
   };
-}
-
-// 舊事件標題猜類型（搬移時當預設值，使用者可以改）
-function guessPetType(title) {
-  const t = String(title || "");
-  if (/美容|洗澡|剪毛|剪甲|SPA/i.test(t)) return "grooming";
-  if (/砂/.test(t)) return "litter";
-  if (/飼料|罐|主食|肉泥|零食|凍乾|糧|餐包/.test(t)) return "food";
-  if (/疫苗|驅蟲|除蚤|心絲蟲|預防針/.test(t)) return "medicine";
-  if (/醫|診|檢查|手術|洗牙|看病|急診|住院|健檢|回診|抽血|超音波/.test(t)) return "vet";
-  if (/藥/.test(t)) return "medicine";
-  return "other";
 }
 
 // 可以搬的事件：owner 是寵物、還沒搬過（sourceEventId 沒出現過）、日期已經到了（還沒發生的預約不能搬），
