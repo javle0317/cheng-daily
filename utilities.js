@@ -9,7 +9,12 @@ const UTIL_TYPES = [
 ];
 
 const UTIL_LIST_LIMIT = 12;
-const util = { bills: [], type: "electric", editingId: null, showAll: false };
+const UTIL_MODES = [
+  { key: "amount", label: "每月金額", unit: "元/月", decimals: 0 },
+  { key: "usage", label: "每月用量", unit: "度/月", decimals: 1 },
+  { key: "price", label: "每度單價", unit: "元/度", decimals: 2 },
+];
+const util = { bills: [], type: "electric", mode: "amount", editingId: null, showAll: false };
 try {
   const saved = localStorage.getItem("utilType");
   if (UTIL_TYPES.some(t => t.key === saved)) util.type = saved;
@@ -48,54 +53,132 @@ function utilMoney(n) {
   return "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
 }
 
-// 某類型的趨勢點（依帳單月份排序）：date 用該月 1 號當 x 軸，label 是提示文字
-function utilPoints(bills, type) {
-  return bills
-    .filter(b => b.type === type && /^\d{4}-\d{2}$/.test(String(b.billingMonth)) && Number(b.amount) >= 0)
-    .sort((a, b) => String(a.billingMonth).localeCompare(String(b.billingMonth)))
-    .map(b => ({
-      date: `${b.billingMonth}-01`,
-      value: utilMonthlyAvg(b),
-      label: `${utilMonthLabel(b.billingMonth)}（帳單 ${utilMoney(b.amount)}，${utilMonths(b)} 個月）`,
-    }));
+function utilUsage(b) {
+  const n = Number(b.usage);
+  return b.usage !== "" && b.usage !== undefined && b.usage !== null && Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// 摘要：最近一期每月均攤、與前一期比、最近 6 期平均、去年同期（同月份）
+function utilRound(n, dec) {
+  const f = Math.pow(10, dec);
+  return Math.round(n * f) / f;
+}
+
+// 某類型的趨勢點（依帳單月份排序）：date 用該月 1 號當 x 軸，label 是提示文字。
+// mode：amount＝每月均攤金額、usage＝每月均攤用量（度）、price＝每度單價（只算有填用量的帳單）
+function utilPoints(bills, type, mode) {
+  mode = mode || "amount";
+  return bills
+    .filter(b => b.type === type && /^\d{4}-\d{2}$/.test(String(b.billingMonth)) && Number(b.amount) >= 0)
+    .filter(b => mode === "amount" || utilUsage(b) !== null)
+    .sort((a, b) => String(a.billingMonth).localeCompare(String(b.billingMonth)))
+    .map(b => {
+      const months = utilMonths(b);
+      const u = utilUsage(b);
+      const value = mode === "usage" ? utilRound(u / months, 1) : mode === "price" ? utilRound(Number(b.amount) / u, 2) : utilMonthlyAvg(b);
+      return {
+        date: `${b.billingMonth}-01`,
+        value,
+        label: `${utilMonthLabel(b.billingMonth)}（帳單 ${utilMoney(b.amount)}${u !== null ? `，用量 ${u} 度` : ""}，${months} 個月）`,
+      };
+    });
+}
+
+// 摘要：最近一期、與前一期比、最近 6 期平均、去年同期（同月份）
 function utilSummary(points) {
   if (!points.length) return null;
   const last = points[points.length - 1];
   const prev = points.length > 1 ? points[points.length - 2] : null;
   const recent = points.slice(-6);
-  const avg6 = Math.round(recent.reduce((s, p) => s + p.value, 0) / recent.length);
+  const avg6 = recent.reduce((s, p) => s + p.value, 0) / recent.length;
   const lastYear = points.find(p => p.date.slice(5, 7) === last.date.slice(5, 7) && Number(p.date.slice(0, 4)) === Number(last.date.slice(0, 4)) - 1) || null;
   return { last, prev, avg6, lastYear, n: recent.length };
+}
+
+// 這個類型有沒有任何一筆填了用量（沒有就不顯示用量／單價的切換）
+function utilHasUsage(bills, type) {
+  return bills.some(b => b.type === type && utilUsage(b) !== null);
+}
+
+const UTIL_FMT = {
+  amount: n => utilMoney(n),
+  usage: n => `${utilRound(n, 1)} 度`,
+  price: n => `$${n.toFixed(2)}`,
+};
+
+// 批次匯入：{ items: [{ type, billingMonth, months, amount, usage, note }] }；有任何問題整批不匯入，讓使用者修正
+function parseUtilImport(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { return null; }
+  const arr = Array.isArray(data) ? data : data && Array.isArray(data.items) ? data.items : null;
+  if (!arr) return null;
+  const problems = [];
+  const items = [];
+  const seen = new Set();
+  arr.forEach((it, i) => {
+    const tag = `第 ${i + 1} 筆`;
+    const type = it && it.type;
+    const month = String((it && it.billingMonth) || "").trim();
+    const amount = parseStrictNumber(it && it.amount);
+    const monthsRaw = it && it.months !== undefined && it.months !== "" ? parseStrictNumber(it.months) : utilTypeMeta(type).months;
+    const usageRaw = it && it.usage !== undefined && it.usage !== null && it.usage !== "" ? parseStrictNumber(it.usage) : "";
+    const bad = [];
+    if (!UTIL_TYPES.some(t => t.key === type)) bad.push(`類型「${type}」不是 water／electric／gas`);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) bad.push(`月份「${month}」格式要 yyyy-MM`);
+    if (amount === null || amount < 0) bad.push(`金額「${it && it.amount}」不是有效數字`);
+    if (monthsRaw === null || !Number.isInteger(monthsRaw) || monthsRaw < 1 || monthsRaw > 12) bad.push("計費月數要是 1–12 的整數");
+    if (usageRaw === null || (usageRaw !== "" && usageRaw < 0)) bad.push(`用量「${it && it.usage}」不是有效數字`);
+    const key = `${type}|${month}`;
+    if (!bad.length && seen.has(key)) bad.push("跟前面的同類型同月份重複了");
+    if (bad.length) { problems.push(`${tag}：${bad.join("；")}`); return; }
+    seen.add(key);
+    items.push({ type, billingMonth: month, months: monthsRaw, amount, usage: usageRaw, note: String((it && it.note) || "").trim() });
+  });
+  return { items, problems };
 }
 
 // ====== 渲染 ======
 function renderUtilities() {
   renderUtilTypes();
-  const points = utilPoints(util.bills, util.type);
+  if (util.mode !== "amount" && !utilHasUsage(util.bills, util.type)) util.mode = "amount";
+  renderUtilModes();
+  const mode = UTIL_MODES.find(m => m.key === util.mode) || UTIL_MODES[0];
+  const points = utilPoints(util.bills, util.type, mode.key);
   drawTimeChart(document.getElementById("utilChart"), points, {
-    unit: "元/月", decimals: 0, fmtX: d => `${d.slice(2, 4)}/${d.slice(5, 7)}`,
+    unit: mode.unit, decimals: mode.decimals, fmtX: d => `${d.slice(2, 4)}/${d.slice(5, 7)}`,
   });
   const s = utilSummary(points);
   const el = document.getElementById("utilStats");
+  const fmt = UTIL_FMT[mode.key];
+  const diff = (d) => (d === 0 ? "持平" : `${d > 0 ? "▲" : "▼"}${fmt(Math.abs(d)).replace(" 度", "")}`);
   if (!s) {
     el.textContent = "";
   } else {
-    const parts = [`最近一期每月 ${utilMoney(s.last.value)}`];
-    if (s.prev) {
-      const d = s.last.value - s.prev.value;
-      parts.push(d === 0 ? "與前一期持平" : `比前一期 ${d > 0 ? "▲" : "▼"}${utilMoney(Math.abs(d)).slice(1)}`);
-    }
-    if (s.lastYear) {
-      const d = s.last.value - s.lastYear.value;
-      parts.push(`去年同月 ${utilMoney(s.lastYear.value)}（${d === 0 ? "持平" : (d > 0 ? "▲" : "▼") + utilMoney(Math.abs(d)).slice(1)}）`);
-    }
-    if (s.n > 1) parts.push(`最近 ${s.n} 期平均每月 ${utilMoney(s.avg6)}`);
+    const parts = [`最近一期每月 ${fmt(s.last.value)}`.replace("每月 $", mode.key === "price" ? "每度 $" : "每月 $")];
+    if (mode.key === "price") parts[0] = `最近一期每度 ${fmt(s.last.value)}`;
+    if (s.prev) parts.push(`比前一期 ${diff(s.last.value - s.prev.value)}`);
+    if (s.lastYear) parts.push(`去年同月 ${fmt(s.lastYear.value)}（${diff(s.last.value - s.lastYear.value)}）`);
+    if (s.n > 1) parts.push(`最近 ${s.n} 期平均 ${fmt(s.avg6)}`);
     el.textContent = parts.join("　·　");
   }
   renderUtilList();
+}
+
+function renderUtilModes() {
+  const box = document.getElementById("utilModes");
+  box.innerHTML = "";
+  const has = utilHasUsage(util.bills, util.type);
+  box.classList.toggle("hidden", !has);
+  if (!has) return;
+  UTIL_MODES.forEach(m => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "seg-btn" + (m.key === util.mode ? " on" : "");
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", m.key === util.mode ? "true" : "false");
+    b.textContent = m.label;
+    b.addEventListener("click", () => { util.mode = m.key; renderUtilities(); });
+    box.appendChild(b);
+  });
 }
 
 function renderUtilTypes() {
@@ -184,7 +267,10 @@ function buildUtilRow(b) {
   // 第二行小字：計費月數與每月均攤，有備註接在後面
   const sub = document.createElement("div");
   sub.className = "item-time util-sub";
-  sub.textContent = `${utilMonths(b)} 個月・每月 ${utilMoney(utilMonthlyAvg(b))}` + (b.note ? `　📝 ${b.note}` : "");
+  const u = utilUsage(b);
+  sub.textContent = `${utilMonths(b)} 個月・每月 ${utilMoney(utilMonthlyAvg(b))}`
+    + (u !== null ? `・用量 ${u} 度（每度 $${(Number(b.amount) / u).toFixed(2)}）` : "")
+    + (b.note ? `　📝 ${b.note}` : "");
   li.appendChild(sub);
   lockIfPending(li);
   return li;
@@ -220,8 +306,12 @@ function openUtilForm(b) {
   document.getElementById("utilMonth").value = b ? String(b.billingMonth) : "";
   document.getElementById("utilAmount").value = b ? String(b.amount) : "";
   document.getElementById("utilMonths").value = String(b ? utilMonths(b) : utilTypeMeta(type).months);
+  document.getElementById("utilUsage").value = b && utilUsage(b) !== null ? String(utilUsage(b)) : "";
   document.getElementById("utilNote").value = b ? b.note || "" : "";
   document.getElementById("utilHint").textContent = b ? "" : "同類型同月份已經有帳單的話，會更新那一筆。";
+  document.getElementById("utilImportBox").classList.toggle("hidden", !!b);
+  document.getElementById("utilImportText").value = "";
+  document.getElementById("utilImportMsg").textContent = "";
   updateUtilFormValidity();
   document.getElementById("utilModal").classList.remove("hidden");
 }
@@ -236,11 +326,15 @@ document.getElementById("utilForm").addEventListener("submit", async (e) => {
   const amountRaw = document.getElementById("utilAmount").value.trim();
   const amount = parseStrictNumber(amountRaw);
   if (amount === null || amount < 0) { hint.textContent = `金額「${amountRaw}」不是有效數字`; return; }
+  const usageRaw = document.getElementById("utilUsage").value.trim();
+  const usage = usageRaw === "" ? "" : parseStrictNumber(usageRaw);
+  if (usage === null || (usage !== "" && usage < 0)) { hint.textContent = `用量「${usageRaw}」不是有效數字`; return; }
   const params = {
     type: document.getElementById("utilType").value,
     billingMonth: document.getElementById("utilMonth").value,
     amount,
     months: document.getElementById("utilMonths").value,
+    usage,
     note: document.getElementById("utilNote").value,
   };
   const editing = util.editingId;
@@ -257,5 +351,32 @@ document.getElementById("utilForm").addEventListener("submit", async (e) => {
   } finally {
     setFormBusy(e.target, false);
     updateUtilFormValidity();
+  }
+});
+
+// 批次貼上匯入：檢查通過後先確認筆數，再一次送出（全部成功或全部不寫）
+document.getElementById("utilImportBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget; // 要在第一個 await 之前取：await 之後 currentTarget 會是 null
+  const msg = document.getElementById("utilImportMsg");
+  const parsed = parseUtilImport(document.getElementById("utilImportText").value);
+  if (!parsed) { msg.textContent = "格式不對，請整段貼上對話裡給你的資料（要有 items 陣列）"; return; }
+  if (parsed.problems.length) { msg.textContent = "⚠️ 有問題，整批沒有匯入：" + parsed.problems.slice(0, 5).join("；") + (parsed.problems.length > 5 ? `…（共 ${parsed.problems.length} 處）` : ""); return; }
+  if (!parsed.items.length) { msg.textContent = "沒有可以匯入的帳單"; return; }
+  const by = (k) => parsed.items.filter(i => i.type === k).length;
+  const months = parsed.items.map(i => i.billingMonth).sort();
+  const withUsage = parsed.items.filter(i => i.usage !== "").length;
+  const overwrite = parsed.items.filter(i => util.bills.some(b => b.type === i.type && String(b.billingMonth) === i.billingMonth)).length;
+  const summary = `${parsed.items.length} 筆（水 ${by("water")}、電 ${by("electric")}、瓦斯 ${by("gas")}；${utilMonthLabel(months[0])} ～ ${utilMonthLabel(months[months.length - 1])}；有用量 ${withUsage} 筆）`;
+  if (!(await showConfirm(`確定匯入 ${summary}？` + (overwrite ? `\n其中 ${overwrite} 筆跟已有的同類型同月份重複，會更新那一筆。` : "")))) return;
+  btn.disabled = true;
+  try {
+    applyUtilityBills(await api("addUtilityBills", { items: JSON.stringify(parsed.items) })); // api() 會把參數轉成字串，陣列要先轉成 JSON
+    renderUtilities();
+    closeUtilForm();
+    showToast(`已匯入 ${parsed.items.length} 筆帳單`);
+  } catch (err) {
+    msg.textContent = "匯入失敗：" + err.message;
+  } finally {
+    btn.disabled = false;
   }
 });

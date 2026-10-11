@@ -30,9 +30,10 @@
  *   CreditCardBills 欄位: id | bank | billingMonth | date | fullAmount | lowestAmount | paidAmount | createdAt
  *   Recipes         欄位: id | name | tags | ingredients | steps | notes | rating | cookCount | lastCookedAt | createdAt
  *                   （用 ensureSheet 自動建立，欄位與順序寫死在 RECIPE_HEADERS；tags 是逗號分隔、rating 0–5（0=未評分））
- *   UtilityBills    欄位: id | type | billingMonth | months | amount | note | createdAt
+ *   UtilityBills    欄位: id | type | billingMonth | months | amount | note | createdAt | usage
  *                   （水電瓦斯分項追蹤，ensureSheet 自動建立，寫死在 UTILITY_HEADERS；type 是 water/electric/gas，months 是計費月數，
- *                   趨勢用「每月均攤＝amount÷months」；同 type+billingMonth 只有一筆）
+ *                   趨勢用「每月均攤＝amount÷months」；同 type+billingMonth 只有一筆；usage 是用量（度，選填），
+ *                   這欄是後來加的，已存在的 UtilityBills 要手動在表頭最後面補上 usage）
  *   PetSkipped      欄位: id | eventId | createdAt
  *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
  *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
@@ -243,6 +244,8 @@ function dispatch_(p) {
         return respond({ ok: true, data: getUtilityBills() });
       case "addUtilityBill":
         return respond({ ok: true, data: addUtilityBill(p) });
+      case "addUtilityBills":
+        return respond({ ok: true, data: addUtilityBills(p.items) });
       case "updateUtilityBill":
         return respond({ ok: true, data: updateUtilityBill(p) });
       case "deleteUtilityBill":
@@ -267,7 +270,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.6";
+var BACKEND_VERSION = "2026-10-12.8";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -2062,7 +2065,7 @@ function clearPetLabPref(pet, name) {
 
 // ====== 水電瓦斯分項追蹤（UtilityBills）======
 // 只看趨勢用，不加進信用卡帳單的任何總額（多半已經刷卡，會重複）。網路、電信、訂閱先不記。
-var UTILITY_HEADERS = ["id", "type", "billingMonth", "months", "amount", "note", "createdAt"];
+var UTILITY_HEADERS = ["id", "type", "billingMonth", "months", "amount", "note", "createdAt", "usage"];
 var UTILITY_TYPES = ["water", "electric", "gas"];
 
 function utilitySheet_() {
@@ -2085,7 +2088,17 @@ function utilityFields_(p) {
     months: numArg_(p.months, "計費月數", { int: true, min: 1, max: 12 }),
     amount: numArg_(p.amount, "金額", { min: 0 }),
     note: textArg_(p.note, "備註", { max: 100 }),
+    usage: numArg_(p.usage, "用量", { emptyValue: "", min: 0 }),
   };
+}
+
+// 舊的 UtilityBills 可能還沒有 usage 欄：沒填用量就略過這個欄位、照常寫；有填用量卻沒有這一欄就報錯要求補欄位（不悄悄丟掉）
+function utilityFieldsForSheet_(f, headers) {
+  if (headers.indexOf("usage") >= 0) return f;
+  if (f.usage !== "") throw new Error("UtilityBills 分頁缺少 usage 欄，請先在表頭最後面補上 usage");
+  var g = {};
+  Object.keys(f).forEach(function (k) { if (k !== "usage") g[k] = f[k]; });
+  return g;
 }
 
 // 找同類型同月份的那一列（排除 exceptId），回傳列號或 0
@@ -2104,13 +2117,35 @@ function addUtilityBill(p) {
   var values = sheet.getDataRange().getValues();
   var headers = values[0];
   var existing = findUtilityRow_(values, headers, f.type, f.billingMonth, "");
+  var writable = utilityFieldsForSheet_(f, headers);
   if (existing) {
     var id = values[existing - 1][headers.indexOf("id")];
-    updateRowByHeaders_("UtilityBills", id, f);
+    updateRowByHeaders_("UtilityBills", id, writable);
     return getUtilityBills();
   }
-  var vals = { id: Utilities.getUuid(), type: f.type, billingMonth: f.billingMonth, months: f.months, amount: f.amount, note: f.note, createdAt: new Date() };
+  var vals = { id: Utilities.getUuid(), type: f.type, billingMonth: f.billingMonth, months: f.months, amount: f.amount, note: f.note, createdAt: new Date(), usage: f.usage };
   appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
+  return getUtilityBills();
+}
+
+// 批次新增（歷史帳單一次貼上）：全部驗證過才寫，同批次內同類型同月份重複就整批不寫；已經有的同類型同月份＝更新
+function addUtilityBills(items) {
+  if (typeof items === "string") {
+    try { items = JSON.parse(items); } catch (e) { throw new Error("匯入資料格式錯誤"); }
+  }
+  if (!items || !items.length) throw new Error("沒有要匯入的帳單");
+  if (items.length > 150) throw new Error("一次最多匯入 150 筆");
+  var seen = {};
+  var parsed = items.map(function (it) {
+    var f = utilityFields_(it);
+    var key = f.type + "|" + f.billingMonth;
+    if (seen[key]) throw new Error("匯入資料裡 " + f.billingMonth + " 的這個類型重複了");
+    seen[key] = true;
+    return f;
+  });
+  var headers = utilitySheet_().getDataRange().getValues()[0];
+  parsed.forEach(function (f) { utilityFieldsForSheet_(f, headers); }); // 有填用量卻沒有 usage 欄就在寫入之前丟錯
+  parsed.forEach(function (f) { addUtilityBill(f); });
   return getUtilityBills();
 }
 
@@ -2120,7 +2155,7 @@ function updateUtilityBill(p) {
   var sheet = utilitySheet_();
   var values = sheet.getDataRange().getValues();
   if (findUtilityRow_(values, values[0], f.type, f.billingMonth, id)) throw new Error("這個類型的 " + f.billingMonth + " 已經有一筆帳單了");
-  updateRowByHeaders_("UtilityBills", id, f);
+  updateRowByHeaders_("UtilityBills", id, utilityFieldsForSheet_(f, values[0]));
   return getUtilityBills();
 }
 

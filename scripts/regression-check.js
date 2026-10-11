@@ -252,8 +252,20 @@ console.log("前端：水電瓦斯（每月均攤、趨勢點、摘要、渲染�
   const sm = JSON.parse(ev('JSON.stringify(utilSummary(utilPoints(__bills, "electric")))'));
   check("utilSummary：最近一期、前一期、去年同月、最近平均", sm.last.value === 1800 && sm.prev.value === 1200 && sm.lastYear.value === 1500 && sm.avg6 === 1500, sm);
   check("utilSummary：沒資料回傳 null；只有一筆沒有前一期", ev('utilSummary([])') === null && ev('utilSummary(utilPoints(__bills, "gas")).prev') === null);
+  u.__ubills = [
+    { id: "1", type: "electric", billingMonth: "2026-06", months: 2, amount: 2400, usage: 600 },
+    { id: "2", type: "electric", billingMonth: "2026-08", months: 2, amount: 3600, usage: 800 },
+    { id: "3", type: "electric", billingMonth: "2026-04", months: 2, amount: 2000, usage: "" },
+  ];
+  check("utilPoints：用量模式＝用量÷計費月數（每月），只算有填用量的；單價模式＝金額÷用量", JSON.stringify(JSON.parse(ev('JSON.stringify(utilPoints(__ubills, "electric", "usage").map(p => p.value))'))) === "[300,400]" && JSON.stringify(JSON.parse(ev('JSON.stringify(utilPoints(__ubills, "electric", "price").map(p => p.value))'))) === "[4,4.5]" && ev('utilPoints(__ubills, "electric", "amount").length') === 3);
+  check("utilHasUsage／utilUsage：沒填或 0 視為沒有；label 帶用量", ev('utilHasUsage(__ubills, "electric")') === true && ev('utilHasUsage(__bills, "electric")') === false && ev('utilUsage({usage: 0})') === null && ev('utilUsage({usage: ""})') === null && ev('utilPoints(__ubills, "electric", "usage")[1].label').includes("用量 800 度"));
+  const imp = JSON.parse(ev('JSON.stringify(parseUtilImport(\'{"items":[{"type":"electric","billingMonth":"2026-08","amount":"3,600","usage":800},{"type":"water","billingMonth":"2026-08","months":2,"amount":500,"note":"x"},{"type":"gas","billingMonth":"2026-08","amount":450,"months":1}]}\'))'));
+  check("parseUtilImport：數字解析（3,600）、缺月數用類型預設（電 2、瓦斯 1）、沒填用量留空", imp && imp.problems.length === 0 && imp.items.length === 3 && imp.items[0].amount === 3600 && imp.items[0].months === 2 && imp.items[0].usage === 800 && imp.items[1].usage === "" && imp.items[2].months === 1, imp);
+  const impBad = JSON.parse(ev('JSON.stringify(parseUtilImport(\'[{"type":"net","billingMonth":"2026-08","amount":1},{"type":"gas","billingMonth":"2026-13","amount":1},{"type":"gas","billingMonth":"2026-08","amount":"x"},{"type":"gas","billingMonth":"2026-08","amount":1,"months":3.5},{"type":"gas","billingMonth":"2026-07","amount":1},{"type":"gas","billingMonth":"2026-07","amount":2}]\'))'));
+  check("parseUtilImport：壞類型／壞月份／壞金額／壞月數／同批次重複都列入 problems（整批不匯入）", impBad.problems.length === 5 && impBad.items.length === 1, impBad);
+  check("parseUtilImport：壞 JSON／沒有陣列回傳 null；批次匯入鈕在 await 前取 e.currentTarget", ev('parseUtilImport("abc")') === null && ev('parseUtilImport("{}")') === null && read("utilities.js").indexOf("const btn = e.currentTarget") < read("utilities.js").indexOf("await showConfirm(`確定匯入"));
   let err = null;
-  try { ev('util.bills = __bills; ["water","electric","gas"].forEach(t => { util.type = t; renderUtilities(); }); util.bills = []; renderUtilities();'); } catch (e) { err = String(e); }
+  try { ev('util.bills = __bills; ["water","electric","gas"].forEach(t => { util.type = t; renderUtilities(); }); util.bills = __ubills; util.type = "electric"; ["amount","usage","price"].forEach(m => { util.mode = m; renderUtilities(); }); util.bills = []; util.mode = "usage"; renderUtilities();'); } catch (e) { err = String(e); }
   check("三種類型（含沒有資料）渲染不丟錯", err === null, err);
   const html = read("bills.html");
   const order = ["shared.js", "health-charts.js", "bills.js", "utilities.js"].map(f => html.indexOf('src="' + f));
@@ -365,10 +377,25 @@ check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.t
     const n = sh.rows.length;
     check("addUtilityBill：不認得的類型／壞月份／壞金額／月數 0 或 13／負金額都丟錯且不寫入",
       [{ type: "net" }, { billingMonth: "2026-13" }, { amount: "abc" }, { months: "0" }, { months: "13" }, { amount: "-1" }].every(o => throws(() => be.addUtilityBill(Object.assign({ type: "water", billingMonth: "2026-09", months: "2", amount: "100" }, o)))) && sh.rows.length === n);
+    be.addUtilityBill({ type: "water", billingMonth: "2026-08", months: "2", amount: "500", usage: "40" });
+    check("addUtilityBill：用量寫進 usage 欄（轉數字）；同月份再新增可更新用量", sh.rows[sh.rows.length - 1][7] === 40 && (be.addUtilityBill({ type: "water", billingMonth: "2026-08", months: "2", amount: "520", usage: "42" }), sh.rows[sh.rows.length - 1][7] === 42 && sh.rows[sh.rows.length - 1][4] === 520));
+    check("addUtilityBill：壞用量（abc、負數）丟錯", throws(() => be.addUtilityBill({ type: "water", billingMonth: "2026-09", months: "2", amount: "1", usage: "abc" })) && throws(() => be.addUtilityBill({ type: "water", billingMonth: "2026-09", months: "2", amount: "1", usage: "-3" })));
+    const legacy = mk(be.UTILITY_HEADERS.slice(0, 7));
+    be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => legacy });
+    be.addUtilityBill({ type: "gas", billingMonth: "2026-07", months: "1", amount: "300" });
+    be.addUtilityBill({ type: "gas", billingMonth: "2026-07", months: "1", amount: "310" });
+    check("舊的 UtilityBills（沒有 usage 欄）：沒填用量照常新增與更新；填了用量丟錯要求補欄位",
+      legacy.rows.length === 1 && legacy.rows[0].length === 7 && legacy.rows[0][4] === 310 && throws(() => be.addUtilityBill({ type: "gas", billingMonth: "2026-08", months: "1", amount: "1", usage: "10" })) && legacy.rows.length === 1);
+    be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh });
+    const before = sh.rows.length;
+    be.addUtilityBills(JSON.stringify([{ type: "electric", billingMonth: "2025-08", months: "2", amount: "3000", usage: "700" }, { type: "water", billingMonth: "2025-08", months: "2", amount: "400" }, { type: "electric", billingMonth: "2026-08", months: "2", amount: "3700", usage: "810" }]));
+    check("addUtilityBills：批次新增，已有的同類型同月份＝更新（2026-08 電變 3700），其餘新增", sh.rows.length === before + 2 && sh.rows.find(x => x[1] === "electric" && x[2] === "2026-08")[4] === 3700 && sh.rows.find(x => x[1] === "electric" && x[2] === "2025-08")[7] === 700);
+    const n3 = sh.rows.length;
+    check("addUtilityBills：有一筆壞／批次內重複／空陣列整批不寫", [[{ type: "gas", billingMonth: "2025-01", months: "1", amount: "1" }, { type: "bad", billingMonth: "2025-02", months: "1", amount: "1" }], [{ type: "gas", billingMonth: "2025-01", months: "1", amount: "1" }, { type: "gas", billingMonth: "2025-01", months: "1", amount: "2" }], []].every(a => throws(() => be.addUtilityBills(a))) && sh.rows.length === n3);
     const gasId = sh.rows[1][0];
     check("updateUtilityBill：改成跟同類型別筆相同月份要丟錯；改自己的月份沒事", throws(() => be.updateUtilityBill({ id: gasId, type: "electric", billingMonth: "2026-08", months: "1", amount: "1" })) && (be.updateUtilityBill({ id: gasId, type: "gas", billingMonth: "2026-09", months: "1", amount: "500" }), sh.rows[1][4] === 500));
     be.deleteUtilityBill(gasId);
-    check("deleteUtilityBill：刪掉那一筆", sh.rows.length === 1 && sh.rows[0][1] === "electric");
+    check("deleteUtilityBill：只刪掉那一筆（瓦斯），電與水還在", !sh.rows.some(x => x[1] === "gas") && sh.rows.some(x => x[1] === "electric") && sh.rows.some(x => x[1] === "water"));
   } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; be.Utilities.getUuid = realUuid; }
 }
 {

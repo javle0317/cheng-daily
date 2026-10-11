@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261011224718">
+<link rel="stylesheet" href="style.css?v=20261011225944">
 </head>
 <body>
 
@@ -81,7 +81,8 @@
       <section class="card utility-card">
         <h2>水電瓦斯<button id="openUtilForm" type="button" class="ghost-btn add-btn" title="新增帳單" aria-label="新增水電瓦斯帳單">＋</button></h2>
         <div id="utilTypes" class="seg-switch" role="tablist" aria-label="類型"></div>
-        <p class="progress-line">只看趨勢，不加進上面信用卡帳單的合計（水電多半已經刷卡）。圖上是每月均攤（金額÷計費月數）。</p>
+        <div id="utilModes" class="seg-switch seg-small hidden" role="tablist" aria-label="圖表內容"></div>
+        <p class="progress-line">只看趨勢，不加進上面信用卡帳單的合計（水電多半已經刷卡）。金額與用量圖是每月均攤（÷計費月數），單價＝金額÷用量。</p>
         <div id="utilChart"></div>
         <p id="utilStats" class="progress-line"></p>
         <div id="utilList"></div>
@@ -161,6 +162,12 @@
         <button id="utilClose" class="ghost-btn" type="button">✕</button>
       </div>
       <form id="utilForm" class="entry-form entry-form-rows modal-form">
+        <details id="utilImportBox" class="more-fields">
+          <summary>批次貼上匯入（歷史帳單）</summary>
+          <textarea id="utilImportText" rows="4" placeholder="貼上對話裡給你的帳單資料（JSON）…"></textarea>
+          <button id="utilImportBtn" type="button" class="ghost-btn">檢查並匯入</button>
+        </details>
+        <p id="utilImportMsg" class="import-msg" role="status"></p>
         <div class="form-row">
           <label class="mf">類型
             <select id="utilType"></select>
@@ -180,6 +187,9 @@
             </select>
           </label>
         </div>
+        <label class="mf">用量（度，選填）
+          <input id="utilUsage" type="text" inputmode="decimal" placeholder="帳單上的度數">
+        </label>
         <label class="mf">備註（選填）
           <input id="utilNote" type="text" maxlength="100" autocomplete="off">
         </label>
@@ -205,9 +215,9 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261011224718"></script>
-  <script src="health-charts.js?v=20261011224718"></script>
-  <script src="bills.js?v=20261011224718"></script>
-  <script src="utilities.js?v=20261011224718"></script>
+  <script src="shared.js?v=20261011225944"></script>
+  <script src="health-charts.js?v=20261011225944"></script>
+  <script src="bills.js?v=20261011225944"></script>
+  <script src="utilities.js?v=20261011225944"></script>
 </body>
 </html>

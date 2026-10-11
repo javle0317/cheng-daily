@@ -1253,3 +1253,4 @@ input[type="checkbox"]:checked {
 /* 首頁寵物圖示上的「待登記」紅點 */
 .has-badge { position: relative; }
 .notify-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--status-critical); color: #fff; font-size: 10px; line-height: 16px; text-align: center; font-weight: 700; box-sizing: border-box; }
+.seg-small .seg-btn { font-size: 13px; padding: 7px 4px; }
