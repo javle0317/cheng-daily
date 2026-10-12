@@ -24,9 +24,6 @@ let state = {
   selectedDate: toDateStr(new Date()),
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
-  petExpenseMonth: new Date().getMonth(),
-  petExpenseYear: new Date().getFullYear(),
-  petExpenseFilter: "all",
 };
 
 // ====== Utils ======
@@ -369,7 +366,6 @@ function renderAll() {
   renderCalendar();
   renderRecurringList();
   renderShoppingList();
-  renderPetExpenses();
 }
 
 // 換選取日期：所有跟「選取日期」有關的區塊（待辦、事件、習慣、表單日期）一起重畫，
@@ -961,104 +957,6 @@ function renderRecurringList() {
   });
 }
 
-function expenseCategory(owner) {
-  return PET_NAMES.includes(owner) ? owner : "家庭"; // 我/太太/共同都算同一筆家庭花費，不細分是誰花的
-}
-
-function renderPetExpenses() {
-  const monthLabel = document.getElementById("petExpenseMonthLabel");
-  const container = document.getElementById("petExpenseList");
-  container.innerHTML = "";
-
-  const monthStr = `${state.petExpenseYear}-${String(state.petExpenseMonth + 1).padStart(2, "0")}`;
-  monthLabel.textContent = `💰 ${state.petExpenseYear} 年 ${state.petExpenseMonth + 1} 月`;
-
-  const entries = state.events
-    .filter(ev => Number(ev.amount) > 0 && ev.date.startsWith(monthStr))
-    .filter(ev => state.petExpenseFilter === "all" || expenseCategory(ev.owner) === state.petExpenseFilter)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  if (!entries.length) {
-    container.innerHTML = `<p class="empty-hint">這個月還沒有花費紀錄</p>`;
-    return;
-  }
-
-  const total = entries.reduce((sum, ev) => sum + Number(ev.amount), 0);
-  const totalP = document.createElement("p");
-  totalP.className = "sub-heading";
-  totalP.textContent = `本月合計 $${total}`;
-  container.appendChild(totalP);
-
-  const byDate = {};
-  entries.forEach(ev => {
-    if (!byDate[ev.date]) byDate[ev.date] = [];
-    byDate[ev.date].push(ev);
-  });
-
-  Object.keys(byDate).forEach(date => {
-    const group = document.createElement("div");
-    const dateHeading = document.createElement("h3");
-    dateHeading.className = "sub-heading";
-    dateHeading.textContent = date;
-    group.appendChild(dateHeading);
-
-    const ul = document.createElement("ul");
-    ul.className = "item-list";
-    byDate[date].forEach(ev => {
-      const li = document.createElement("li");
-      li.className = "item-row";
-
-      const meta = OWNER_META[ev.owner] || { label: ev.owner || "", icon: "", color: "var(--accent)" };
-      const badge = document.createElement("span");
-      badge.className = "owner-badge";
-      badge.textContent = `${meta.icon} ${meta.label}`.trim();
-      badge.style.color = meta.color;
-      badge.style.background = meta.color + "22";
-
-      const textSpan = document.createElement("span");
-      textSpan.className = "item-text";
-      textSpan.textContent = ev.title;
-
-      const amountSpan = document.createElement("span");
-      amountSpan.className = "item-time";
-      amountSpan.textContent = `$${Number(ev.amount)}`;
-
-      li.classList.add("clickable");
-      li.addEventListener("click", () => openEventModal({ event: ev }));
-
-      li.appendChild(badge);
-      li.appendChild(textSpan);
-      li.appendChild(amountSpan);
-      ul.appendChild(li);
-    });
-    group.appendChild(ul);
-    container.appendChild(group);
-  });
-}
-
-document.getElementById("petExpensePrev").addEventListener("click", () => {
-  state.petExpenseMonth--;
-  if (state.petExpenseMonth < 0) {
-    state.petExpenseMonth = 11;
-    state.petExpenseYear--;
-  }
-  renderPetExpenses();
-});
-
-document.getElementById("petExpenseNext").addEventListener("click", () => {
-  state.petExpenseMonth++;
-  if (state.petExpenseMonth > 11) {
-    state.petExpenseMonth = 0;
-    state.petExpenseYear++;
-  }
-  renderPetExpenses();
-});
-
-document.getElementById("petExpenseFilter").addEventListener("change", (e) => {
-  state.petExpenseFilter = e.target.value;
-  renderPetExpenses();
-});
-
 // ====== 事件／循環行程 編輯視窗（新增與編輯共用同一個）======
 // 約定：多欄位的實體（事件、循環行程）用彈窗新增與編輯；單欄快速輸入（待辦、購物清單）留在列表上。
 // 錯誤直接顯示在視窗裡（Toast 的層級比視窗低，會被蓋住）。
@@ -1201,7 +1099,6 @@ $id("eventModalForm").addEventListener("submit", async (e) => {
     closeEventModal();
     renderEvents();
     renderCalendar();
-    renderPetExpenses();
     refreshPetPending();
     showToast(petLog ? (res.petLogged === "exists" ? "已儲存（這個事件之前已登記過寵物紀錄）" : "已儲存，並登記到寵物紀錄") : (wasEdit ? "已儲存" : "已新增"));
   } catch (err) {
@@ -1221,7 +1118,6 @@ $id("emDeleteBtn").addEventListener("click", async () => {
     closeEventModal();
     renderEvents();
     renderCalendar();
-    renderPetExpenses();
     refreshPetPending();
     showToast("已刪除");
   } catch (err) {

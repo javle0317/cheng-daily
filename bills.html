@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261012223343">
+<link rel="stylesheet" href="style.css?v=20261012223903">
 </head>
 <body data-page="bills">
 
@@ -83,7 +83,9 @@
         <div id="utilModes" class="seg-switch seg-small hidden" role="tablist" aria-label="圖表內容"></div>
         <p class="progress-line">只看趨勢，不加進上面信用卡帳單的合計（水電多半已經刷卡）。「月均」＝帳單 ÷ 計費月數（兩個月一期的帳單除以 2，才能跟一個月一期的比）；每度單價＝金額 ÷ 用量。</p>
         <div id="utilChart"></div>
+        <div id="utilChartTools" class="util-chart-tools hidden"><button id="utilChartToggle" type="button" class="ghost-btn"></button></div>
         <p id="utilStats" class="progress-line"></p>
+        <div id="utilYoY"></div>
         <div id="utilList"></div>
       </section>
 
@@ -214,9 +216,9 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261012223343"></script>
-  <script src="health-charts.js?v=20261012223343"></script>
-  <script src="bills.js?v=20261012223343"></script>
-  <script src="utilities.js?v=20261012223343"></script>
+  <script src="shared.js?v=20261012223903"></script>
+  <script src="health-charts.js?v=20261012223903"></script>
+  <script src="bills.js?v=20261012223903"></script>
+  <script src="utilities.js?v=20261012223903"></script>
 </body>
 </html>

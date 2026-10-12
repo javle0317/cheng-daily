@@ -14,7 +14,8 @@ const UTIL_MODES = [
   { key: "usage", label: "月均用量", unit: "度/月", decimals: 1 },
   { key: "price", label: "每度單價", unit: "元/度", decimals: 2 },
 ];
-const util = { bills: [], type: "electric", mode: "amount", editingId: null, showAll: false };
+const UTIL_CHART_LIMIT = 6; // 圖表預設只畫最近 6 期（雙月一期＝一年），要看更早的再展開
+const util = { bills: [], type: "electric", mode: "amount", editingId: null, showAll: false, chartAll: false };
 try {
   const saved = localStorage.getItem("utilType");
   if (UTIL_TYPES.some(t => t.key === saved)) util.type = saved;
@@ -103,6 +104,21 @@ function utilSummary(points) {
   return { last, prev, avg6, lastYear, n: recent.length };
 }
 
+// 年對年：最近 limit 期裡，找得到「去年同月」的每一期（新到舊）。points 是某個圖表模式的點（date＝yyyy-MM-01）。
+// diff＝今年－去年，pct＝變化百分比（去年是 0 時為 null）
+function utilYoY(points, limit) {
+  const byMonth = new Map(points.map(p => [p.date.slice(0, 7), p]));
+  return points.slice(-(limit || UTIL_CHART_LIMIT)).reverse()
+    .map(p => {
+      const prevKey = `${Number(p.date.slice(0, 4)) - 1}-${p.date.slice(5, 7)}`;
+      const prev = byMonth.get(prevKey) || null;
+      if (!prev) return null;
+      const diff = p.value - prev.value;
+      return { date: p.date, value: p.value, prev: prev.value, diff, pct: prev.value > 0 ? (diff / prev.value) * 100 : null };
+    })
+    .filter(Boolean);
+}
+
 // 這個類型有沒有任何一筆填了用量（沒有就不顯示用量／單價的切換）
 function utilHasUsage(bills, type) {
   return bills.some(b => b.type === type && utilUsage(b) !== null);
@@ -153,9 +169,14 @@ function renderUtilities() {
   renderUtilModes();
   const mode = UTIL_MODES.find(m => m.key === util.mode) || UTIL_MODES[0];
   const points = utilPoints(util.bills, util.type, mode.key);
-  drawTimeChart(document.getElementById("utilChart"), points, {
+  const shown = util.chartAll ? points : points.slice(-UTIL_CHART_LIMIT);
+  drawTimeChart(document.getElementById("utilChart"), shown, {
     unit: mode.unit, decimals: mode.decimals, fmtX: d => `${d.slice(2, 4)}/${d.slice(5, 7)}`,
   });
+  const tools = document.getElementById("utilChartTools");
+  const toggle = document.getElementById("utilChartToggle");
+  tools.classList.toggle("hidden", points.length <= UTIL_CHART_LIMIT);
+  toggle.textContent = util.chartAll ? `只看最近 ${UTIL_CHART_LIMIT} 期` : `圖表只畫最近 ${UTIL_CHART_LIMIT} 期，顯示全部 ${points.length} 期`;
   const s = utilSummary(points);
   const el = document.getElementById("utilStats");
   const fmt = UTIL_FMT[mode.key];
@@ -165,11 +186,50 @@ function renderUtilities() {
   } else {
     const parts = [mode.key === "price" ? `最近一期每度 ${fmt(s.last.value)}` : `最近一期月均 ${fmt(s.last.value)}`];
     if (s.prev) parts.push(`比前一期 ${diff(s.last.value - s.prev.value)}`);
-    if (s.lastYear) parts.push(`去年同月 ${fmt(s.lastYear.value)}（${diff(s.last.value - s.lastYear.value)}）`);
     if (s.n > 1) parts.push(`最近 ${s.n} 期平均 ${fmt(s.avg6)}`);
     el.textContent = parts.join("　·　");
   }
+  renderUtilYoY(points, mode, fmt);
   renderUtilList();
+}
+
+function renderUtilYoY(points, mode, fmt) {
+  const box = document.getElementById("utilYoY");
+  box.innerHTML = "";
+  const rows = utilYoY(points, UTIL_CHART_LIMIT);
+  const head = document.createElement("h3");
+  head.className = "sub-heading";
+  head.textContent = `年對年（${mode.label}，今年對去年同期）`;
+  box.appendChild(head);
+  if (!rows.length) {
+    const p = document.createElement("p");
+    p.className = "empty-hint";
+    p.textContent = "還沒有去年同期的資料可以比（有去年同一期的帳單或用量才會出現）";
+    box.appendChild(p);
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "util-yoy";
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>期別</th><th>今年</th><th>去年</th><th>變化</th></tr>";
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    const cells = [utilMonthLabel(r.date.slice(0, 7)), fmt(r.value), fmt(r.prev)];
+    cells.forEach((t, i) => { const td = document.createElement("td"); td.textContent = t; if (i === 0) td.className = "util-yoy-month"; tr.appendChild(td); });
+    const td = document.createElement("td");
+    if (r.diff === 0) { td.textContent = "持平"; }
+    else {
+      td.className = r.diff > 0 ? "util-up" : "util-down";
+      td.textContent = `${r.diff > 0 ? "▲" : "▼"}${r.pct === null ? "" : Math.abs(r.pct).toFixed(0) + "%"}`;
+      td.title = `${r.diff > 0 ? "多" : "少"} ${fmt(Math.abs(r.diff))}`;
+    }
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
 }
 
 function renderUtilModes() {
@@ -203,6 +263,7 @@ function renderUtilTypes() {
     b.addEventListener("click", () => {
       util.type = t.key;
       util.showAll = false;
+      util.chartAll = false;
       try { localStorage.setItem("utilType", t.key); } catch (e) { /* 存不了就算了 */ }
       renderUtilities();
     });
@@ -394,4 +455,9 @@ document.getElementById("utilImportBtn").addEventListener("click", async (e) => 
   } finally {
     btn.disabled = false;
   }
+});
+
+document.getElementById("utilChartToggle").addEventListener("click", () => {
+  util.chartAll = !util.chartAll;
+  renderUtilities();
 });

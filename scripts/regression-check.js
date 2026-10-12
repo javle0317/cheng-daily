@@ -187,7 +187,7 @@ console.log("前端：api() 參數一律被轉成字串，陣列／物件要先 
 console.log("前端：事件彈窗已拿掉花費／只記帳欄位，編輯舊事件要把原本的 amount、hideFromCalendar 帶回去（不然後端當成清空）");
 {
   const a = read("app.js"), h = read("index.html");
-  check("index.html 沒有 emAmount／emHide／addExpenseBtn", !/id="emAmount"|id="emHide"|id="addExpenseBtn"/.test(h));
+  check("index.html 沒有 emAmount／emHide／addExpenseBtn，也沒有首頁的花費統計卡片（petExpense*）", !/id="emAmount"|id="emHide"|id="addExpenseBtn"|petExpense/.test(h) && !/petExpense|renderPetExpenses/.test(a));
   check("app.js 編輯事件時沿用 editingEvent.amount 與 hideFromCalendar", /params\.amount\s*=\s*editingEvent\.amount/.test(a) && /params\.hideFromCalendar\s*=\s*isTruthy\(editingEvent\.hideFromCalendar\)/.test(a));
 }
 
@@ -274,8 +274,18 @@ console.log("前端：水電瓦斯（每月均攤、趨勢點、摘要、渲染�
   check("utilAmount／utilMonthlyAvg：留空＝null（不是 0）", ev('utilAmount({amount: ""})') === null && ev('utilMonthlyAvg({amount: "", months: 2})') === null && ev('utilMonthlyAvg({amount: 600, months: 2})') === 300);
   const impOnly = JSON.parse(ev('JSON.stringify(parseUtilImport(\'{"items":[{"type":"water","billingMonth":"2025-05","usage":39},{"type":"gas","billingMonth":"2025-02"}]}\'))'));
   check("parseUtilImport：只有用量可以；金額與用量都沒有列入 problems", impOnly.items.length === 1 && impOnly.items[0].amount === "" && impOnly.items[0].usage === 39 && impOnly.problems.length === 1 && impOnly.problems[0].includes("至少要有一個"), impOnly);
+  u.__yoy = [
+    { id: "1", type: "water", billingMonth: "2025-03", months: 2, amount: "", usage: 38 },
+    { id: "2", type: "water", billingMonth: "2025-05", months: 2, amount: "", usage: 40 },
+    { id: "3", type: "water", billingMonth: "2026-03", months: 2, amount: 662, usage: 39 },
+    { id: "4", type: "water", billingMonth: "2026-05", months: 2, amount: 599, usage: 30 },
+    { id: "5", type: "water", billingMonth: "2026-07", months: 2, amount: 536, usage: 27 },
+  ];
+  const yoy = JSON.parse(ev('JSON.stringify(utilYoY(utilPoints(__yoy, "water", "usage"), 6))'));
+  check("utilYoY：只列找得到去年同月的期別（新到舊）、diff 與百分比；2026-07 沒有去年同期不列", yoy.map(r => r.date).join() === "2026-05-01,2026-03-01" && yoy[0].value === 15 && yoy[0].prev === 20 && yoy[0].diff === -5 && Math.round(yoy[0].pct) === -25 && yoy[1].diff === 0.5, yoy);
+  check("utilYoY：沒有去年資料回傳空陣列；limit 只看最近幾期", ev('utilYoY(utilPoints(__only, "water", "price"), 6).length') === 0 && ev('utilYoY(utilPoints(__yoy, "water", "usage"), 1).length') === 0);
   let err = null;
-  try { ev('util.bills = __bills; ["water","electric","gas"].forEach(t => { util.type = t; renderUtilities(); }); util.bills = __only; util.type = "water"; ["amount","usage","price"].forEach(m => { util.mode = m; renderUtilities(); }); util.bills = __ubills; util.type = "electric"; ["amount","usage","price"].forEach(m => { util.mode = m; renderUtilities(); }); util.bills = []; util.mode = "usage"; renderUtilities();'); } catch (e) { err = String(e); }
+  try { ev('util.bills = __bills; ["water","electric","gas"].forEach(t => { util.type = t; renderUtilities(); }); util.bills = __yoy; util.type = "water"; util.chartAll = false; ["amount","usage","price"].forEach(m => { util.mode = m; renderUtilities(); }); util.chartAll = true; renderUtilities(); util.chartAll = false; util.bills = __only; util.type = "water"; ["amount","usage","price"].forEach(m => { util.mode = m; renderUtilities(); }); util.bills = __ubills; util.type = "electric"; ["amount","usage","price"].forEach(m => { util.mode = m; renderUtilities(); }); util.bills = []; util.mode = "usage"; renderUtilities();'); } catch (e) { err = String(e); }
   check("三種類型（含沒有資料）渲染不丟錯", err === null, err);
   const html = read("bills.html");
   const order = ["shared.js", "health-charts.js", "bills.js", "utilities.js"].map(f => html.indexOf('src="' + f));

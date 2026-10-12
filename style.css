@@ -181,7 +181,6 @@ a.ghost-btn {
     grid-template-columns: 1fr 1fr;
   }
   .calendar-card { grid-column: span 2; }
-  .pet-expense-card { grid-column: span 2; }
 }
 
 .card {
@@ -252,8 +251,7 @@ a.ghost-btn {
 }
 
 .entry-form input,
-.entry-form select,
-.pet-expense-card select {
+.entry-form select {
   padding: 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -1015,7 +1013,6 @@ a.ghost-btn {
 .modal-form button.ghost-btn { background: none; color: var(--text); border: 1px solid var(--border); font-weight: 400; }
 .modal-form button.danger-btn { color: var(--danger); border-color: var(--danger); }
 .modal-error { color: var(--danger); font-weight: 600; }
-.expense-tools { align-items: center; margin: 8px 0; }
 .card h2 .add-btn { flex: none; }
 
 
@@ -1265,3 +1262,14 @@ input[type="checkbox"]:checked {
 .app-nav-link .notify-dot { top: 0; right: 14px; }
 .pet-lab-latest .empty-hint { grid-column: 1 / -1; }
 .util-row .item-text { white-space: nowrap; flex: 0 0 auto; }
+
+/* 水電瓦斯：圖表只畫最近幾期的切換、年對年表 */
+.util-chart-tools { margin: 2px 0 6px; }
+.util-chart-tools .ghost-btn { font-size: 12px; padding: 4px 10px; }
+.util-yoy { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+.util-yoy th { text-align: right; font-weight: 500; color: var(--text-dim); font-size: 11px; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.util-yoy th:first-child, .util-yoy td:first-child { text-align: left; }
+.util-yoy td { text-align: right; padding: 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.util-yoy tr:last-child td { border-bottom: 0; }
+.util-up { color: var(--status-warning); font-weight: 600; }
+.util-down { color: var(--status-good); font-weight: 600; }
