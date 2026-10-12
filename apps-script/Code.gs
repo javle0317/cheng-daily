@@ -32,7 +32,8 @@
  *                   （用 ensureSheet 自動建立，欄位與順序寫死在 RECIPE_HEADERS；tags 是逗號分隔、rating 0–5（0=未評分））
  *   UtilityBills    欄位: id | type | billingMonth | months | amount | note | createdAt | usage
  *                   （水電瓦斯分項追蹤，ensureSheet 自動建立，寫死在 UTILITY_HEADERS；type 是 water/electric/gas，months 是計費月數，
- *                   趨勢用「每月均攤＝amount÷months」；同 type+billingMonth 只有一筆；usage 是用量（度，選填），
+ *                   趨勢用「每月均攤＝amount÷months」；同 type+billingMonth 只有一筆；usage 是用量（度，選填；
+ *                   amount 與 usage 至少填一個，只有用量＝帳單附註的歷史用量），
  *                   這欄是後來加的，已存在的 UtilityBills 要手動在表頭最後面補上 usage）
  *   PetSkipped      欄位: id | eventId | createdAt
  *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
@@ -270,7 +271,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.8";
+var BACKEND_VERSION = "2026-10-12.9";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -2086,10 +2087,16 @@ function utilityFields_(p) {
     type: enumArg_(p.type, "類型", UTILITY_TYPES),
     billingMonth: monthArg_(p.billingMonth, "帳單"),
     months: numArg_(p.months, "計費月數", { int: true, min: 1, max: 12 }),
-    amount: numArg_(p.amount, "金額", { min: 0 }),
+    amount: numArg_(p.amount, "金額", { emptyValue: "", min: 0 }),
     note: textArg_(p.note, "備註", { max: 100 }),
     usage: numArg_(p.usage, "用量", { emptyValue: "", min: 0 }),
   };
+}
+
+// 金額與用量至少要有一個（只有用量＝帳單附註的歷史用量，金額留空）
+function utilityHasValue_(f) {
+  if (f.amount === "" && f.usage === "") throw new Error("金額和用量至少要填一個");
+  return f;
 }
 
 // 舊的 UtilityBills 可能還沒有 usage 欄：沒填用量就略過這個欄位、照常寫；有填用量卻沒有這一欄就報錯要求補欄位（不悄悄丟掉）
@@ -2112,7 +2119,7 @@ function findUtilityRow_(values, headers, type, month, exceptId) {
 
 // 新增：同類型同月份已經有了就更新那一筆（重打一次＝修正）
 function addUtilityBill(p) {
-  var f = utilityFields_(p);
+  var f = utilityHasValue_(utilityFields_(p));
   var sheet = utilitySheet_();
   var values = sheet.getDataRange().getValues();
   var headers = values[0];
@@ -2137,7 +2144,7 @@ function addUtilityBills(items) {
   if (items.length > 150) throw new Error("一次最多匯入 150 筆");
   var seen = {};
   var parsed = items.map(function (it) {
-    var f = utilityFields_(it);
+    var f = utilityHasValue_(utilityFields_(it));
     var key = f.type + "|" + f.billingMonth;
     if (seen[key]) throw new Error("匯入資料裡 " + f.billingMonth + " 的這個類型重複了");
     seen[key] = true;
@@ -2151,7 +2158,7 @@ function addUtilityBills(items) {
 
 function updateUtilityBill(p) {
   var id = textArg_(p.id, "帳單", { required: true, max: 100 });
-  var f = utilityFields_(p);
+  var f = utilityHasValue_(utilityFields_(p));
   var sheet = utilitySheet_();
   var values = sheet.getDataRange().getValues();
   if (findUtilityRow_(values, values[0], f.type, f.billingMonth, id)) throw new Error("這個類型的 " + f.billingMonth + " 已經有一筆帳單了");

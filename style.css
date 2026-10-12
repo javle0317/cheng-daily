@@ -1264,3 +1264,4 @@ input[type="checkbox"]:checked {
 .app-nav-link.on { color: var(--accent); background: var(--accent-soft); font-weight: 700; }
 .app-nav-link .notify-dot { top: 0; right: 14px; }
 .pet-lab-latest .empty-hint { grid-column: 1 / -1; }
+.util-row .item-text { white-space: nowrap; flex: 0 0 auto; }
