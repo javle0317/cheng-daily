@@ -10,8 +10,8 @@ const UTIL_TYPES = [
 
 const UTIL_LIST_LIMIT = 12;
 const UTIL_MODES = [
-  { key: "amount", label: "每月金額", unit: "元/月", decimals: 0 },
-  { key: "usage", label: "每月用量", unit: "度/月", decimals: 1 },
+  { key: "amount", label: "月均金額", unit: "元/月", decimals: 0 },
+  { key: "usage", label: "月均用量", unit: "度/月", decimals: 1 },
   { key: "price", label: "每度單價", unit: "元/度", decimals: 2 },
 ];
 const util = { bills: [], type: "electric", mode: "amount", editingId: null, showAll: false };
@@ -153,8 +153,7 @@ function renderUtilities() {
   if (!s) {
     el.textContent = "";
   } else {
-    const parts = [`最近一期每月 ${fmt(s.last.value)}`.replace("每月 $", mode.key === "price" ? "每度 $" : "每月 $")];
-    if (mode.key === "price") parts[0] = `最近一期每度 ${fmt(s.last.value)}`;
+    const parts = [mode.key === "price" ? `最近一期每度 ${fmt(s.last.value)}` : `最近一期月均 ${fmt(s.last.value)}`];
     if (s.prev) parts.push(`比前一期 ${diff(s.last.value - s.prev.value)}`);
     if (s.lastYear) parts.push(`去年同月 ${fmt(s.lastYear.value)}（${diff(s.last.value - s.lastYear.value)}）`);
     if (s.n > 1) parts.push(`最近 ${s.n} 期平均 ${fmt(s.avg6)}`);
@@ -268,7 +267,7 @@ function buildUtilRow(b) {
   const sub = document.createElement("div");
   sub.className = "item-time util-sub";
   const u = utilUsage(b);
-  sub.textContent = `${utilMonths(b)} 個月・每月 ${utilMoney(utilMonthlyAvg(b))}`
+  sub.textContent = `${utilMonths(b)} 個月・月均 ${utilMoney(utilMonthlyAvg(b))}`
     + (u !== null ? `・用量 ${u} 度（每度 $${(Number(b.amount) / u).toFixed(2)}）` : "")
     + (b.note ? `　📝 ${b.note}` : "");
   li.appendChild(sub);
