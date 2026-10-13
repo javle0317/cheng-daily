@@ -318,6 +318,13 @@ console.log("全站導覽：每個頁面都有 data-page、APP_NAV 涵蓋所有�
   check("首頁有 navIcons 容器、不再手寫四個功能連結；子頁拿掉「← 返回」", read("index.html").includes('id="navIcons"') && !/<a href="(health|bills|pets|recipes)\.html"/.test(read("index.html")) && pages.slice(1).every(p => !read(p).includes("back-link")));
 }
 
+console.log("樣式：貼上匯入的「填入表單」鈕要明確清掉底色（健康頁表單的 .entry-form button 是實心藍底，只改文字色會變藍字藍底、看不到字）");
+{
+  const css = read("style.css");
+  const m = /\.more-fields button\.ghost-btn \{([^}]*)\}/.exec(css);
+  check("`.more-fields button.ghost-btn` 有設 background", !!m && /background\s*:\s*(transparent|none)/.test(m[1]), m && m[1]);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
