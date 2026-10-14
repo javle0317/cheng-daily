@@ -375,6 +375,24 @@ console.log("想吃的店：店名欄位不能有 HTML required（會讓瀏覽�
   check("#placeName 沒有 required 屬性", !!m && !/\brequired\b/.test(m[0]), m && m[0]);
 }
 
+console.log("表單送出中（處理中…）：按鈕被別的程式改回可按時，再按或按 Enter 也不能重複送出");
+{
+  const f = loadFrontend(["shared.js"]);
+  const mkForm = () => { const ds = {}; const btn = { disabled: false, dataset: {}, textContent: "新增", type: "submit" }; return { ds, btn, dataset: ds, querySelectorAll: () => [btn], querySelector: () => btn }; };
+  f.__form = mkForm();
+  vm.runInContext("setFormBusy(__form, true)", f);
+  check("setFormBusy(true)：標記 data-busy、按鈕 disabled、文字變「處理中…」", f.__form.ds.busy === "1" && f.__form.btn.disabled === true && f.__form.btn.textContent === "處理中…");
+  f.__form.btn.disabled = false; // 模擬別的程式（例如重畫畫面時的 updateXxxValidity）把按鈕改回可按
+  let prevented = 0, stopped = 0;
+  f.__evt = { target: f.__form, preventDefault: () => { prevented++; }, stopImmediatePropagation: () => { stopped++; } };
+  const blocked = vm.runInContext("blockBusySubmit(__evt)", f);
+  check("busy 期間的 submit 事件被攔下（preventDefault + stopImmediatePropagation）", blocked === true && prevented === 1 && stopped === 1);
+  vm.runInContext("setFormBusy(__form, false)", f);
+  const blocked2 = vm.runInContext("blockBusySubmit(__evt)", f);
+  check("setFormBusy(false) 之後 submit 不再被攔、按鈕文字還原", f.__form.ds.busy === undefined && blocked2 === false && prevented === 1 && f.__form.btn.textContent === "新增");
+  check("shared.js 在 document 的 capture 階段註冊 submit 守門員；CSS 有 form[data-busy] 的 pointer-events 規則", /document\.addEventListener\("submit", blockBusySubmit, true\)/.test(read("shared.js")) && /form\[data-busy="1"\] button\s*\{[^}]*pointer-events:\s*none/.test(read("style.css")));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {

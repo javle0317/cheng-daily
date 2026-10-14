@@ -3,7 +3,7 @@
 個人生活小助手：待辦、習慣、行事曆、健康、帳單、練字。純靜態 HTML/JS（GitHub Pages）+ 單一 Google Apps Script 後端（`apps-script/Code.gs`）+ Google Sheet。完整慣例、部署步驟與回歸檢查見 README.md，改程式前先看一下，這裡只列最容易踩的：
 
 - 每頁先定義 `window.loadPageData` 再呼叫 `initAuth()`；API 一律 POST，不用 GET 寫入。
-- 送出期間鎖控制項：表單用 `setFormBusy`，列表項目用 `withRowLock`。
+- 送出期間鎖控制項：表單用 `setFormBusy`，列表項目用 `withRowLock`。`setFormBusy` 另外會標 `data-busy`，`shared.js` 的 capture 階段守門員會擋掉忙碌表單的 submit（即使別的程式——重畫畫面時的 `updateXxxValidity` 之類——把按鈕改回可按，也不會重複送出）；不要在送出期間自己去改送出鈕的 `disabled` 以外的狀態。
 - 改了 js/css，commit 前要更新 HTML 的 `?v=`（pre-commit hook 會做；hook 不跟著 repo，新環境先跑 `sh scripts/install-hooks.sh`）。
 - 改了 `Code.gs`：要手動貼進 Apps Script 重新部署新版本，並同步 `BACKEND_VERSION` 與 `shared.js` 的 `BACKEND_MIN_VERSION`。
 - 新增頁面：在 `shared.js` 的 `APP_NAV` 加一筆並在該頁 `<body>` 加 `data-page`（全站共用導覽；不要每頁自己手寫連結）。

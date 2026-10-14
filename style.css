@@ -1284,3 +1284,6 @@ input[type="checkbox"]:checked {
 a.pay-btn { text-decoration: none; display: inline-block; }
 .place-pick { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
 .place-pick-name { font-size: 22px; }
+
+/* 表單送出中：送出鈕就算被別的程式改回可按，也不能點、看起來是停用的（shared.js 的 setFormBusy／blockBusySubmit） */
+form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }

@@ -69,7 +69,21 @@ function showToast(msg, opts = {}) {
   }, opts.error ? 5000 : 1800);
 }
 
+// 表單送出中（data-busy）：就算按鈕被別的程式（重畫畫面順手呼叫的「判斷按鈕該不該亮」之類）改回可按，
+// 再按一次或按 Enter 也不會重複送出。用 document 的 capture 階段攔，比各表單自己的 submit 處理函式更早。
+function blockBusySubmit(e) {
+  const form = e.target;
+  if (form && form.dataset && form.dataset.busy === "1") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return true;
+  }
+  return false;
+}
+document.addEventListener("submit", blockBusySubmit, true);
+
 function setFormBusy(form, busy) {
+  if (busy) form.dataset.busy = "1"; else delete form.dataset.busy;
   // 送出期間整張表單（輸入框、下拉、勾選、按鈕）全部鎖住，等後端回應完才能再操作
   form.querySelectorAll("input, select, textarea, button").forEach(el => {
     if (busy) {
