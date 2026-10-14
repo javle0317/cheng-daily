@@ -444,7 +444,8 @@ document.getElementById("utilImportBtn").addEventListener("click", async (e) => 
   const overwrite = parsed.items.filter(i => util.bills.some(b => b.type === i.type && String(b.billingMonth) === i.billingMonth)).length;
   const summary = `${parsed.items.length} 筆（水 ${by("water")}、電 ${by("electric")}、瓦斯 ${by("gas")}；${utilMonthLabel(months[0])} ～ ${utilMonthLabel(months[months.length - 1])}；有用量 ${withUsage} 筆${usageOnly ? `，其中 ${usageOnly} 筆只有用量` : ""}）`;
   if (!(await showConfirm(`確定匯入 ${summary}？` + (overwrite ? `\n其中 ${overwrite} 筆跟已有的同類型同月份重複，會更新那一筆。` : "")))) return;
-  btn.disabled = true;
+  const form = document.getElementById("utilForm");
+  setFormBusy(form, true); // 整張表單鎖住、送出鈕變「處理中…」（跟一般新增一樣）
   try {
     applyUtilityBills(await api("addUtilityBills", { items: JSON.stringify(parsed.items) })); // api() 會把參數轉成字串，陣列要先轉成 JSON
     renderUtilities();
@@ -453,7 +454,8 @@ document.getElementById("utilImportBtn").addEventListener("click", async (e) => 
   } catch (err) {
     msg.textContent = "匯入失敗：" + err.message;
   } finally {
-    btn.disabled = false;
+    setFormBusy(form, false);
+    updateUtilFormValidity();
   }
 });
 

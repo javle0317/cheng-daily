@@ -393,6 +393,14 @@ console.log("表單送出中（處理中…）：按鈕被別的程式改回可�
   check("shared.js 在 document 的 capture 階段註冊 submit 守門員；CSS 有 form[data-busy] 的 pointer-events 規則", /document\.addEventListener\("submit", blockBusySubmit, true\)/.test(read("shared.js")) && /form\[data-busy="1"\] button\s*\{[^}]*pointer-events:\s*none/.test(read("style.css")));
 }
 
+console.log("批次匯入也要走 setFormBusy（整張表單鎖住、送出鈕變「處理中…」），不能只鎖匯入鈕");
+{
+  const pj = read("places.js"), uj = read("utilities.js");
+  const body = (s, start) => s.slice(s.indexOf(start));
+  check("想吃的店匯入：確認後 setFormBusy(form, true)、finally 還原", /setFormBusy\(form, true\)[\s\S]*importPlaces[\s\S]*setFormBusy\(form, false\)/.test(body(pj, 'document.getElementById("placeImportBtn").addEventListener')));
+  check("水電瓦斯匯入：確認後 setFormBusy(form, true)、finally 還原", /setFormBusy\(form, true\)[\s\S]*addUtilityBills[\s\S]*setFormBusy\(form, false\)/.test(body(uj, 'document.getElementById("utilImportBtn").addEventListener')));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {

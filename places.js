@@ -364,7 +364,8 @@ document.getElementById("placeImportBtn").addEventListener("click", async (e) =>
   const existing = parsed.items.filter(i => pl.places.some(p => p.name.trim().toLowerCase().replace(/\s+/g, "") === i.name.toLowerCase().replace(/\s+/g, "") && (!i.city || !p.city || p.city === i.city))).length;
   const summary = `${parsed.items.length} 家（${parsed.items.length - existing} 家新增，${existing} 家是已有的店${existing ? (overwrite ? "，會覆蓋有填的欄位" : "，只補空白欄位") : ""}）`;
   if (!(await showConfirm(`確定匯入 ${summary}？`))) return;
-  btn.disabled = true;
+  const form = document.getElementById("placeForm");
+  setFormBusy(form, true); // 跟一般新增一樣：整張表單鎖住、送出鈕變「處理中…」
   try {
     const res = await api("importPlaces", { items: JSON.stringify(parsed.items), overwrite: overwrite ? "true" : "false" }); // api() 會把參數轉成字串，陣列要先轉成 JSON
     applyPlaces(res);
@@ -374,7 +375,8 @@ document.getElementById("placeImportBtn").addEventListener("click", async (e) =>
   } catch (err) {
     msg.textContent = "匯入失敗：" + err.message;
   } finally {
-    btn.disabled = false;
+    setFormBusy(form, false);
+    updatePlaceFormValidity();
   }
 });
 
