@@ -401,6 +401,41 @@ console.log("批次匯入也要走 setFormBusy（整張表單鎖住、送出鈕�
   check("水電瓦斯匯入：確認後 setFormBusy(form, true)、finally 還原", /setFormBusy\(form, true\)[\s\S]*addUtilityBills[\s\S]*setFormBusy\(form, false\)/.test(body(uj, 'document.getElementById("utilImportBtn").addEventListener')));
 }
 
+console.log("匯入 skill（.claude/skills/cheng-daily-import）：每個參考檔的範例 JSON 都能被 App 真正的匯入解析程式接受（格式改了卻忘了改 skill，這裡會失敗）");
+{
+  const dir = path.join(root, ".claude/skills/cheng-daily-import");
+  const skill = fs.readFileSync(path.join(dir, "SKILL.md"), "utf8");
+  const refs = ["body", "labs", "pet-labs", "utilities", "places", "recipes"];
+  check("SKILL.md 有 name／description，且提到的每個 references 檔都存在", /^---\nname: cheng-daily-import\ndescription: .{40,}\n---/s.test(skill) && refs.every(n => skill.includes(`references/${n}.md`) && fs.existsSync(path.join(dir, "references", n + ".md"))));
+  const example = (n) => { const m = /```json\n([\s\S]*?)\n```/.exec(fs.readFileSync(path.join(dir, "references", n + ".md"), "utf8")); return m ? m[1] : null; };
+  const ex = Object.fromEntries(refs.map(n => [n, example(n)]));
+  check("每個參考檔都有一個 ```json 範例，且都是合法 JSON", refs.every(n => { try { JSON.parse(ex[n]); return true; } catch (e) { return false; } }), refs.filter(n => !ex[n]));
+  const bodyKeys = new Set([...read("health-body.js").matchAll(/:\s*"(weight|height|bodyFat|fatMass|skeletalMuscle|muscleMass|bodyWater|protein|bmr|visceralFat|bodyAge|whr)"/g)].map(m => m[1]));
+  const body = JSON.parse(ex.body);
+  check("體組成範例：日期格式、weight 必填、每個鍵都是 health-body.js 認得的欄位", /^\d{4}-\d{2}-\d{2}$/.test(body.date) && typeof body.values.weight === "number" && Object.keys(body.values).every(k => bodyKeys.has(k)) && bodyKeys.size === 12, [...bodyKeys]);
+  const labKeys = new Set([...read("health-labs.js").matchAll(/\{ key: "([a-zA-Z0-9]+)", label:/g)].map(m => m[1]));
+  const labs = JSON.parse(ex.labs);
+  const labDoc = fs.readFileSync(path.join(dir, "references", "labs.md"), "utf8");
+  check("驗血（人）範例：values 的鍵是 health-labs.js 的固定項目；文件列的固定項目都真的存在；extra 欄位名正確", /^\d{4}-\d{2}-\d{2}$/.test(labs.date) && Object.keys(labs.values).every(k => labKeys.has(k)) && labs.extra.every(x => x.name && typeof x.value === "number") && ["glucose", "hba1c", "cholesterol", "ldl", "hdl", "triglyceride", "ast", "alt", "creatinine", "egfr", "bun", "uricAcid", "sodium", "potassium", "tsh", "ck"].every(k => labKeys.has(k) && labDoc.includes("`" + k + "`")), [...labKeys]);
+  const pl = loadFrontend(["shared.js", "health-charts.js", "pets.js", "pets-labs.js"], "// ====== Boot ======");
+  pl.__t = ex["pet-labs"];
+  const petImp = JSON.parse(vm.runInContext("JSON.stringify(parsePetLabImport(__t))", pl));
+  check("寵物驗血範例：parsePetLabImport 沒有問題、寵物是 PET_NAMES 之一", petImp && petImp.problems.length === 0 && petImp.items.length === 2 && JSON.parse(vm.runInContext("JSON.stringify(PET_NAMES)", pl)).includes(petImp.pet), petImp);
+  const ut = loadFrontend(["shared.js", "health-charts.js", "utilities.js"]);
+  ut.__t = ex.utilities;
+  const utImp = JSON.parse(vm.runInContext("JSON.stringify(parseUtilImport(__t))", ut));
+  check("水電瓦斯範例：parseUtilImport 沒有問題", utImp && utImp.problems.length === 0 && utImp.items.length === 1, utImp);
+  const pr = loadFrontend(["shared.js", "recipes.js", "places.js"], "// ====== Boot ======");
+  pr.__t = ex.places;
+  const plImp = JSON.parse(vm.runInContext("JSON.stringify(parsePlacesImport(__t))", pr));
+  check("想吃的店範例：parsePlacesImport 沒有問題", plImp && plImp.problems.length === 0 && plImp.items.length === 1, plImp);
+  pr.__t = ex.recipes;
+  const rcImp = JSON.parse(vm.runInContext("JSON.stringify(parseRecipeImport(__t))", pr));
+  check("食譜範例：parseRecipeImport 接受、欄位都有填入", rcImp && rcImp.fields.name && rcImp.fields.ingredients.includes("\n") && rcImp.unknown.length === 0, rcImp);
+  const claude = read("CLAUDE.md");
+  check("CLAUDE.md 不再重複放匯入格式，改指向 skill（只有一份來源）", claude.includes(".claude/skills/cheng-daily-import") && !/```json/.test(claude));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {

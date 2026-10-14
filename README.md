@@ -392,6 +392,13 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 - **驗血分頁**（順序：趨勢圖在最上面，下面是各項目最近一次）：每個項目最近一次一塊（依狀況差的排前面；**項目多時預設只列需要注意的（偏高偏低、且沒標成醫師說無妨），其他收起，按「顯示全部 N 項」展開**；點方塊會捲回上面看趨勢圖）、項目趨勢圖（x 軸日期，跨年沒問題，色帶取最後一次的範圍）、與上次／整體的比較說明、依日期的歷史列表。新增彈窗每個項目一列（名稱、數值、單位、範圍下限／上限），也能「貼上匯入」（JSON 格式見 CLAUDE.md）；分級共用函式（`classifyRange`、`compareHealth`、`renderLabExplain`）在 `health-charts.js`，人用驗血 `health-labs.js` 與寵物 `pets-labs.js` 共用。「個人化設定」鈕（趨勢圖旁）設定「醫師說無妨」或自訂範圍。
 - **用完了**（飼料、貓砂）：列上的「用完了」鈕記用完日（`setPetLogFinished`，不能早於購買日；已用完的顯示「✅ 用完於 … 用了 N 天」，點了可改日期或清空）。概況多「未用完 N 件（最久放了 D 天）」與「平均 N 天用完」（`petUsageStats`）。
 
+## 匯入 JSON 的 skill（Claude app 也能用）
+
+- 六種「貼上匯入」格式（體組成、人的驗血、寵物驗血、水電瓦斯、想吃的店、食譜）的整理規則放在 **`.claude/skills/cheng-daily-import/`**（`SKILL.md` 判斷是哪一種並列共通規則，`references/*.md` 各一種格式）。這是**唯一的來源**：專案裡的 Claude Code 自動載入；Claude app 用的是同一份打包出來的檔案。
+- **打包**：`sh scripts/package-skill.sh` → `dist/cheng-daily-import.skill`（zip，`dist/` 不進 git）。**上傳**：Claude app（網頁／桌面／手機）設定 → Capabilities（功能）→ Skills → 上傳這個檔案；格式有改就重新打包、重新上傳覆蓋。是否能在手機對話使用要看方案與「程式碼執行與檔案建立」有沒有開；用起來 skill 沒有出現的話，到桌面版（含 Cowork）試試，或直接對 Claude 說「用承日常匯入這個 skill」。
+- **測試**：上傳後在新對話丟一張體脂計截圖或一張帳單，看它是否直接給出符合格式的 JSON 區塊（而不是開始問你格式）。
+- **不會漂移**：回歸檢查會把每個參考檔的範例 JSON 丟給 App 真正的匯入解析程式（`parsePetLabImport`、`parseUtilImport`、`parsePlacesImport`、`parseRecipeImport`，體組成與驗血對照欄位清單）；改了匯入欄位或規則卻忘了改 skill，測試會失敗。
+
 ## 輸入框不記憶以前填過的值
 
 - `shared.js` 的 `disableInputHistory()`：每個頁面載入時把所有 `input`／`textarea`／`form` 補上 `autocomplete="off"`（已經自己寫了的、密碼欄不動），之後動態新增的輸入框由 `MutationObserver` 補上，所以**新增欄位不用記得自己加**。瀏覽器輸入框下方「以前填過的值」的下拉就不會再出現。
