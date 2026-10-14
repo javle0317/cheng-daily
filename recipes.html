@@ -12,11 +12,11 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>食譜 · 承日常</title>
+<title>飲食 · 承日常</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261014084108">
+<link rel="stylesheet" href="style.css?v=20261014212312">
 </head>
 <body data-page="recipes">
 
@@ -36,17 +36,22 @@
   <div id="app" class="app hidden">
     <header class="app-header">
       <div>
-        <h1>食譜</h1>
+        <h1>飲食</h1>
       </div>
       <div class="header-actions">
         <button id="logoutBtn" class="ghost-btn">登出</button>
       </div>
     </header>
 
-    <main class="grid dense">
-      <div class="health-toolbar"><button id="openRecipeForm" type="button" class="add-primary">＋ 新增食譜</button></div>
+    <main class="grid dense food-main">
+      <div class="pet-switch pet-tabs" id="foodTabs" role="tablist" aria-label="食譜或想吃的店">
+        <button type="button" class="pet-tab on" data-tabbtn="recipes" role="tab">食譜</button>
+        <button type="button" class="pet-tab" data-tabbtn="places" role="tab">想吃的店</button>
+      </div>
 
-      <section class="card recipe-card-wrap">
+      <div class="health-toolbar" data-tab="recipes"><button id="openRecipeForm" type="button" class="add-primary">＋ 新增食譜</button></div>
+
+      <section class="card recipe-card-wrap" data-tab="recipes">
         <div class="recipe-filters">
           <input id="recipeSearch" type="search" placeholder="搜尋名稱或食材" autocomplete="off">
           <select id="recipeTagFilter" aria-label="標籤"></select>
@@ -58,6 +63,30 @@
         </div>
         <p id="recipeCount" class="progress-line"></p>
         <ul id="recipeList" class="item-list recipe-list"></ul>
+      </section>
+      <!-- ====== 想吃的店 ====== -->
+      <div class="health-toolbar pet-toolbar hidden" data-tab="places">
+        <button id="openPlaceForm" type="button" class="add-primary">＋ 新增店家</button>
+        <button id="placePickBtn" type="button" class="ghost-btn">🎲 今天吃什麼</button>
+      </div>
+
+      <section class="card hidden" data-tab="places">
+        <div class="recipe-filters">
+          <input id="placeSearch" type="search" placeholder="搜尋店名、餐點、標籤、備註" autocomplete="off">
+          <select id="placeStatus" aria-label="狀態">
+            <option value="want">想去</option>
+            <option value="visited">去過了</option>
+            <option value="all">全部</option>
+          </select>
+        </div>
+        <div class="recipe-filters place-regions">
+          <select id="placeCountry" aria-label="國家"></select>
+          <select id="placeCity" aria-label="縣市／城市"></select>
+          <select id="placeArea" aria-label="區域"></select>
+          <select id="placeTag" aria-label="標籤"></select>
+        </div>
+        <p id="placeCount" class="progress-line"></p>
+        <ul id="placeList" class="item-list recipe-list"></ul>
       </section>
     </main>
 
@@ -101,6 +130,95 @@
     </div>
   </div>
 
+  <div id="placeFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2 id="placeFormTitle">新增店家</h2>
+        <button id="placeFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="placeForm" class="entry-form entry-form-rows modal-form">
+        <details id="placeImportBox" class="more-fields">
+          <summary>批次貼上匯入（整理好的店家資料）</summary>
+          <textarea id="placeImportText" rows="4" placeholder="貼上對話裡給你的店家資料（JSON）…"></textarea>
+          <label class="checkbox-label"><input id="placeImportOverwrite" type="checkbox"> 覆蓋已有內容（預設只補空白欄位）</label>
+          <button id="placeImportBtn" type="button" class="ghost-btn">檢查並匯入</button>
+        </details>
+        <p id="placeImportMsg" class="import-msg" role="status"></p>
+        <label class="mf">店名（只有這個必填）
+          <input id="placeName" type="text" maxlength="100" required autocomplete="off">
+        </label>
+        <details id="placeMore" class="more-fields">
+          <summary>更多欄位（之後再補也可以）</summary>
+          <div class="form-row">
+            <label class="mf">國家<input id="placeCountryInput" type="text" list="placeCountryOptions" maxlength="30" placeholder="台灣"></label>
+            <label class="mf">縣市／城市<input id="placeCityInput" type="text" list="placeCityOptions" maxlength="30" placeholder="台北市"></label>
+          </div>
+          <label class="mf">區域<input id="placeAreaInput" type="text" list="placeAreaOptions" maxlength="30" placeholder="大安區、公館、難波…"></label>
+          <label class="mf">標籤（用逗號分隔）<input id="placeTags" type="text" list="placeTagOptions" placeholder="小吃, 早午餐, 約會"></label>
+          <label class="mf">特色餐點<input id="placeDishes" type="text" maxlength="300"></label>
+          <label class="mf">來源連結（IG／YouTube）<input id="placeSource" type="url" maxlength="500" placeholder="https://"></label>
+          <label class="mf">Google 地圖連結（在 Google 地圖按「分享」複製連結貼上）<input id="placeMapUrl" type="url" maxlength="500" placeholder="https://maps.app.goo.gl/…"></label>
+          <label class="mf">備註（例如：建議早餐去、要排隊、只收現金）<textarea id="placeNote" rows="3" maxlength="1000"></textarea></label>
+        </details>
+        <datalist id="placeCountryOptions"></datalist>
+        <datalist id="placeCityOptions"></datalist>
+        <datalist id="placeAreaOptions"></datalist>
+        <datalist id="placeTagOptions"></datalist>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="placeSubmit" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="placeVisitModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>去過了</h2>
+        <button id="placeVisitClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="placeVisitForm" class="entry-form entry-form-rows modal-form">
+        <p id="placeVisitName" class="sub-heading"></p>
+        <div class="form-row">
+          <label class="mf">日期<input id="placeVisitDate" type="date" required></label>
+          <label class="mf">評分
+            <select id="placeVisitRating">
+              <option value="0">還不打分</option>
+              <option value="5">★★★★★</option>
+              <option value="4">★★★★</option>
+              <option value="3">★★★</option>
+              <option value="2">★★</option>
+              <option value="1">★</option>
+            </select>
+          </label>
+        </div>
+        <label class="mf">心得（選填）<textarea id="placeVisitReview" rows="3" maxlength="1000"></textarea></label>
+        <p id="placeVisitHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="placeVisitUndo" type="button" class="ghost-btn danger-btn hidden">改回想去</button>
+          <span class="spacer"></span>
+          <button id="placeVisitSubmit" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="placePickModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>🎲 今天吃什麼</h2>
+        <button id="placePickClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <div id="placePickBody" class="place-pick"></div>
+      <div class="dialog-actions modal-actions">
+        <span id="placePickInfo" class="progress-line"></span>
+        <span class="spacer"></span>
+        <button id="placePickAgain" type="button" class="ghost-btn">再抽一次</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <div id="dialogModal" class="modal-overlay hidden">
@@ -114,7 +232,8 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261014084108"></script>
-  <script src="recipes.js?v=20261014084108"></script>
+  <script src="shared.js?v=20261014212312"></script>
+  <script src="recipes.js?v=20261014212312"></script>
+  <script src="places.js?v=20261014212312"></script>
 </body>
 </html>

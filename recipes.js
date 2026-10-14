@@ -9,7 +9,12 @@ let state = {
   sort: "new",
   expanded: new Set(), // 展開中的食譜 id（重畫後保持展開）
   editingId: null,
+  tab: "recipes",
 };
+
+try {
+  if (localStorage.getItem("foodTab") === "places") state.tab = "places";
+} catch (e) { /* 讀不到就用預設 */ }
 
 function applyRecipes(recipes) {
   state.recipes = recipes || [];
@@ -18,7 +23,24 @@ function applyRecipes(recipes) {
 window.loadPageData = async function () {
   applyRecipes(await api("getRecipes"));
   renderRecipesAll();
+  // 想吃的店（places.js）另外載入：它讀不到不影響食譜
+  if (typeof loadPlaces === "function") loadPlaces().catch(err => setStatus("想吃的店載入失敗：" + err.message, true));
 };
+
+// 食譜／想吃的店 兩個分頁
+function renderFoodTabs() {
+  document.querySelectorAll("#foodTabs [data-tabbtn]").forEach(b => {
+    const on = b.dataset.tabbtn === state.tab;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.querySelectorAll("[data-tab]").forEach(el => el.classList.toggle("hidden", el.dataset.tab !== state.tab));
+}
+document.querySelectorAll("#foodTabs [data-tabbtn]").forEach(b => b.addEventListener("click", () => {
+  state.tab = b.dataset.tabbtn;
+  try { localStorage.setItem("foodTab", state.tab); } catch (e) { /* 存不了就算了 */ }
+  renderFoodTabs();
+}));
 
 // ====== 純邏輯（regression-check 會測）======
 function splitTags(v) {
@@ -95,6 +117,7 @@ function parseRecipeImport(text) {
 
 // ====== 渲染 ======
 function renderRecipesAll() {
+  renderFoodTabs();
   renderTagFilter();
   renderTagOptions();
   renderRecipeList();

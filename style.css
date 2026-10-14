@@ -1273,3 +1273,14 @@ input[type="checkbox"]:checked {
 .util-yoy tr:last-child td { border-bottom: 0; }
 .util-up { color: var(--status-warning); font-weight: 600; }
 .util-down { color: var(--status-good); font-weight: 600; }
+
+/* ====== 想吃的店（食譜頁第二個分頁）====== */
+.food-main > * { grid-column: 1 / -1; }
+.place-regions select { flex: 1 1 110px; min-width: 0; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
+.place-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.place-stars { color: var(--brass-text); font-size: 14px; letter-spacing: 1px; white-space: nowrap; }
+.place-line { font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.place-row .recipe-actions { flex-wrap: wrap; }
+a.pay-btn { text-decoration: none; display: inline-block; }
+.place-pick { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
+.place-pick-name { font-size: 22px; }

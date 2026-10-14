@@ -11,7 +11,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這十八個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這十九個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -35,6 +35,9 @@
  *                   趨勢用「每月均攤＝amount÷months」；同 type+billingMonth 只有一筆；usage 是用量（度，選填；
  *                   amount 與 usage 至少填一個，只有用量＝帳單附註的歷史用量），
  *                   這欄是後來加的，已存在的 UtilityBills 要手動在表頭最後面補上 usage）
+ *   Places          欄位: id | name | country | city | area | tags | source | note | dishes | mapUrl | status | rating | visitedAt | review | createdAt
+ *                   （想吃的店，食譜頁的「想吃的店」分頁；ensureSheet 自動建立，寫死在 PLACE_HEADERS；只有 name 必填，
+ *                   country／city／area 是三層地區；status 是 want／visited；mapUrl 是 Google 地圖的店家連結，沒填就不顯示地圖鈕；營業時間不記，建議時段等寫在 note）
  *   PetSkipped      欄位: id | eventId | createdAt
  *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
  *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
@@ -251,6 +254,18 @@ function dispatch_(p) {
         return respond({ ok: true, data: updateUtilityBill(p) });
       case "deleteUtilityBill":
         return respond({ ok: true, data: deleteUtilityBill(p.id) });
+      case "getPlaces":
+        return respond({ ok: true, data: getPlaces() });
+      case "addPlace":
+        return respond({ ok: true, data: addPlace(p) });
+      case "updatePlace":
+        return respond({ ok: true, data: updatePlace(p) });
+      case "setPlaceVisit":
+        return respond({ ok: true, data: setPlaceVisit(p) });
+      case "deletePlace":
+        return respond({ ok: true, data: deletePlace(p.id) });
+      case "importPlaces":
+        return respond({ ok: true, data: importPlaces(p.items, p.overwrite) });
       case "getRecipes":
         return respond({ ok: true, data: getRecipes() });
       case "addRecipe":
@@ -271,7 +286,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-12.9";
+var BACKEND_VERSION = "2026-10-14.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -337,7 +352,7 @@ function sheetToObjects(sheet) {
       if (Object.prototype.toString.call(v) === "[object Date]") {
         if (h === "time" || h === "endTime") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
-        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt" || h === "finishedAt") {
+        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt" || h === "finishedAt" || h === "visitedAt") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
           // Google Sheets 常會把這種格子自動判斷成日期型態存，讀回來要轉回純
           // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
@@ -2222,5 +2237,151 @@ function updateEventWithPetLog_(p) {
   updateEvent(p);
   var out = getData(["events"]);
   out.petLogged = registerPetLogForEvent_(textArg_(p.id, "事件", { required: true, max: 100 }), fields);
+  return out;
+}
+
+// ====== 想吃的店（食譜頁的「想吃的店」分頁）======
+// 新分頁，用 ensureSheet 自動建立。欄位與順序寫死，不能改名或調整順序。只有 name 必填，其餘之後再補（可以請 Claude 整理第二層 JSON 匯入）。
+var PLACE_HEADERS = ["id", "name", "country", "city", "area", "tags", "source", "note", "dishes", "mapUrl", "status", "rating", "visitedAt", "review", "createdAt"];
+var PLACE_STATUS = ["want", "visited"];
+
+function placeSheet_() {
+  return ensureSheet("Places", PLACE_HEADERS);
+}
+
+function getPlaces() {
+  return { places: sheetToObjects(placeSheet_()) };
+}
+
+// 連結只收 http(s)（不收 javascript: 之類），可空白
+function urlArg_(v, label) {
+  var t = v === undefined || v === null ? "" : String(v).trim();
+  if (t === "") return "";
+  if (t.length > 500) throw new Error(label + "太長（最多 500 字）");
+  if (!/^https?:\/\/\S+$/i.test(t)) throw new Error(label + "要是 http:// 或 https:// 開頭的網址");
+  return t;
+}
+
+// 內容欄位（新增、編輯、匯入共用）；沒給的欄位回傳空字串
+function placeContent_(p) {
+  return {
+    name: textArg_(p.name, "店名", { required: true, max: 100 }),
+    country: textArg_(p.country, "國家", { max: 30 }),
+    city: textArg_(p.city, "縣市／城市", { max: 30 }),
+    area: textArg_(p.area, "區域", { max: 30 }),
+    tags: tagsArg_(Array.isArray(p.tags) ? p.tags.join(",") : p.tags),
+    source: urlArg_(p.source, "來源連結"),
+    note: textArg_(p.note, "備註", { max: 1000 }),
+    dishes: textArg_(p.dishes, "特色餐點", { max: 300 }),
+    mapUrl: urlArg_(p.mapUrl, "地圖連結"),
+  };
+}
+
+function addPlace(p) {
+  var f = placeContent_(p);
+  var sheet = placeSheet_();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var vals = Object.assign({ id: Utilities.getUuid(), status: "want", rating: 0, visitedAt: "", review: "", createdAt: new Date() }, f);
+  appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
+  return getPlaces();
+}
+
+// 編輯只改內容欄位，不動狀態、評分與心得
+function updatePlace(p) {
+  var id = textArg_(p.id, "店家", { required: true, max: 100 });
+  placeSheet_();
+  updateRowByHeaders_("Places", id, placeContent_(p));
+  return getPlaces();
+}
+
+// 「去過了」：status=visited 帶評分（0–5）、日期（預設今天）、心得；status=want 改回想去（清掉評分與日期，心得保留）
+function setPlaceVisit(p) {
+  var id = textArg_(p.id, "店家", { required: true, max: 100 });
+  var status = enumArg_(p.status, "狀態", PLACE_STATUS);
+  placeSheet_();
+  var fields = { status: status };
+  if (status === "visited") {
+    fields.rating = numArg_(p.rating, "評分", { emptyValue: 0, int: true, min: 0, max: 5 });
+    fields.visitedAt = dateArg_(p.visitedAt === undefined || String(p.visitedAt).trim() === "" ? todayStr_() : p.visitedAt, "去過");
+    fields.review = textArg_(p.review, "心得", { max: 1000 });
+  } else {
+    fields.rating = 0;
+    fields.visitedAt = "";
+  }
+  updateRowByHeaders_("Places", id, fields);
+  return getPlaces();
+}
+
+function deletePlace(id) {
+  id = textArg_(id, "店家", { required: true, max: 100 });
+  var sheet = placeSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  return getPlaces();
+}
+
+function placeKey_(name) {
+  return String(name).trim().toLowerCase().replace(/\s+/g, "");
+}
+
+// 批次匯入（先放店名、之後請 Claude 整理第二層資料）：依店名比對已有的店（兩邊都有填縣市時，縣市也要一致）——
+// 找到就「補上空白欄位」（overwrite=true 才覆蓋已有內容；標籤是聯集），找不到就新增。全部驗證過才寫。
+// 回傳 { places, created, updated }
+function importPlaces(items, overwrite) {
+  if (typeof items === "string") {
+    try { items = JSON.parse(items); } catch (e) { throw new Error("匯入資料格式錯誤"); }
+  }
+  if (!items || !items.length) throw new Error("沒有要匯入的店家");
+  if (items.length > 200) throw new Error("一次最多匯入 200 家");
+  var over = boolArg_(overwrite);
+  var seen = {};
+  var parsed = items.map(function (it) {
+    var f = placeContent_(it);
+    var key = placeKey_(f.name) + "|" + f.city;
+    if (seen[key]) throw new Error("匯入資料裡「" + f.name + "」重複了");
+    seen[key] = true;
+    return f;
+  });
+  var sheet = placeSheet_();
+  var created = 0, updated = 0;
+  parsed.forEach(function (f) {
+    var values = sheet.getDataRange().getValues();
+    var headers = values[0];
+    var nameCol = headers.indexOf("name"), cityCol = headers.indexOf("city"), idCol = headers.indexOf("id");
+    var found = null;
+    for (var i = 1; i < values.length; i++) {
+      if (placeKey_(values[i][nameCol]) !== placeKey_(f.name)) continue;
+      var ec = String(values[i][cityCol] || "");
+      if (f.city && ec && f.city !== ec) continue;
+      found = { row: values[i], id: values[i][idCol] };
+      break;
+    }
+    if (!found) {
+      var vals = Object.assign({ id: Utilities.getUuid(), status: "want", rating: 0, visitedAt: "", review: "", createdAt: new Date() }, f);
+      appendRowSafe_(sheet, headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; }));
+      created++;
+      return;
+    }
+    var changes = {};
+    Object.keys(f).forEach(function (k) {
+      if (k === "name" || f[k] === "") return;
+      var cur = String(found.row[headers.indexOf(k)] || "");
+      if (k === "tags") {
+        var merged = tagsArg_((cur ? cur + "," : "") + f.tags);
+        if (merged !== cur) changes.tags = merged;
+      } else if (cur === "" || over) {
+        if (cur !== f[k]) changes[k] = f[k];
+      }
+    });
+    if (Object.keys(changes).length) { updateRowByHeaders_("Places", found.id, changes); updated++; }
+  });
+  var out = getPlaces();
+  out.created = created;
+  out.updated = updated;
   return out;
 }

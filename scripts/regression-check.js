@@ -336,6 +336,32 @@ console.log("全站關掉瀏覽器表單歷史記憶（autocomplete=off）");
   check("shared.js 會監看之後動態新增的輸入框（MutationObserver）", /new MutationObserver/.test(read("shared.js")) && /disableInputHistory\(n\)/.test(read("shared.js")));
 }
 
+console.log("前端：想吃的店（地區連動、篩選、地圖連結、隨機抽、匯入解析、渲染）");
+{
+  const f = loadFrontend(["shared.js", "recipes.js", "places.js"], "// ====== Boot ======");
+  const ev = code => vm.runInContext(code, f);
+  f.__pl = [
+    { id: "1", name: "阿財滷肉飯", country: "台灣", city: "台北市", area: "大安區", tags: "小吃,滷肉飯", dishes: "滷肉飯", note: "IG 推薦", source: "https://instagram.com/p/x", mapUrl: "", status: "want", rating: 0, visitedAt: "", review: "" },
+    { id: "2", name: "一蘭拉麵", country: "日本", city: "大阪", area: "難波", tags: "拉麵", dishes: "", note: "", source: "", mapUrl: "https://maps.app.goo.gl/abc", status: "want", rating: 0, visitedAt: "", review: "" },
+    { id: "3", name: "鼎泰豐", country: "台灣", city: "台北市", area: "信義區", tags: "小籠包", dishes: "", note: "", source: "javascript:alert(1)", mapUrl: "", status: "visited", rating: 4, visitedAt: "2026-10-01", review: "好吃" },
+    { id: "4", name: "只有店名", country: "", city: "", area: "", tags: "", dishes: "", note: "", source: "", mapUrl: "", status: "want", rating: "", visitedAt: "", review: "" },
+  ];
+  const opts = JSON.parse(ev('JSON.stringify(regionOptions(__pl, { country: "all", city: "all" }))'));
+  check("regionOptions：國家只列有資料的；選了國家後縣市只列那個國家的；選了縣市後區域只列那個縣市的", opts.countries.join() === "日本,台灣" && JSON.parse(ev('JSON.stringify(regionOptions(__pl, { country: "日本", city: "all" }).cities)')).join() === "大阪" && JSON.parse(ev('JSON.stringify(regionOptions(__pl, { country: "台灣", city: "台北市" }).areas)')).join() === "大安區,信義區", opts);
+  const flt = (o) => ev(`filterPlaces(__pl, Object.assign({ search: "", status: "all", country: "all", city: "all", area: "all", tag: "all" }, ${JSON.stringify(o)})).map(p => p.id).join()`);
+  check("filterPlaces：狀態、國家、縣市、區域、標籤、搜尋（店名／餐點／備註／標籤）", flt({ status: "want" }) === "1,2,4" && flt({ status: "visited" }) === "3" && flt({ country: "日本" }) === "2" && flt({ city: "台北市", area: "大安區" }) === "1" && flt({ tag: "小籠包" }) === "3" && flt({ search: "IG" }) === "1" && flt({ search: "拉麵" }) === "2" && flt({ search: "不存在" }) === "");
+  check("placeMapUrl：只用有存的 Google 地圖連結；沒填、壞連結（非 http）就回傳空字串（不自動組搜尋連結）", ev('placeMapUrl(__pl[1])') === "https://maps.app.goo.gl/abc" && ev('placeMapUrl(__pl[0])') === "" && ev('placeMapUrl({ mapUrl: "javascript:alert(1)" })') === "" && ev('placeMapUrl(__pl[3])') === "");
+  check("pickRandomPlace：空清單 null、只有一家就是它、盡量不連續抽到同一家、結果在清單內（注入亂數）", ev('pickRandomPlace([], null)') === null && ev('pickRandomPlace([__pl[0]], "1").id') === "1" && ev('pickRandomPlace([__pl[0], __pl[1]], "1", () => 0).id') === "2" && ev('pickRandomPlace(__pl, null, () => 0.99).id') === "4");
+  const imp = JSON.parse(ev('JSON.stringify(parsePlacesImport(\'{"items":[{"name":"A店","city":"台北市","tags":["小吃","夜市"],"mapUrl":"https://maps.app.goo.gl/x"},{"name":"B店","source":"ftp://x"},{"name":" "},{"name":"a店","city":"台北市"}]}\'))'));
+  check("parsePlacesImport：陣列標籤轉逗號、壞連結／沒店名／重複列入 problems（整批不匯入）", imp.items.length === 1 && imp.items[0].tags === "小吃, 夜市" && imp.problems.length === 3, imp);
+  check("parsePlacesImport：壞 JSON／沒有陣列回傳 null；匯入鈕在 await 前取 e.currentTarget", ev('parsePlacesImport("abc")') === null && ev('parsePlacesImport("{}")') === null && read("places.js").indexOf("const btn = e.currentTarget") < read("places.js").indexOf("await showConfirm(`確定匯入"));
+  let err = null;
+  try { ev('pl.places = __pl; renderPlacesAll(); pl.status = "all"; renderPlacesAll(); pl.country = "日本"; renderPlacesAll(); pl.places = []; pl.country = "all"; renderPlacesAll();'); } catch (e) { err = String(e); }
+  check("店家列表（含只有店名、壞連結、去過了、空清單）渲染不丟錯", err === null, err);
+  const html = read("recipes.html");
+  check("recipes.html 載入 places.js（在 recipes.js 之後）且有想吃的店分頁", html.indexOf('src="recipes.js') > -1 && html.indexOf('src="places.js') > html.indexOf('src="recipes.js') && html.includes('data-tabbtn="places"'));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -380,6 +406,40 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
+    getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
+  const sh = mk(be.PLACE_HEADERS);
+  const realUuid = be.Utilities.getUuid; let uc = 0; be.Utilities.getUuid = () => "pl-" + (++uc);
+  const realToday = be.todayStr_; be.todayStr_ = () => "2026-10-14";
+  const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh });
+  const col = (h) => be.PLACE_HEADERS.indexOf(h);
+  try {
+    be.addPlace({ name: "阿財滷肉飯" });
+    check("addPlace：只有店名就能新增（其餘空白）、狀態是 want、評分 0", sh.rows.length === 1 && sh.rows[0][col("name")] === "阿財滷肉飯" && sh.rows[0][col("status")] === "want" && sh.rows[0][col("rating")] === 0 && sh.rows[0][col("city")] === "", sh.rows[0]);
+    check("addPlace：空店名、壞連結（javascript:）、太長丟錯且不寫入", [{ name: " " }, { name: "x", source: "javascript:alert(1)" }, { name: "x", mapUrl: "ftp://x" }, { name: "a".repeat(101) }].every(o => throws(() => be.addPlace(o))) && sh.rows.length === 1);
+    const id = sh.rows[0][0];
+    be.updatePlace({ id, name: "阿財滷肉飯", country: "台灣", city: "台北市", area: "大安區", tags: "小吃，滷肉飯, 小吃", dishes: "滷肉飯", mapUrl: "https://maps.app.goo.gl/x" });
+    check("updatePlace：改內容欄位（標籤去重、全形逗號）、不動狀態與評分", sh.rows[0][col("city")] === "台北市" && sh.rows[0][col("tags")] === "小吃,滷肉飯" && sh.rows[0][col("status")] === "want");
+    be.setPlaceVisit({ id, status: "visited", rating: "4", review: "好吃" });
+    check("setPlaceVisit：去過了＝狀態、評分、日期（預設今天）、心得", sh.rows[0][col("status")] === "visited" && sh.rows[0][col("rating")] === 4 && sh.rows[0][col("visitedAt")] === "2026-10-14" && sh.rows[0][col("review")] === "好吃");
+    check("setPlaceVisit：評分超過範圍、壞日期、壞狀態丟錯", throws(() => be.setPlaceVisit({ id, status: "visited", rating: "6" })) && throws(() => be.setPlaceVisit({ id, status: "visited", rating: "3", visitedAt: "2026/10/01" })) && throws(() => be.setPlaceVisit({ id, status: "done" })));
+    be.setPlaceVisit({ id, status: "want" });
+    check("setPlaceVisit：改回想去＝清掉評分與日期，心得保留", sh.rows[0][col("status")] === "want" && sh.rows[0][col("rating")] === 0 && sh.rows[0][col("visitedAt")] === "" && sh.rows[0][col("review")] === "好吃");
+    // import: 補空白欄位 vs 覆蓋
+    const r1 = be.importPlaces(JSON.stringify([{ name: "阿財 滷肉飯", city: "台北市", mapUrl: "https://maps.app.goo.gl/x", dishes: "別的餐點", tags: ["夜市"] }, { name: "新店", country: "日本", city: "大阪" }]), "false");
+    check("importPlaces（只補空白）：店名比對（忽略空白與大小寫）找到＝補上空白欄位、不蓋已有的餐點、標籤取聯集；沒找到＝新增",
+      r1.created === 1 && r1.updated === 1 && sh.rows[0][col("mapUrl")] === "https://maps.app.goo.gl/x" && sh.rows[0][col("dishes")] === "滷肉飯" && sh.rows[0][col("tags")] === "小吃,滷肉飯,夜市" && sh.rows.length === 2, { r1: [r1.created, r1.updated], row: sh.rows[0] });
+    const r2 = be.importPlaces([{ name: "阿財滷肉飯", dishes: "招牌滷肉飯" }], true);
+    check("importPlaces（覆蓋）：有填的欄位覆蓋已有內容", r2.updated === 1 && sh.rows[0][col("dishes")] === "招牌滷肉飯");
+    const r3 = be.importPlaces([{ name: "阿財滷肉飯", city: "新北市", note: "x" }]);
+    check("importPlaces：兩邊都有縣市但不同＝不同的店，另外新增", r3.created === 1 && sh.rows.length === 3);
+    const n = sh.rows.length;
+    check("importPlaces：有一筆壞／批次內重複／空陣列整批不寫", [[{ name: "ok" }, { name: " " }], [{ name: "dup" }, { name: "DUP" }], [{ name: "x", source: "ftp://x" }], []].every(a => throws(() => be.importPlaces(a))) && sh.rows.length === n);
+    be.deletePlace(id);
+    check("deletePlace：刪掉那一家", !sh.rows.some(x => x[0] === id));
+  } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; be.Utilities.getUuid = realUuid; be.todayStr_ = realToday; }
+}
 {
   const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
