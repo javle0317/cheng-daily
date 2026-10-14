@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261014212312">
+<link rel="stylesheet" href="style.css?v=20261014213607">
 </head>
 <body data-page="recipes">
 
@@ -139,13 +139,14 @@
       <form id="placeForm" class="entry-form entry-form-rows modal-form">
         <details id="placeImportBox" class="more-fields">
           <summary>批次貼上匯入（整理好的店家資料）</summary>
+          <p class="progress-line">貼上整理好的資料後，按下面的「檢查並匯入」（或最底下的「新增」）。</p>
           <textarea id="placeImportText" rows="4" placeholder="貼上對話裡給你的店家資料（JSON）…"></textarea>
           <label class="checkbox-label"><input id="placeImportOverwrite" type="checkbox"> 覆蓋已有內容（預設只補空白欄位）</label>
           <button id="placeImportBtn" type="button" class="ghost-btn">檢查並匯入</button>
         </details>
         <p id="placeImportMsg" class="import-msg" role="status"></p>
         <label class="mf">店名（只有這個必填）
-          <input id="placeName" type="text" maxlength="100" required autocomplete="off">
+          <input id="placeName" type="text" maxlength="100" autocomplete="off">
         </label>
         <details id="placeMore" class="more-fields">
           <summary>更多欄位（之後再補也可以）</summary>
@@ -232,8 +233,8 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261014212312"></script>
-  <script src="recipes.js?v=20261014212312"></script>
-  <script src="places.js?v=20261014212312"></script>
+  <script src="shared.js?v=20261014213607"></script>
+  <script src="recipes.js?v=20261014213607"></script>
+  <script src="places.js?v=20261014213607"></script>
 </body>
 </html>

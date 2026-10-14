@@ -294,10 +294,13 @@ document.getElementById("placeTag").addEventListener("change", (e) => { pl.tag =
 // ====== 新增／編輯 ======
 const PLACE_FIELDS = { name: "placeName", country: "placeCountryInput", city: "placeCityInput", area: "placeAreaInput", tags: "placeTags", dishes: "placeDishes", source: "placeSource", mapUrl: "placeMapUrl", note: "placeNote" };
 
+// 底下的「新增」鈕：填了店名，或貼了批次匯入的資料，就可以按（貼了匯入資料時按它＝執行匯入）
 function updatePlaceFormValidity() {
-  document.getElementById("placeSubmit").disabled = !document.getElementById("placeName").value.trim();
+  const hasImport = !document.getElementById("placeImportBox").classList.contains("hidden") && document.getElementById("placeImportText").value.trim() !== "";
+  document.getElementById("placeSubmit").disabled = !(document.getElementById("placeName").value.trim() || hasImport);
 }
 document.getElementById("placeName").addEventListener("input", updatePlaceFormValidity);
+document.getElementById("placeImportText").addEventListener("input", updatePlaceFormValidity);
 
 function openPlaceForm(p) {
   pl.editingId = p ? p.id : null;
@@ -313,6 +316,7 @@ function openPlaceForm(p) {
   document.getElementById("placeImportBox").classList.toggle("hidden", !!p);
   document.getElementById("placeImportText").value = "";
   document.getElementById("placeImportMsg").textContent = "";
+  document.getElementById("placeImportBox").open = false;
   updatePlaceFormValidity();
   document.getElementById("placeFormModal").classList.remove("hidden");
   if (!p) setTimeout(() => document.getElementById("placeName").focus(), 0);
@@ -326,7 +330,11 @@ document.getElementById("placeForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const params = {};
   Object.entries(PLACE_FIELDS).forEach(([key, id]) => { params[key] = document.getElementById(id).value; });
-  if (!params.name.trim()) return;
+  if (!params.name.trim()) {
+    // 沒填店名但貼了批次匯入資料：按「新增」就是執行匯入（不然看起來按了沒反應）
+    if (document.getElementById("placeImportText").value.trim() !== "") document.getElementById("placeImportBtn").click();
+    return;
+  }
   const editing = pl.editingId;
   if (editing) params.id = editing;
   setFormBusy(e.target, true);

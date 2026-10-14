@@ -362,6 +362,19 @@ console.log("前端：想吃的店（地區連動、篩選、地圖連結、隨�
   check("recipes.html 載入 places.js（在 recipes.js 之後）且有想吃的店分頁", html.indexOf('src="recipes.js') > -1 && html.indexOf('src="places.js') > html.indexOf('src="recipes.js') && html.includes('data-tabbtn="places"'));
 }
 
+console.log("想吃的店：貼了批次匯入資料、沒填店名時，底下的「新增」鈕要能按（按了＝執行匯入），不然看起來按了沒反應也沒有網路請求");
+{
+  const src = read("places.js");
+  check("updatePlaceFormValidity 把「有貼匯入資料」也算可以送出", /hasImport/.test(src) && /placeImportText"\)\.addEventListener\("input", updatePlaceFormValidity\)/.test(src));
+  check("送出時沒店名但有匯入資料＝點匯入鈕", /placeImportBtn"\)\.click\(\)/.test(src.slice(src.indexOf('document.getElementById("placeForm").addEventListener("submit"'))));
+}
+
+console.log("想吃的店：店名欄位不能有 HTML required（會讓瀏覽器原生驗證在 submit 事件之前就擋掉；改由 JS 判斷，才能讓「貼了匯入資料按新增」運作）");
+{
+  const m = /<input id="placeName"[^>]*>/.exec(read("recipes.html"));
+  check("#placeName 沒有 required 屬性", !!m && !/\brequired\b/.test(m[0]), m && m[0]);
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
