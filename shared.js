@@ -451,3 +451,23 @@ function initAppNav() {
   header.insertAdjacentElement("afterend", nav);
 }
 initAppNav();
+
+// ====== 全站關掉瀏覽器的「表單歷史記憶」（輸入框下拉出現以前填過的值）======
+// 每個輸入框與表單都補 autocomplete="off"（已經自己寫了的不動；密碼欄不動，留給密碼管理員）。
+// 之後動態產生的輸入框（驗血的項目列等）由 MutationObserver 補上。
+// 注意：<datalist> 是我們刻意提供的建議（食譜標籤、驗血項目名稱），不受這個影響，仍然會出現。
+function disableInputHistory(root) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("input, textarea, form").forEach(el => {
+    if (el.type === "password" || el.hasAttribute("autocomplete")) return;
+    el.setAttribute("autocomplete", "off");
+  });
+}
+disableInputHistory(document);
+if (typeof MutationObserver === "function" && document.body) {
+  new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+    if (n.nodeType !== 1) return;
+    if (n.matches && n.matches("input, textarea, form") && n.type !== "password" && !n.hasAttribute("autocomplete")) n.setAttribute("autocomplete", "off");
+    disableInputHistory(n);
+  }))).observe(document.body, { childList: true, subtree: true });
+}

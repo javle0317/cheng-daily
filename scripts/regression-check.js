@@ -325,6 +325,17 @@ console.log("樣式：貼上匯入的「填入表單」鈕要明確清掉底色�
   check("`.more-fields button.ghost-btn` 有設 background", !!m && /background\s*:\s*(transparent|none)/.test(m[1]), m && m[1]);
 }
 
+console.log("全站關掉瀏覽器表單歷史記憶（autocomplete=off）");
+{
+  const f = loadFrontend(["shared.js"]);
+  const mkEl = (type, attr) => { const a = Object.assign({}, attr); return { type, hasAttribute: k => k in a, setAttribute: (k, v) => { a[k] = v; }, get attrs() { return a; } }; };
+  const els = [mkEl("text"), mkEl("password"), mkEl("text", { autocomplete: "on" }), mkEl("textarea"), mkEl("search")];
+  f.__root = { querySelectorAll: () => els };
+  vm.runInContext("disableInputHistory(__root)", f);
+  check("disableInputHistory：沒寫 autocomplete 的補 off、密碼欄與已經自己寫的不動", els[0].attrs.autocomplete === "off" && !("autocomplete" in els[1].attrs) && els[2].attrs.autocomplete === "on" && els[3].attrs.autocomplete === "off" && els[4].attrs.autocomplete === "off", els.map(e => e.attrs));
+  check("shared.js 會監看之後動態新增的輸入框（MutationObserver）", /new MutationObserver/.test(read("shared.js")) && /disableInputHistory\(n\)/.test(read("shared.js")));
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
