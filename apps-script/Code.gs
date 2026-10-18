@@ -4,6 +4,7 @@
  *
  * 「專案設定 > Script Properties」需要這幾個屬性（值都不寫進程式碼/repo）：
  *   PASSWORD       - 網頁前端的密碼
+ *   WALLPAPER_TOKEN - 鎖定畫面桌布頁（wallpaper.html）專用的唯讀 token，只能呼叫 getWallpaperData；自己隨便取一串長亂碼
  *   LINE_TOKEN     - LINE Messaging API 的 channel access token
  *   LINE_MY_ID     - 你的 LINE 使用者 ID
  *   LINE_WIFE_ID   - 太太的 LINE 使用者 ID
@@ -99,6 +100,12 @@ function doPost(e) {
 
 function handleRequest(p) {
   try {
+    // 鎖定畫面桌布頁專用：只認唯讀的 WALLPAPER_TOKEN（不能用來呼叫其他動作），讀取不用鎖。
+    if (p.action === "getWallpaperData") {
+      var wt = PropertiesService.getScriptProperties().getProperty("WALLPAPER_TOKEN");
+      if (!wt || p.token !== wt) return respond({ ok: false, error: "unauthorized" });
+      return respond({ ok: true, data: getWallpaperData_() });
+    }
     var stored = PropertiesService.getScriptProperties().getProperty("PASSWORD");
     if (!stored || p.password !== stored) {
       return respond({ ok: false, error: "unauthorized" });
@@ -286,7 +293,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-14.1";
+var BACKEND_VERSION = "2026-10-18.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1411,6 +1418,70 @@ function sendDailyNotifications() {
   if (wifeLines.length > 0) {
     sendLinePush_(token, wifeId, "【個人提醒】\n日期：" + todayStr + "\n\n" + wifeLines.join("\n\n"));
   }
+}
+
+// 鎖定畫面桌布用的精簡資料（唯讀）：今天、當月每天的行程數、今天的行程、今天還沒完成的每日習慣。
+// 只回桌布要畫的東西，不回整張表。行程規則與 sendDailyNotifications 一致（排除 hideFromCalendar、循環規則展開並略過例外）。
+function getWallpaperData_() {
+  var todayStr = Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd");
+  var y = Number(todayStr.slice(0, 4));
+  var m = Number(todayStr.slice(5, 7));
+  var daysInMonth = new Date(y, m, 0).getDate();
+  var monthPrefix = todayStr.slice(0, 7);
+
+  var events = sheetToObjects(getSheet("Events")).filter(function (e) { return !e.hideFromCalendar; });
+  var rules = sheetToObjects(getSheet("RecurringEvents"));
+  var skipped = {};
+  sheetToObjects(getSheet("RecurringExceptions")).forEach(function (ex) {
+    skipped[ex.recurringId + "|" + ex.date] = true;
+  });
+
+  var days = {};
+  var today = [];
+  for (var d = 1; d <= daysInMonth; d++) {
+    var ds = monthPrefix + "-" + (d < 10 ? "0" + d : d);
+    var dateObj = new Date(ds + "T00:00:00");
+    var list = events.filter(function (e) { return e.date === ds; }).map(function (e) {
+      return { owner: e.owner, time: e.time, endTime: e.endTime, title: e.title };
+    });
+    rules.forEach(function (r) {
+      if (matchesRecurringRule_(r, dateObj, ds) && !skipped[r.id + "|" + ds]) {
+        list.push({ owner: r.owner, time: r.time, endTime: r.endTime, title: r.title });
+      }
+    });
+    if (list.length) days[ds] = list.length;
+    if (ds === todayStr) today = sortEventsByTime_(list);
+  }
+
+  var holidayDates = {};
+  getHolidaysSafe_().forEach(function (h) { holidayDates[h.date] = h.name; });
+  var isWorkday = new Date(todayStr + "T00:00:00").getDay() % 6 !== 0 && !holidayDates[todayStr];
+
+  var logs = sheetToObjects(getSheet("HabitLog"));
+  var habits = sheetToObjects(getSheet("Habits")).filter(function (h) {
+    if (h.frequency !== "daily") return false;
+    var wd = h.workdaysOnly === true || String(h.workdaysOnly).toUpperCase() === "TRUE";
+    return !wd || isWorkday;
+  }).map(function (h) {
+    var count = 0, exercise = "";
+    logs.forEach(function (l) {
+      if (l.habitId === h.id && String(l.periodKey) === todayStr) {
+        count = Number(l.count) || 0;
+        exercise = l.exercise || "";
+      }
+    });
+    var name = h.id === CHALLENGE_HABIT_ID && exercise ? exercise : h.name;
+    return { name: name, done: count >= Number(h.target || 1) };
+  });
+
+  return {
+    today: todayStr,
+    holidays: holidayDates,
+    days: days,
+    events: today,
+    pendingHabits: habits.filter(function (h) { return !h.done; }).map(function (h) { return h.name; }),
+    habitTotal: habits.length,
+  };
 }
 
 // 依 time（HH:mm）由早到晚排；沒有 time 的（全天）排最前面。穩定排序：同一時間保持原本順序，不改動傳入的陣列。

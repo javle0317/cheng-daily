@@ -308,6 +308,15 @@ GitHub Pages 產生的網址任何人拿到連結都能打開，密碼是實際�
 Repo 目前是公開的（免費方案的 Pages 需要），所以**原始碼與 git 歷史裡不能放任何真實資料**
 （健康數值、帳單、密碼、網址以外的金鑰）：資料只存在 Google Sheet，程式碼只放邏輯。
 一次性搬移／匯入資料的函式跑完就整段刪掉，不要留在 `Code.gs` 裡 commit。
+另有唯讀的 `WALLPAPER_TOKEN`（只給鎖定畫面桌布頁，見下方「鎖定畫面桌布」），外洩也只能讀到當月行程與今日未完成習慣。
+
+## 鎖定畫面桌布（wallpaper.html）
+
+給 iOS 捷徑截圖、當鎖定畫面桌布用的獨立頁面：固定深色，上方約 41% 留空給 iOS 時鐘與小工具，下面是當月月曆（有行程的日子點一點、國定假日與週日紅字）、今日行程、今天還沒完成的每日練習（運動挑戰顯示抽到的內容）。
+
+- 資料：後端唯讀動作 `getWallpaperData`（`Code.gs` 的 `getWallpaperData_`），**只認 Script Property `WALLPAPER_TOKEN`**，不接受 `PASSWORD`，也不能拿這個 token 呼叫其他動作。token 自己取一串長亂碼，第一次開頁面貼進去，只存在該瀏覽器的 localStorage，不放網址。
+- 頁面不載入 `shared.js`／`app.js`（它們會綁登入表單），獨立的 `wallpaper.js`；載入完成後 `<body data-ready="1">`（失敗是 `error`，token 錯會清掉重新輸入）。
+- 捷徑做法與限制見下方步驟；新版 iOS 的捷徑不一定有可靠的「設定桌布」動作，備案是把截圖存進專用相簿，鎖定畫面用「照片輪播」。
 
 ## 同步到 Google 行事曆（單向：App → Google）
 

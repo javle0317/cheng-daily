@@ -851,6 +851,18 @@ check("寫入 action 會取鎖並釋放；get 不取鎖", (() => {
   return afterWrite[0] === 1 && afterWrite[1] === 1 && calls.locks === 0;
 })());
 
+console.log("桌布頁：唯讀 token");
+const wpPost = o => out(be.doPost({ postData: { contents: JSON.stringify(o) } }));
+check("getWallpaperData 只認 token：缺 token／用密碼代替都 unauthorized", wpPost({ action: "getWallpaperData" }).error === "unauthorized" && wpPost({ action: "getWallpaperData", password: "secret" }).error === "unauthorized" && wpPost({ action: "getWallpaperData", token: "bad" }).error === "unauthorized");
+check("桌布 token 不能拿去呼叫其他動作", wpPost({ action: "getData", token: "secret" }).error === "unauthorized");
+{
+  const wp = loadFrontend(["wallpaper.js"], "// ====== Boot ======");
+  const cells = wp.buildMonthCells("2026-10-18", { "2026-10-20": 2 }, { "2026-10-10": "國慶日" });
+  check("桌布月曆：2026-10 月初空 4 格（週四開頭）、共 31 天", cells.slice(0, 4).every(c => c === null) && cells.filter(Boolean).length === 31);
+  check("桌布月曆：今天、假日、有行程、週日標記", cells[4 + 17].today && cells[4 + 9].holiday && cells[4 + 19].dots === 2 && cells[4 + 3].sun);
+  check("桌布頁不載入 shared.js／app.js，也沒有 token 放網址", !read("wallpaper.html").includes("shared.js") && !read("wallpaper.js").includes("location.search"));
+}
+
 console.log("後端：登記體組成自動幫週活動習慣打卡");
 {
   const realUtilities = be.Utilities, realGetSheet = be.getSheet, realToObjects = be.sheetToObjects;
