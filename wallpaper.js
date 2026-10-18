@@ -30,7 +30,7 @@ function buildMonthCells(todayStr, days, holidays) {
 }
 
 // 截圖只有一個畫面高，超過就收成「還有 N 項」，不然會被擠出畫面
-const MAX_EVENTS = 4;
+const MAX_EVENTS = 3;
 const MAX_HABITS = 3;
 function moreRow(n) { return n > 0 ? `<li class="more">還有 ${n} 項…</li>` : ""; }
 

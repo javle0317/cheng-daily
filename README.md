@@ -312,7 +312,7 @@ Repo 目前是公開的（免費方案的 Pages 需要），所以**原始碼與
 
 ## 鎖定畫面桌布（wallpaper.html）
 
-給 iOS 捷徑截圖、當鎖定畫面桌布用的獨立頁面：固定深色，上方約 21% 留空給 iOS 時鐘與小工具，下面是當月月曆（有行程的日子點一點、國定假日與週日紅字）、今日行程、今天還沒完成的每日練習（運動挑戰顯示抽到的內容）。
+給 iOS 捷徑截圖、當鎖定畫面桌布用的獨立頁面：固定深色，上方約 24% 留空給 iOS 時鐘與小工具，下面是當月月曆（有行程的日子點一點、國定假日與週日紅字）、今日行程、今天還沒完成的每日練習（運動挑戰顯示抽到的內容）。
 
 - 資料：後端唯讀動作 `getWallpaperData`（`Code.gs` 的 `getWallpaperData_`），**只認 Script Property `WALLPAPER_TOKEN`**，不接受 `PASSWORD`，也不能拿這個 token 呼叫其他動作。token 自己取一串長亂碼，第一次開頁面貼進去，只存在該瀏覽器的 localStorage，不放網址。
 - 頁面不載入 `shared.js`／`app.js`（它們會綁登入表單），獨立的 `wallpaper.js`；載入完成後 `<body data-ready="1">`（失敗是 `error`，token 錯會清掉重新輸入）。

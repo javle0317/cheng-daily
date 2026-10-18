@@ -15,16 +15,16 @@
 html, body { background: var(--bg); color: var(--text); font-family: "Noto Serif TC", serif; }
 /* 左右內縮 14%：設成桌布時 iOS 會把比較寬的裁切圖左右各裁掉約 11%。上方留白用 vh，頁面可用高度會被瀏覽器工具列壓縮，所以比例要比螢幕小。 */
 html, body { height: 100%; overflow: hidden; }
-body { padding: 21vh 14vw 0; }
+body { padding: 24vh 14vw 0; }
 .month-title { font-size: 15px; letter-spacing: .12em; color: var(--accent); margin-bottom: 8px; display: flex; justify-content: space-between; }
 .grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; text-align: center; }
 .dow { font-size: 10px; color: var(--dim); padding-bottom: 4px; }
-.cell { font-size: 13px; height: 27px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.cell { font-size: 13px; height: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
 .cell.holiday, .cell.sun { color: var(--pop); }
 .cell.today span { background: var(--accent); color: var(--bg); border-radius: 50%; width: 22px; height: 22px; line-height: 22px; font-weight: 700; }
 .cell i { position: absolute; bottom: 1px; width: 4px; height: 4px; border-radius: 50%; background: var(--dim); }
 .cell.today i { display: none; }
-h2 { font-size: 12px; letter-spacing: .15em; color: var(--dim); font-weight: 500; margin: 16px 0 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+h2 { font-size: 12px; letter-spacing: .15em; color: var(--dim); font-weight: 500; margin: 12px 0 5px; padding-top: 8px; border-top: 1px solid var(--line); }
 ul { list-style: none; padding: 0; }
 li { font-size: 14px; line-height: 1.55; display: flex; gap: 8px; }
 li .t { color: var(--accent); min-width: 44px; font-variant-numeric: tabular-nums; }
@@ -46,6 +46,6 @@ li.habit::before { content: "○"; color: var(--accent); }
     <p id="err"></p>
   </form>
 
-  <script src="wallpaper.js?v=20261018150808"></script>
+  <script src="wallpaper.js?v=20261018153551"></script>
 </body>
 </html>
