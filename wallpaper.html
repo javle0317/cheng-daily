@@ -13,11 +13,13 @@
 :root { --bg: #10141f; --text: #e9e4d6; --dim: #8b90a0; --line: #2a3042; --accent: #d9b66b; --pop: #e8786a; }
 * { box-sizing: border-box; margin: 0; }
 html, body { background: var(--bg); color: var(--text); font-family: "Noto Serif TC", serif; }
-body { min-height: 100vh; padding: 41vh 22px calc(env(safe-area-inset-bottom) + 70px); }
+/* 左右內縮 14%：設成桌布時 iOS 會把比較寬的裁切圖左右各裁掉約 11%。上方留白用 vh，頁面可用高度會被瀏覽器工具列壓縮，所以比例要比螢幕小。 */
+html, body { height: 100%; overflow: hidden; }
+body { padding: 25vh 14vw 0; }
 .month-title { font-size: 15px; letter-spacing: .12em; color: var(--accent); margin-bottom: 8px; display: flex; justify-content: space-between; }
 .grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; text-align: center; }
 .dow { font-size: 10px; color: var(--dim); padding-bottom: 4px; }
-.cell { font-size: 13px; height: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.cell { font-size: 13px; height: 27px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
 .cell.holiday, .cell.sun { color: var(--pop); }
 .cell.today span { background: var(--accent); color: var(--bg); border-radius: 50%; width: 22px; height: 22px; line-height: 22px; font-weight: 700; }
 .cell i { position: absolute; bottom: 1px; width: 4px; height: 4px; border-radius: 50%; background: var(--dim); }
@@ -26,7 +28,7 @@ h2 { font-size: 12px; letter-spacing: .15em; color: var(--dim); font-weight: 500
 ul { list-style: none; padding: 0; }
 li { font-size: 14px; line-height: 1.55; display: flex; gap: 8px; }
 li .t { color: var(--accent); min-width: 44px; font-variant-numeric: tabular-nums; }
-li.empty { color: var(--dim); }
+li.empty, li.more { color: var(--dim); }
 li.habit::before { content: "○"; color: var(--accent); }
 #setup { position: fixed; inset: 0; background: var(--bg); padding: 30vh 24px; display: none; }
 #setup.show { display: block; }
@@ -44,6 +46,6 @@ li.habit::before { content: "○"; color: var(--accent); }
     <p id="err"></p>
   </form>
 
-  <script src="wallpaper.js?v=20261018140143"></script>
+  <script src="wallpaper.js?v=20261018143912"></script>
 </body>
 </html>

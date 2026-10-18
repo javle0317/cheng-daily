@@ -29,6 +29,11 @@ function buildMonthCells(todayStr, days, holidays) {
   return cells;
 }
 
+// 截圖只有一個畫面高，超過就收成「還有 N 項」，不然會被擠出畫面
+const MAX_EVENTS = 4;
+const MAX_HABITS = 3;
+function moreRow(n) { return n > 0 ? `<li class="more">還有 ${n} 項…</li>` : ""; }
+
 function renderWallpaper(data) {
   const [y, m, d] = data.today.split("-").map(Number);
   const cells = buildMonthCells(data.today, data.days || {}, data.holidays || {});
@@ -36,11 +41,13 @@ function renderWallpaper(data) {
   const grid = cells.map(c => c
     ? `<div class="cell${c.today ? " today" : ""}${c.holiday ? " holiday" : ""}${c.sun ? " sun" : ""}"><span>${c.d}</span>${c.dots ? "<i></i>" : ""}</div>`
     : "<div></div>").join("");
-  const events = (data.events || []).length
-    ? data.events.map(e => `<li><span class="t">${escapeText(formatWallpaperTime(e))}</span><span>${escapeText(e.title)}</span></li>`).join("")
+  const evs = data.events || [];
+  const events = evs.length
+    ? evs.slice(0, MAX_EVENTS).map(e => `<li><span class="t">${escapeText(formatWallpaperTime(e))}</span><span>${escapeText(e.title)}</span></li>`).join("") + moreRow(evs.length - MAX_EVENTS)
     : '<li class="empty">今天沒有行程</li>';
-  const habits = (data.pendingHabits || []).length
-    ? data.pendingHabits.map(n => `<li class="habit"><span>${escapeText(n)}</span></li>`).join("")
+  const hs = data.pendingHabits || [];
+  const habits = hs.length
+    ? hs.slice(0, MAX_HABITS).map(n => `<li class="habit"><span>${escapeText(n)}</span></li>`).join("") + moreRow(hs.length - MAX_HABITS)
     : `<li class="empty">${data.habitTotal ? "今天的練習都完成了 ✓" : "今天沒有每日練習"}</li>`;
   document.getElementById("main").innerHTML = `
     <div class="month-title"><span>${y} 年 ${m} 月</span><span>${m}/${d}</span></div>
