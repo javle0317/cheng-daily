@@ -1287,3 +1287,10 @@ a.pay-btn { text-decoration: none; display: inline-block; }
 
 /* 表單送出中：送出鈕就算被別的程式改回可按，也不能點、看起來是停用的（shared.js 的 setFormBusy／blockBusySubmit） */
 form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
+
+/* 習慣區塊自己的日期（預設今天；往前最多 7 天補打卡，不能選未來） */
+.habit-date-bar { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.habit-date-bar .ghost-btn { padding: 4px 12px; }
+.habit-date-text { font-size: 14px; font-weight: 600; min-width: 7em; text-align: center; }
+.habit-backfill-note { margin: -4px 0 10px; padding: 6px 10px; border-radius: 8px; font-size: 12px; background: var(--accent-soft); color: var(--text); border-left: 3px solid var(--status-warning); }
+.habits-card.backfill { box-shadow: inset 0 0 0 2px var(--status-warning); }

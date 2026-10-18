@@ -22,6 +22,7 @@ let state = {
   shoppingLoaded: false,
   holidayDates: new Set(),
   selectedDate: toDateStr(new Date()),
+  habitBack: 0, // 習慣區塊看的是「今天往前幾天」（0＝今天，最多 7）；跟行事曆選的日期無關
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
 };
@@ -356,28 +357,65 @@ document.getElementById("calPreviewBtn").addEventListener("click", async (e) => 
 });
 
 // ====== Rendering ======
+// ====== 習慣區塊的日期：預設永遠是今天，跟行事曆選哪天無關 ======
+// （以前習慣跟著行事曆選的日期走：點別天看行程，順手勾習慣就記到錯的日子，還能勾到未來。）
+// 補打卡：用習慣區塊自己的日期切換往前最多 7 天；切到過去時整塊標示「補登」；不能選未來。
+const HABIT_BACKFILL_DAYS = 7;
+
+function habitDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - Math.max(0, Math.min(HABIT_BACKFILL_DAYS, Number(state.habitBack) || 0)));
+  return toDateStr(d);
+}
+
+function habitDateLabel() {
+  const back = Math.max(0, Math.min(HABIT_BACKFILL_DAYS, Number(state.habitBack) || 0));
+  const ds = habitDate();
+  const md = `${Number(ds.slice(5, 7))}/${Number(ds.slice(8, 10))}`;
+  return back === 0 ? `今天 ${md}` : `補登 ${md}（${back === 1 ? "昨天" : back === 2 ? "前天" : back + " 天前"}）`;
+}
+
+function renderHabitDateBar() {
+  const back = Math.max(0, Math.min(HABIT_BACKFILL_DAYS, Number(state.habitBack) || 0));
+  document.getElementById("selectedDateLabel").textContent = "";
+  document.getElementById("habitDateText").textContent = habitDateLabel();
+  document.getElementById("habitPrevDay").disabled = back >= HABIT_BACKFILL_DAYS;
+  document.getElementById("habitNextDay").disabled = back <= 0;
+  document.getElementById("habitTodayBtn").classList.toggle("hidden", back === 0);
+  document.getElementById("habitBackfillNote").classList.toggle("hidden", back === 0);
+  document.getElementById("habitsCard").classList.toggle("backfill", back > 0);
+}
+
+function renderHabitsAll() {
+  renderHabitDateBar();
+  renderDailyHabits();
+  renderWeeklyHabits();
+  renderMonthlyHabits();
+}
+
+function setHabitBack(n) {
+  state.habitBack = Math.max(0, Math.min(HABIT_BACKFILL_DAYS, n));
+  renderHabitsAll();
+}
+
 function renderAll() {
   renderHeader();
   renderGoals();
   renderEvents();
-  renderDailyHabits();
-  renderWeeklyHabits();
-  renderMonthlyHabits();
+  renderHabitsAll();
   renderCalendar();
   renderRecurringList();
   renderShoppingList();
 }
 
-// 換選取日期：所有跟「選取日期」有關的區塊（待辦、事件、習慣、表單日期）一起重畫，
+// 換選取日期：所有跟「選取日期」有關的區塊（待辦、事件、表單日期）一起重畫，
 // 畫面顯示的日期跟之後勾選寫入的日期才會一致。新增跟日期有關的區塊時記得加在這裡。
+// 注意：習慣區塊不跟著選取日期走（有自己的補打卡日期，見 habitDate()），所以這裡不重畫它。
 function selectDate(dateStr) {
   state.selectedDate = dateStr;
   renderHeader();
   renderGoals();
   renderEvents();
-  renderDailyHabits();
-  renderWeeklyHabits();
-  renderMonthlyHabits();
   renderCalendar();
 }
 
@@ -394,7 +432,6 @@ function renderHeader() {
   document.getElementById("progressLine").textContent =
     todaysGoals.length ? `今日待辦完成 ${done} / ${todaysGoals.length}` : "今天還沒有待辦";
 
-  document.getElementById("selectedDateLabel").textContent = `(${formatDateLabel(state.selectedDate)})`;
   document.getElementById("selectedDateLabel2").textContent = `(${formatDateLabel(state.selectedDate)})`;
   document.getElementById("selectedDateLabel3").textContent = `(${formatDateLabel(state.selectedDate)})`;
 }
@@ -505,7 +542,7 @@ function renderDailyHabits() {
 
   const habits = state.habits.filter(h =>
     h.frequency === "daily" &&
-    (!isTruthy(h.workdaysOnly) || isWorkday(state.selectedDate))
+    (!isTruthy(h.workdaysOnly) || isWorkday(habitDate()))
   );
 
   section.classList.toggle("hidden", habits.length === 0);
@@ -514,7 +551,7 @@ function renderDailyHabits() {
   if (!habits.length) return;
 
   const rows = habits.map(habit => {
-    const periodKey = state.selectedDate;
+    const periodKey = habitDate();
     const count = getHabitLogCount(habit.id, periodKey);
     const done = count >= Number(habit.target || 1);
     return { habit, periodKey, done };
@@ -624,7 +661,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
   if (!habits.length) return;
 
   const rows = habits.map(habit => {
-    const periodKey = getPeriodKey(habit, state.selectedDate);
+    const periodKey = getPeriodKey(habit, habitDate());
     const count = getHabitLogCount(habit.id, periodKey);
     const target = Number(habit.target || 1);
     const done = count >= target;
@@ -1636,6 +1673,10 @@ document.getElementById("nextMonth").addEventListener("click", () => {
   if (state.calendarMonth > 11) { state.calendarMonth = 0; state.calendarYear += 1; }
   renderCalendar();
 });
+
+document.getElementById("habitPrevDay").addEventListener("click", () => setHabitBack((Number(state.habitBack) || 0) + 1));
+document.getElementById("habitNextDay").addEventListener("click", () => setHabitBack((Number(state.habitBack) || 0) - 1));
+document.getElementById("habitTodayBtn").addEventListener("click", () => setHabitBack(0));
 
 document.getElementById("todayBtn").addEventListener("click", () => {
   const today = new Date();

@@ -436,6 +436,20 @@ console.log("匯入 skill（.claude/skills/cheng-daily-import）：每個參考�
   check("CLAUDE.md 不再重複放匯入格式，改指向 skill（只有一份來源）", claude.includes(".claude/skills/cheng-daily-import") && !/```json/.test(claude));
 }
 
+console.log("習慣區塊的日期：預設今天、跟行事曆選的日期無關；補打卡最多往前 7 天、不能選未來");
+{
+  const h = loadFrontend(["shared.js", "app.js"], "// ====== Boot ======", "2026-10-19T12:00:00");
+  const ev = code => vm.runInContext(code, h);
+  check("habitDate：預設今天；往前 N 天；超過 7 天夾在 7、負數夾在 0", ev("(state.habitBack = 0, habitDate())") === "2026-10-19" && ev("(state.habitBack = 2, habitDate())") === "2026-10-17" && ev("(state.habitBack = 30, habitDate())") === "2026-10-12" && ev("(state.habitBack = -3, habitDate())") === "2026-10-19");
+  check("habitDateLabel：今天／昨天／前天／N 天前", ev("(state.habitBack = 0, habitDateLabel())") === "今天 10/19" && ev("(state.habitBack = 1, habitDateLabel())") === "補登 10/18（昨天）" && ev("(state.habitBack = 2, habitDateLabel())") === "補登 10/17（前天）" && ev("(state.habitBack = 5, habitDateLabel())") === "補登 10/14（5 天前）");
+  const src = read("app.js");
+  const body = (name) => { const i = src.indexOf("function " + name + "("); return src.slice(i, src.indexOf("\n}\n", i)); };
+  check("選行事曆日期（selectDate）不再重畫習慣；每日／週期習慣用 habitDate() 而不是 selectedDate", !/renderDailyHabits|renderWeeklyHabits|renderMonthlyHabits|renderHabitsAll/.test(body("selectDate")) && !/selectedDate/.test(body("renderDailyHabits")) && !/selectedDate/.test(body("renderPeriodHabits")));
+  ev("state.habitBack = 3; state.habits = [{ id: 'd1', name: '練習', frequency: 'daily', workdaysOnly: false, target: 1 }, { id: 'w1', name: '週目標', frequency: 'weekly', workdaysOnly: false, target: 3 }]; state.habitLogs = [{ habitId: 'd1', periodKey: '2026-10-16', count: 1 }]; state.holidayDates = new Set(); state.selectedDate = '2026-10-25'; renderDailyHabits(); renderPeriodHabits('weekly', 'weeklyHabitList', 'weeklyHabitSection');");
+  check("選了別天（10/25）習慣仍以補登日期（10/16）算：有紀錄的算完成", ev("getHabitLogCount('d1', habitDate())") === 1 && ev("getHabitLogCount('d1', state.selectedDate)") === 0);
+  ev("state.habitBack = 0");
+}
+
 console.log("後端：數字解析、驗血項目驗證、公式防護");
 const calls = { formats: [], rows: [], locks: 0, unlocks: 0 };
 const gs = {
@@ -480,6 +494,21 @@ check("dateArg_：2026-02-30 無效、2026-02-28 有效", throws(() => be.dateAr
 check("dateArg_：optional 空白通過，必填空白丟錯", be.dateArg_("", "x", { optional: true }) === "" && throws(() => be.dateArg_("", "x")));
 check("monthArg_ / timeArg_", be.monthArg_("2026-10", "x") === "2026-10" && throws(() => be.monthArg_("2026-13", "x")) && be.timeArg_("", "x") === "" && be.timeArg_("08:30", "x") === "08:30" && throws(() => be.timeArg_("25:00", "x")));
 check("tagsArg_：全形逗號、去重、上限；addRecipe 名稱必填", be.tagsArg_("主菜，低醣, 主菜") === "主菜,低醣" && throws(() => be.tagsArg_("a".repeat(21))) && throws(() => be.tagsArg_("1,2,3,4,5,6,7,8,9,10,11")) && throws(() => be.addRecipe({ name: " " })));
+{
+  const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
+    getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };
+  const sh = mk(["id", "habitId", "periodKey", "count", "createdAt", "exercise", "synced"]);
+  const realToday = be.todayStr_; be.todayStr_ = () => "2026-10-19";
+  const realUuid = be.Utilities.getUuid; let uc = 0; be.Utilities.getUuid = () => "hl-" + (++uc);
+  const old = be.SpreadsheetApp.getActiveSpreadsheet; be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => sh });
+  const realData = be.getData; be.getData = () => ({});
+  try {
+    check("toggleHabitLog：今天與過去的日期可以打卡（補打卡）", (() => { be.toggleHabitLog("h1", "2026-10-19", "1"); be.toggleHabitLog("h1", "2026-10-15", "1"); return sh.rows.length === 2; })());
+    const n = sh.rows.length;
+    check("toggleHabitLog：還沒到的日期（明天）、還沒到的週（下週一）、還沒到的月份都丟錯且不寫入", ["2026-10-20", "2026-10-26", "2026-11"].every(k => throws(() => be.toggleHabitLog("h1", k, "1"))) && sh.rows.length === n);
+    check("toggleHabitLog：這個月與這週一（≤今天）可以打卡", (() => { be.toggleHabitLog("h2", "2026-10", "1"); be.toggleHabitLog("h3", "2026-10-19", "3"); return sh.rows.length === n + 2; })());
+  } finally { be.SpreadsheetApp.getActiveSpreadsheet = old; be.todayStr_ = realToday; be.Utilities.getUuid = realUuid; be.getData = realData; }
+}
 {
   const mk = (headers) => { const rows = []; return { rows, getLastColumn: () => headers.length, getLastRow: () => 1 + rows.length, getDataRange: () => ({ getValues: () => [headers, ...rows] }),
     getRange: (r, c) => ({ getValues: () => [headers], setNumberFormat() { return this; }, setValue(v) { if (rows[r - 2]) rows[r - 2][c - 1] = v; }, setValues: v => rows.push(v[0]) }), deleteRow: (n) => { rows.splice(n - 2, 1); } }; };

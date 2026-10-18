@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261018153551">
+<link rel="stylesheet" href="style.css?v=20261019000513">
 </head>
 <body data-page="home">
 
@@ -50,6 +50,13 @@
     <main class="grid">
       <section id="habitsCard" class="card habits-card hidden">
         <h2>習慣與目標 <span id="selectedDateLabel"></span></h2>
+        <div id="habitDateBar" class="habit-date-bar">
+          <button id="habitPrevDay" class="ghost-btn" type="button" aria-label="前一天（補打卡）" title="前一天（補打卡）">‹</button>
+          <span id="habitDateText" class="habit-date-text"></span>
+          <button id="habitNextDay" class="ghost-btn" type="button" aria-label="後一天" title="後一天">›</button>
+          <button id="habitTodayBtn" class="ghost-btn hidden" type="button">回到今天</button>
+        </div>
+        <p id="habitBackfillNote" class="habit-backfill-note hidden">你正在補登過去的日子：勾選會記在這一天，不是今天。</p>
 
         <div id="dailyHabitSection">
           <h3 class="sub-heading">每日習慣</h3>
@@ -343,7 +350,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261018153551"></script>
-  <script src="app.js?v=20261018153551"></script>
+  <script src="shared.js?v=20261019000513"></script>
+  <script src="app.js?v=20261019000513"></script>
 </body>
 </html>

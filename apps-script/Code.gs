@@ -1175,6 +1175,9 @@ function deleteHabit(id) {
 function toggleHabitLog(habitId, periodKey, target) {
   if (habitId === CHALLENGE_HABIT_ID) throw new Error("每日運動挑戰請用抽卡/完成打卡，不能直接勾選");
   if (!/^\d{4}-\d{2}(-\d{2})?$/.test(String(periodKey))) throw new Error("週期格式錯誤");
+  // 還沒到的日期（每日習慣）、還沒到的週（週一起始日）、還沒到的月份不能打卡：打卡記的是已經做了的事
+  var todayKey = todayStr_();
+  if (String(periodKey).length === 10 ? String(periodKey) > todayKey : String(periodKey) > todayKey.slice(0, 7)) throw new Error("還沒到的日期不能打卡");
   {
     var sheet = getSheet("HabitLog");
     var values = sheet.getDataRange().getValues();
