@@ -14,6 +14,8 @@
 
 - 鎖定畫面桌布頁 `wallpaper.html/js`：獨立頁（不載入 shared.js／app.js、不進 `APP_NAV`），用後端唯讀動作 `getWallpaperData` 加 Script Property `WALLPAPER_TOKEN`（不是 `PASSWORD`）；改了月曆／行程／習慣的判斷規則時記得這邊（`Code.gs` 的 `getWallpaperData_`）也要同步。
 
+- 裝潢報價頁 `renovation.html/js`：一次性專案，資料（商家、金額）要保密，只放 Sheet（`RenoItems`／`RenoQuoteLog`，`ensureSheet` 建立），不要把報價資料寫進 repo 的靜態檔。匯入格式在 skill 的 `references/renovation.md`；做完不需要時，整套（頁面、`APP_NAV` 一筆、後端 Reno 區塊、skill 參考檔）可以一起移除。
+
 ## 新增 Google Sheet 分頁的規則（已有 ensureSheet）
 - 新功能需要「全新的分頁」時，用 `ensureSheet(名稱, 表頭陣列)`（`apps-script/Code.gs`，在 `getSheet` 旁邊）：找不到分頁就自己建立、寫入表頭、凍結第一列，已存在的分頁完全不動。這樣不用請 Dean 手動建分頁與表頭（cheng-lingo 的 `sheet_` 是同樣做法）。
 - 既有的分頁（Events、Habits、HabitLog、InBody、LabResults…）仍然用 `getSheet`：缺分頁或缺欄位就丟錯，不要悄悄用欄位對不上的表寫入，避免資料寫錯位置。不要把既有分頁改成自動建立或自動補欄位。

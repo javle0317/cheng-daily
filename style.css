@@ -1302,3 +1302,33 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .habit-date-text { font-size: 14px; font-weight: 600; min-width: 7em; text-align: center; }
 .habit-backfill-note { margin: -4px 0 10px; padding: 6px 10px; border-radius: 8px; font-size: 12px; background: var(--accent-soft); color: var(--text); border-left: 3px solid var(--status-warning); }
 .habits-card.backfill { box-shadow: inset 0 0 0 2px var(--status-warning); }
+
+/* ====== 裝潢報價頁 ====== */
+.reno-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.reno-stat { padding: 10px; border-radius: 10px; background: var(--accent-soft); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.reno-stat.main { grid-column: 1 / -1; }
+.reno-stat-label { font-size: 12px; color: var(--text-dim); }
+.reno-stat-value { font-size: 18px; overflow-wrap: anywhere; }
+.reno-stat.main .reno-stat-value { font-size: 24px; }
+.reno-stat.good .reno-stat-value { color: var(--status-ok, #2e7d4f); }
+.reno-vendor { padding: 12px 0; border-top: 1px solid var(--border); }
+.reno-vendor:first-child { border-top: none; }
+.reno-vendor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.reno-vendor-name { margin: 0; font-size: 16px; }
+.reno-vendor-total { display: flex; flex-direction: column; align-items: flex-end; }
+.reno-vendor-orig { font-size: 12px; color: var(--text-dim); }
+.reno-vendor-tools { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.reno-del { font-size: 12px; }
+.reno-row { align-items: center; gap: 8px; flex-wrap: wrap; }
+.reno-main { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; }
+.reno-sub { font-size: 12px; color: var(--text-dim); overflow-wrap: anywhere; }
+.reno-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.reno-orig { font-size: 12px; color: var(--text-dim); }
+.reno-status { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
+.reno-round { padding: 10px 0; border-top: 1px solid var(--border); }
+.reno-round:first-child { border-top: none; }
+.reno-round-top, .reno-round-total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.reno-chg { font-size: 12px; color: var(--text-dim); }
+.reno-chg.down { color: var(--status-ok, #2e7d4f); }
+.reno-chg.up { color: var(--status-critical); }
+#renoImportText { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; }

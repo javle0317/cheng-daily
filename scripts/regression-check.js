@@ -313,7 +313,7 @@ console.log("全站導覽：每個頁面都有 data-page、APP_NAV 涵蓋所有�
   const nav = loadFrontend(["shared.js"]);
   const items = JSON.parse(vm.runInContext("JSON.stringify(APP_NAV.map(i => [i.key, i.href]))", nav));
   const pages = ["index.html", "health.html", "bills.html", "pets.html", "recipes.html"];
-  check("APP_NAV 的每個 href 都對應一個存在的頁面，且 5 個頁面都在裡面", items.length === 5 && items.every(([k, href]) => fs.existsSync(path.join(root, href))) && pages.every(p => items.some(([, href]) => href === p)), items);
+  check("APP_NAV 的每個 href 都對應一個存在的頁面，且 6 個頁面都在裡面", items.length === 6 && items.every(([k, href]) => fs.existsSync(path.join(root, href))) && pages.every(p => items.some(([, href]) => href === p)), items);
   check("每個頁面 body 有 data-page，且值是 APP_NAV 的 key", pages.every(p => { const m = /<body data-page="([a-z]+)"/.exec(read(p)); return m && items.some(([k]) => k === m[1]); }));
   check("首頁有 navIcons 容器、不再手寫四個功能連結；子頁拿掉「← 返回」", read("index.html").includes('id="navIcons"') && !/<a href="(health|bills|pets|recipes)\.html"/.test(read("index.html")) && pages.slice(1).every(p => !read(p).includes("back-link")));
 }
@@ -405,7 +405,7 @@ console.log("匯入 skill（.claude/skills/cheng-daily-import）：每個參考�
 {
   const dir = path.join(root, ".claude/skills/cheng-daily-import");
   const skill = fs.readFileSync(path.join(dir, "SKILL.md"), "utf8");
-  const refs = ["body", "labs", "pet-labs", "utilities", "places", "recipes"];
+  const refs = ["body", "labs", "pet-labs", "utilities", "places", "recipes", "renovation"];
   check("SKILL.md 有 name／description，且提到的每個 references 檔都存在", /^---\nname: cheng-daily-import\ndescription: .{40,}\n---/s.test(skill) && refs.every(n => skill.includes(`references/${n}.md`) && fs.existsSync(path.join(dir, "references", n + ".md"))));
   const example = (n) => { const m = /```json\n([\s\S]*?)\n```/.exec(fs.readFileSync(path.join(dir, "references", n + ".md"), "utf8")); return m ? m[1] : null; };
   const ex = Object.fromEntries(refs.map(n => [n, example(n)]));
@@ -432,6 +432,10 @@ console.log("匯入 skill（.claude/skills/cheng-daily-import）：每個參考�
   pr.__t = ex.recipes;
   const rcImp = JSON.parse(vm.runInContext("JSON.stringify(parseRecipeImport(__t))", pr));
   check("食譜範例：parseRecipeImport 接受、欄位都有填入", rcImp && rcImp.fields.name && rcImp.fields.ingredients.includes("\n") && rcImp.unknown.length === 0, rcImp);
+  const rn = loadFrontend(["shared.js", "renovation.js"], "// ====== Boot ======");
+  rn.__t = ex.renovation;
+  const rnImp = JSON.parse(vm.runInContext("JSON.stringify(parseRenoImport(__t))", rn));
+  check("裝潢報價範例：parseRenoImport 沒有問題、商家／日期／品項都有", rnImp && rnImp.problems.length === 0 && rnImp.vendor && rnImp.date && rnImp.items.length === 2, rnImp);
   const claude = read("CLAUDE.md");
   check("CLAUDE.md 不再重複放匯入格式，改指向 skill（只有一份來源）", claude.includes(".claude/skills/cheng-daily-import") && !/```json/.test(claude));
 }
@@ -821,6 +825,75 @@ console.log("後端：編輯事件／循環行程（依表頭寫回）");
   const bodyOf2 = (fn) => { const t = read("apps-script/Code.gs"); const i = t.indexOf("function " + fn + "("); return t.slice(i, t.indexOf("\n}\n", i)); };
   check("updateEvent、updateRecurringEvent 都會標記待同步", bodyOf2("updateEvent").includes("markCalendarDirty_();") && bodyOf2("updateRecurringEvent").includes("markCalendarDirty_();"));
   be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => ({}) });
+}
+
+console.log("裝潢報價：小計、總額（不含不買）、匯入檢查與預覽、後端匯入／history");
+{
+  const rn = loadFrontend(["shared.js", "renovation.js"], "// ====== Boot ======");
+  const ev = code => vm.runInContext(code, rn);
+  check("renoLine：數量 × 單價；沒優惠價用原價、沒原價用成交價、沒數量當 1", JSON.stringify(ev("[renoLine({ qty: 3, listPrice: 100, dealPrice: 80 }), renoLine({ qty: 2, listPrice: 50, dealPrice: '' }), renoLine({ qty: '', listPrice: '', dealPrice: 70 })].map(l => [l.list, l.deal])")) === "[[300,240],[100,100],[70,70]]");
+  rn.__items = [
+    { status: "quoted", qty: 2, listPrice: 100, dealPrice: 90 },
+    { status: "signed", qty: 1, listPrice: 1000, dealPrice: 800 },
+    { status: "paid", qty: 1, listPrice: 500, dealPrice: 500 },
+    { status: "dropped", qty: 1, listPrice: 9999, dealPrice: 9999 },
+    { status: "signed", qty: 1, dealPrice: -100 },
+  ];
+  const sum = JSON.parse(ev("JSON.stringify(renoSummarize(__items))"));
+  check("renoSummarize：不含「不買」；原價／優惠價／省下；已簽約、已付款各自合計（折讓用負數）", sum.list === 1600 && sum.deal === 1380 && sum.saved === 220 + 0 && sum.byStatus.signed.deal === 700 && sum.byStatus.paid.deal === 500 && sum.byStatus.quoted.deal === 180 && sum.byStatus.dropped.count === 1 && sum.byStatus.dropped.deal === 0, sum);
+  const good = '{"vendor":"A設計","date":"2026-10-20","items":[{"name":"櫃子","qty":2,"unit":"組","listPrice":"1,000","dealPrice":900},{"name":"折讓","dealPrice":-500}]}';
+  rn.__t = good;
+  const p1 = JSON.parse(ev("JSON.stringify(parseRenoImport(__t))"));
+  check("parseRenoImport：千分位、負數折讓可以；沒數量 = 1", p1.problems.length === 0 && p1.items[0].listPrice === 1000 && p1.items[1].dealPrice === -500 && p1.items[1].qty === 1, p1);
+  const bad = t => { rn.__t = t; return JSON.parse(ev("JSON.stringify(parseRenoImport(__t))")).problems.length > 0; };
+  check("parseRenoImport：缺商家、壞日期、沒價格、價格不是數字、重複品項、壞狀態都擋", bad('{"vendor":"","date":"2026-10-20","items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"10/20","items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x"}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x","dealPrice":"12abc"}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x","dealPrice":1},{"name":"x","dealPrice":2}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x","dealPrice":1,"status":"nope"}]}'));
+  check("parseRenoImport：不是 JSON／沒有 items 回 null", (rn.__t = "abc", ev("parseRenoImport(__t)") === null) && (rn.__t = '{"vendor":"A"}', ev("parseRenoImport(__t)") === null));
+  rn.__t = good;
+  rn.__ex = [{ vendor: "A設計", name: "櫃子", qty: 2, unit: "組", listPrice: 1000, dealPrice: 950, note: "", status: "quoted" }];
+  const plan = JSON.parse(ev("JSON.stringify(renoImportPlan(__ex, parseRenoImport(__t)))"));
+  check("renoImportPlan：同商家同名但價格變 = 更新（950 → 900 的小計 1900 → 1800）；沒有的 = 新增；別家同名不算", plan.changed.length === 1 && plan.changed[0].before.deal === 1900 && plan.changed[0].after.deal === 1800 && plan.added.length === 1 && plan.same.length === 0, plan);
+
+  // 後端：用記憶體 Sheet 跑 importRenoQuote
+  const book = {};
+  const mk = (headers) => {
+    const sh = { values: [headers.slice()] };
+    sh.getDataRange = () => ({ getValues: () => sh.values.map(r => r.slice()) });
+    sh.getLastRow = () => sh.values.length;
+    sh.getRange = (r, c, nr, nc) => ({
+      setNumberFormat() {},
+      setValue: v => { while (sh.values.length < r) sh.values.push([]); sh.values[r - 1][c - 1] = v; },
+      setValues: vs => { while (sh.values.length < r) sh.values.push([]); vs.forEach((row, i) => { sh.values[r - 1 + i] = row.slice(); }); },
+    });
+    sh.setFrozenRows = () => {};
+    sh.deleteRow = (r) => { sh.values.splice(r - 1, 1); };
+    return sh;
+  };
+  be.SpreadsheetApp.getActiveSpreadsheet = () => ({
+    getSheetByName: n => book[n],
+    insertSheet: n => (book[n] = mk([])),
+  });
+  const origUuid = be.Utilities.getUuid, origFmt = be.Utilities.formatDate, origSS = be.SpreadsheetApp.getActiveSpreadsheet;
+  let n = 0;
+  be.Utilities.getUuid = () => "id" + (++n);
+  be.Utilities.formatDate = (d, tz, f) => (f.startsWith("yyyy-MM-dd HH") ? "ts" : "2026-10-20");
+  const q1 = [{ name: "櫃子", qty: 2, unit: "組", listPrice: 1000, dealPrice: 950 }, { name: "地板", qty: 10, unit: "坪", dealPrice: 4000 }];
+  let r = be.importRenoQuote("A設計", "2026-10-01", "", q1);
+  check("importRenoQuote 第一次：兩個品項、兩筆第 1 輪紀錄；預設狀態 quoted；分頁自動建立", r.items.length === 2 && r.log.length === 2 && r.log.every(l => Number(l.round) === 1) && r.items.every(i => i.status === "quoted") && !!book.RenoItems && !!book.RenoQuoteLog, r);
+  r = be.importRenoQuote("A設計", "2026-10-01", "", q1);
+  check("同一份再匯入：沒變 → 不新增紀錄", r.items.length === 2 && r.log.length === 2);
+  r = be.importRenoQuote("A設計", "2026-10-15", "第二輪議價", [{ name: "櫃子", qty: 2, unit: "組", listPrice: 1000, dealPrice: 900 }, { name: "燈", dealPrice: 3000 }]);
+  const cab = r.items.find(i => i.name === "櫃子");
+  check("議價後：櫃子現況改成 900、記第 2 輪（備註帶這輪說明）；地板沒動；新增燈 → 共 3 品項、4 筆紀錄", Number(cab.dealPrice) === 900 && r.items.length === 3 && r.log.length === 4 && r.log.filter(l => l.itemId === cab.id).map(l => Number(l.round)).sort().join() === "1,2" && r.log.some(l => l.note === "第二輪議價"), r);
+  const floor = r.items.find(i => i.name === "地板");
+  r = be.setRenoStatus(JSON.stringify([floor.id]), "signed");
+  check("setRenoStatus：改狀態；壞狀態丟錯", r.items.find(i => i.id === floor.id).status === "signed" && throws(() => be.setRenoStatus(JSON.stringify([floor.id]), "nope")));
+  check("importRenoQuote 驗證：沒價格、重複品項、壞日期、空商家都丟錯，且不寫入", (() => { const before = book.RenoItems.values.length; const t = throws(() => be.importRenoQuote("A設計", "2026-10-20", "", [{ name: "x" }])) && throws(() => be.importRenoQuote("A設計", "2026-10-20", "", [{ name: "x", dealPrice: 1 }, { name: "x", dealPrice: 2 }])) && throws(() => be.importRenoQuote("A設計", "10/20", "", [{ name: "x", dealPrice: 1 }])) && throws(() => be.importRenoQuote("", "2026-10-20", "", [{ name: "x", dealPrice: 1 }])); return t && book.RenoItems.values.length === before; })());
+  be.importRenoQuote("B工班", "2026-10-02", "", [{ name: "水電", dealPrice: 50000 }]);
+  r = be.deleteRenoItem(cab.id);
+  check("deleteRenoItem：品項和它的紀錄一起刪，別的不動", !r.items.some(i => i.id === cab.id) && !r.log.some(l => l.itemId === cab.id) && r.items.length === 3);
+  r = be.deleteRenoVendor("A設計");
+  check("deleteRenoVendor：整家的品項與紀錄都刪，B 工班還在", r.items.length === 1 && r.items[0].vendor === "B工班" && r.log.every(l => l.vendor === "B工班"), r);
+  be.Utilities.getUuid = origUuid; be.Utilities.formatDate = origFmt; be.SpreadsheetApp.getActiveSpreadsheet = origSS;
 }
 
 console.log("後端：讀取時間欄位");

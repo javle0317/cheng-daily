@@ -403,7 +403,7 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 
 ## 匯入 JSON 的 skill（Claude app 也能用）
 
-- 六種「貼上匯入」格式（體組成、人的驗血、寵物驗血、水電瓦斯、想吃的店、食譜）的整理規則放在 **`.claude/skills/cheng-daily-import/`**（`SKILL.md` 判斷是哪一種並列共通規則，`references/*.md` 各一種格式）。這是**唯一的來源**：專案裡的 Claude Code 自動載入；Claude app 用的是同一份打包出來的檔案。
+- 七種「貼上匯入」格式（體組成、人的驗血、寵物驗血、水電瓦斯、想吃的店、食譜、裝潢報價）的整理規則放在 **`.claude/skills/cheng-daily-import/`**（`SKILL.md` 判斷是哪一種並列共通規則，`references/*.md` 各一種格式）。這是**唯一的來源**：專案裡的 Claude Code 自動載入；Claude app 用的是同一份打包出來的檔案。
 - **打包**：`sh scripts/package-skill.sh` → `dist/cheng-daily-import.skill`（zip，`dist/` 不進 git）。**上傳**：Claude app（網頁／桌面／手機）設定 → Capabilities（功能）→ Skills → 上傳這個檔案；格式有改就重新打包、重新上傳覆蓋。是否能在手機對話使用要看方案與「程式碼執行與檔案建立」有沒有開；用起來 skill 沒有出現的話，到桌面版（含 Cowork）試試，或直接對 Claude 說「用承日常匯入這個 skill」。
 - **測試**：上傳後在新對話丟一張體脂計截圖或一張帳單，看它是否直接給出符合格式的 JSON 區塊（而不是開始問你格式）。
 - **不會漂移**：回歸檢查會把每個參考檔的範例 JSON 丟給 App 真正的匯入解析程式（`parsePetLabImport`、`parseUtilImport`、`parsePlacesImport`、`parseRecipeImport`，體組成與驗血對照欄位清單）；改了匯入欄位或規則卻忘了改 skill，測試會失敗。
@@ -445,6 +445,16 @@ App 裡的事件（含循環行程）會自動出現在 Google 的「承日常�
 - 後端 `updateEvent`、`updateRecurringEvent` 依表頭名稱只改傳進來的欄位（`updateRowByHeaders_`），驗證跟新增一樣（驗證不過整筆不寫）；寫入後標記待同步，Google 行事曆沿用對帳（key 不變 → 更新，不是刪掉重建）。
 - 錯誤顯示在視窗裡（Toast 的層級比視窗低會被蓋住）。視窗的 HTML 在 `index.html`（`#eventModal`、`#recurringModal`），邏輯在 `app.js` 的「事件／循環行程 編輯視窗」。
 - 列表上不再有 💰、✕、⏭️、📅 小按鈕；改金額、刪除、跳過都在視窗裡。（`setEventAmount`、`setRecurringEndDate` 後端 action 仍保留，目前沒有網頁入口。）
+
+## 裝潢報價（`renovation.html/js`）
+
+一次性、跨好幾個月的專案：把設計師／廠商的報價單整理成 JSON 貼進來（格式見 `.claude/skills/cheng-daily-import/references/renovation.md`），頁面依商家列出品項，原價、優惠價、小計一目了然，並算出總額。資料有保密需求（商家與金額），**只放 Sheet、要密碼才讀，不要寫進 repo 的靜態檔**。
+
+- 分頁（`ensureSheet` 自動建立，欄位見 `Code.gs` 開頭清單）：`RenoItems`（一個品項一列的現況）、`RenoQuoteLog`（每次報價內容有變就多記一列，不覆蓋＝history；`vendor`／`name` 冗餘存一份，品項刪了紀錄仍看得懂）。
+- 價格是**單價**，小計＝數量 × 單價；優惠價沒填 = 沒優惠（用原價）、原價沒填 = 只有成交價；價格可為負數（「整單折讓」這類品項）。統計一律**不含「不買」**。
+- 匯入（`importRenoQuote`）依「商家＋品項名稱」比對：沒有就新增（第 1 輪）、價格／數量／單位／備註有變就更新現況並記下一輪、完全沒變略過（前端 `renoImportPlan` 先預覽，跟後端規則一致）。同一商家的名稱兩邊要寫一樣，不然會被當新品項。
+- 狀態：報價中／已簽約／已付款／不買（`setRenoStatus`，單項或整家）；總覽有「已簽約＋已付款」、已付、待付。品項後的 ⓘ 看該品項每一輪報價與變動；刪品項連同它的紀錄一起刪，也可整家刪（`deleteRenoItem`／`deleteRenoVendor`）。
+- 沒有網頁手動新增／編輯品項（修錯字或改價就重新匯入）。BACKEND 2026-10-21.2。
 
 ## 習慣的呈現與連續統計
 

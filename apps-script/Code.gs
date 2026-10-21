@@ -12,11 +12,13 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十二個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitNotes      欄位: habitId | detail | updatedAt（ensureSheet 自動建立；習慣的細節說明／步驟，一個習慣一列，沒填就沒有那一列）
+ *   RenoItems       欄位: id | vendor | name | qty | unit | listPrice | dealPrice | status | note | createdAt | updatedAt（ensureSheet 自動建立；裝潢報價的品項現況，價格是「單價」，小計＝qty × 單價；status: quoted/signed/paid/dropped）
+ *   RenoQuoteLog    欄位: id | itemId | vendor | name | round | date | qty | unit | listPrice | dealPrice | note | createdAt（ensureSheet 自動建立；每次報價內容有變就新增一列，不覆蓋，history 靠這個；vendor/name 冗餘存一份，品項刪了紀錄仍看得懂）
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
  *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空。舊的 cardId 欄位已經沒有用到，可以刪除）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
@@ -252,6 +254,16 @@ function dispatch_(p) {
         return respond({ ok: true, data: deletePetLog(p.id) });
       case "importPetEvents":
         return respond({ ok: true, data: importPetEvents(p.items) });
+      case "getReno":
+        return respond({ ok: true, data: getReno() });
+      case "importRenoQuote":
+        return respond({ ok: true, data: importRenoQuote(p.vendor, p.date, p.note, p.items) });
+      case "setRenoStatus":
+        return respond({ ok: true, data: setRenoStatus(p.ids, p.status) });
+      case "deleteRenoItem":
+        return respond({ ok: true, data: deleteRenoItem(p.id) });
+      case "deleteRenoVendor":
+        return respond({ ok: true, data: deleteRenoVendor(p.vendor) });
       case "getUtilityBills":
         return respond({ ok: true, data: getUtilityBills() });
       case "addUtilityBill":
@@ -294,7 +306,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-21.1";
+var BACKEND_VERSION = "2026-10-21.2";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -2292,6 +2304,117 @@ function deleteUtilityBill(id) {
     }
   }
   return getUtilityBills();
+}
+
+// ====== 裝潢報價 ======
+// 一個品項一列（RenoItems，現況），每次報價內容有變就多記一列 RenoQuoteLog（history）。
+// 匯入依「商家＋品項名稱」比對：沒有就新增（第 1 輪）、有而且內容變了就更新現況並記下一輪、沒變就略過。
+// 價格欄位是單價（可為負數，給「整單折讓」這類品項用）；優惠價可空（沒優惠）、原價也可空（只有成交價）。至少要有一個。
+var RENO_ITEM_HEADERS = ["id", "vendor", "name", "qty", "unit", "listPrice", "dealPrice", "status", "note", "createdAt", "updatedAt"];
+var RENO_LOG_HEADERS = ["id", "itemId", "vendor", "name", "round", "date", "qty", "unit", "listPrice", "dealPrice", "note", "createdAt"];
+var RENO_STATUSES = ["quoted", "signed", "paid", "dropped"];
+
+function renoItemsSheet_() { return ensureSheet("RenoItems", RENO_ITEM_HEADERS); }
+function renoLogSheet_() { return ensureSheet("RenoQuoteLog", RENO_LOG_HEADERS); }
+
+function getReno() {
+  return { items: sheetToObjects(renoItemsSheet_()), log: sheetToObjects(renoLogSheet_()) };
+}
+
+function renoFields_(it, label) {
+  if (!it || typeof it !== "object") throw new Error(label + "格式錯誤");
+  var f = {
+    name: textArg_(it.name, label + "品項名稱", { required: true, max: 200 }),
+    qty: numArg_(it.qty, label + "數量", { emptyValue: 1, min: 0 }),
+    unit: textArg_(it.unit, label + "單位", { max: 20 }),
+    listPrice: numArg_(it.listPrice, label + "原價", { emptyValue: "" }),
+    dealPrice: numArg_(it.dealPrice, label + "優惠價", { emptyValue: "" }),
+    note: textArg_(it.note, label + "備註", { max: 500 }),
+    status: enumArg_(it.status, label + "狀態", RENO_STATUSES, { emptyValue: "" }),
+  };
+  if (f.listPrice === "" && f.dealPrice === "") throw new Error(label + "原價和優惠價至少要填一個");
+  return f;
+}
+
+function renoSame_(row, f) {
+  return Number(row.qty) === f.qty && String(row.unit) === f.unit &&
+    String(row.listPrice) === String(f.listPrice) && String(row.dealPrice) === String(f.dealPrice) &&
+    String(row.note) === f.note && (f.status === "" || String(row.status) === f.status);
+}
+
+function importRenoQuote(vendor, date, note, items) {
+  if (typeof items === "string") {
+    try { items = JSON.parse(items); } catch (e) { throw new Error("匯入資料格式錯誤"); }
+  }
+  if (!items || !items.length) throw new Error("沒有要匯入的品項");
+  if (items.length > 300) throw new Error("一次最多匯入 300 個品項");
+  var v = textArg_(vendor, "商家", { required: true, max: 100 });
+  var d = dateArg_(date, "報價日期");
+  var roundNote = textArg_(note, "這一輪的備註", { max: 500 });
+  var seen = {};
+  var parsed = items.map(function (it, i) {
+    var f = renoFields_(it, "第 " + (i + 1) + " 筆");
+    if (seen[f.name]) throw new Error("「" + f.name + "」在這份報價裡重複了");
+    seen[f.name] = true;
+    return f;
+  });
+  var itemSheet = renoItemsSheet_();
+  var logSheet = renoLogSheet_();
+  var existing = sheetToObjects(itemSheet);
+  var rounds = {};
+  sheetToObjects(logSheet).forEach(function (l) { rounds[l.itemId] = Math.max(rounds[l.itemId] || 0, Number(l.round) || 0); });
+  var now = new Date();
+  parsed.forEach(function (f) {
+    var row = existing.filter(function (r) { return r.vendor === v && r.name === f.name; })[0];
+    var id;
+    if (!row) {
+      id = Utilities.getUuid();
+      appendRowSafe_(itemSheet, [id, v, f.name, f.qty, f.unit, f.listPrice, f.dealPrice, f.status || "quoted", f.note, now, now]);
+    } else {
+      if (renoSame_(row, f)) return;
+      id = row.id;
+      var fields = { qty: f.qty, unit: f.unit, listPrice: f.listPrice, dealPrice: f.dealPrice, note: f.note, updatedAt: now };
+      if (f.status) fields.status = f.status;
+      updateRowByHeaders_("RenoItems", id, fields);
+    }
+    rounds[id] = (rounds[id] || 0) + 1;
+    appendRowSafe_(logSheet, [Utilities.getUuid(), id, v, f.name, rounds[id], d, f.qty, f.unit, f.listPrice, f.dealPrice, f.note || roundNote, now]);
+  });
+  return getReno();
+}
+
+function setRenoStatus(ids, status) {
+  if (typeof ids === "string") {
+    try { ids = JSON.parse(ids); } catch (e) { ids = [ids]; }
+  }
+  if (!Array.isArray(ids) || !ids.length) throw new Error("沒有指定品項");
+  var st = enumArg_(status, "狀態", RENO_STATUSES);
+  renoItemsSheet_();
+  ids.forEach(function (id) {
+    updateRowByHeaders_("RenoItems", textArg_(id, "品項", { required: true, max: 100 }), { status: st, updatedAt: new Date() });
+  });
+  return getReno();
+}
+
+function deleteRenoRows_(sheet, colIndex, match) {
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (match(values[i][colIndex])) sheet.deleteRow(i + 1);
+  }
+}
+
+function deleteRenoItem(id) {
+  id = textArg_(id, "品項", { required: true, max: 100 });
+  deleteRenoRows_(renoItemsSheet_(), 0, function (v) { return v === id; });
+  deleteRenoRows_(renoLogSheet_(), 1, function (v) { return v === id; });
+  return getReno();
+}
+
+function deleteRenoVendor(vendor) {
+  var v = textArg_(vendor, "商家", { required: true, max: 100 });
+  deleteRenoRows_(renoItemsSheet_(), 1, function (x) { return x === v; });
+  deleteRenoRows_(renoLogSheet_(), 2, function (x) { return x === v; });
+  return getReno();
 }
 
 // ====== 事件 → 寵物紀錄（新增／編輯寵物事件時勾「登記到寵物紀錄」）======
