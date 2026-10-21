@@ -213,22 +213,24 @@ function renderRenoSummary() {
     d.appendChild(el("strong", "reno-stat-value", value));
     grid.appendChild(d);
   };
-  stat("優惠後總額", renoMoney(s.deal), "main");
-  stat("原價總額", renoMoney(s.list));
-  stat("省下", renoMoney(s.saved), s.saved > 0 ? "good" : "");
+  const pay = renoPaySummary(reno.items, reno.payments);
+  stat("優惠後總額（應付）", renoMoney(s.deal), "main");
+  stat("已付", renoMoney(pay.paid));
+  stat("尚餘", renoMoney(pay.remaining), "remain");
   host.appendChild(grid);
   const cats = renoCategorySummary(reno.items, reno.payments, reno.vendors);
   if (cats.length > 1) {
     cats.forEach(c => host.appendChild(el("p", "progress-line reno-cat-line",
-      `${c.category}　${renoMoney(c.deal)}（原價 ${renoMoney(c.list)}）　·　已付 ${renoMoney(c.paid)}　·　尚餘 ${renoMoney(c.remaining)}`)));
+      `${c.category}　${renoMoney(c.deal)}　·　已付 ${renoMoney(c.paid)}　·　尚餘 ${renoMoney(c.remaining)}`)));
   }
+  // 原價、省下、報價進度是談價過程的參考資料，收在「更多」裡（預設收起）
   const by = s.byStatus;
-  const pay = renoPaySummary(reno.items, reno.payments);
-  host.appendChild(el("p", "progress-line", pay.paid || reno.payments.length
-    ? `已付 ${renoMoney(pay.paid)}　·　尚餘 ${renoMoney(pay.remaining)}（依各家付款紀錄）`
-    : "還沒有付款紀錄（在商家卡片上按「＋ 付款」記定金、期款、尾款）"));
-  host.appendChild(el("p", "progress-line",
-    `已簽約＋已付款的品項 ${renoMoney(by.signed.deal + by.paid.deal)}　·　報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）` + (by.dropped.count ? `　·　備選 ${by.dropped.count} 項（不計入）` : "")));
+  const more = el("details", "reno-more");
+  more.appendChild(el("summary", "", "更多"));
+  more.appendChild(el("p", "progress-line", `原價總額 ${renoMoney(s.list)}　·　省下 ${renoMoney(s.saved)}`));
+  more.appendChild(el("p", "progress-line",
+    `報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）　·　已簽約 ${renoMoney(by.signed.deal)}　·　已付款 ${renoMoney(by.paid.deal)}` + (by.dropped.count ? `　·　備選 ${by.dropped.count} 項（不計入）` : "")));
+  host.appendChild(more);
 }
 
 function renoVendorList() {
