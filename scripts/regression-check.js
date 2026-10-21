@@ -827,7 +827,7 @@ console.log("後端：編輯事件／循環行程（依表頭寫回）");
   be.SpreadsheetApp.getActiveSpreadsheet = () => ({ getSheetByName: () => ({}) });
 }
 
-console.log("裝潢報價：小計、總額（不含不買）、匯入檢查與預覽、後端匯入／history");
+console.log("裝潢報價：小計、總額（不含備選）、匯入檢查與預覽、後端匯入／history");
 {
   const rn = loadFrontend(["shared.js", "renovation.js"], "// ====== Boot ======");
   const ev = code => vm.runInContext(code, rn);
@@ -840,11 +840,11 @@ console.log("裝潢報價：小計、總額（不含不買）、匯入檢查與�
     { status: "signed", qty: 1, dealPrice: -100 },
   ];
   const sum = JSON.parse(ev("JSON.stringify(renoSummarize(__items))"));
-  check("renoSummarize：不含「不買」；原價／優惠價／省下；已簽約、已付款各自合計（折讓用負數）", sum.list === 1600 && sum.deal === 1380 && sum.saved === 220 + 0 && sum.byStatus.signed.deal === 700 && sum.byStatus.paid.deal === 500 && sum.byStatus.quoted.deal === 180 && sum.byStatus.dropped.count === 1 && sum.byStatus.dropped.deal === 0, sum);
+  check("renoSummarize：不含「備選」；原價／優惠價／省下；已簽約、已付款各自合計（折讓用負數）", sum.list === 1600 && sum.deal === 1380 && sum.saved === 220 + 0 && sum.byStatus.signed.deal === 700 && sum.byStatus.paid.deal === 500 && sum.byStatus.quoted.deal === 180 && sum.byStatus.dropped.count === 1 && sum.byStatus.dropped.deal === 0, sum);
   rn.__pi = [{ vendor: "A", status: "quoted", qty: 2, dealPrice: 1000 }, { vendor: "A", status: "dropped", dealPrice: 9999 }, { vendor: "B", status: "signed", dealPrice: 500 }];
   rn.__pp = [{ vendor: "A", amount: 800 }, { vendor: "A", amount: 300 }, { vendor: "B", amount: 100 }];
   const ps = JSON.parse(ev("JSON.stringify(renoPaySummary(__pi, __pp))"));
-  check("renoPaySummary：各家總額（不含不買）− 付款 = 尚餘；多付為負數；總計加總", ps.byVendor.A.total === 2000 && ps.byVendor.A.paid === 1100 && ps.byVendor.A.remaining === 900 && ps.byVendor.B.remaining === 400 && ps.total === 2500 && ps.paid === 1200 && ps.remaining === 1300 && JSON.parse(ev("JSON.stringify(renoPaySummary(__pi, [{ vendor: 'B', amount: 700 }]).byVendor.B.remaining)")) === -200, ps);
+  check("renoPaySummary：各家總額（不含備選）− 付款 = 尚餘；多付為負數；總計加總", ps.byVendor.A.total === 2000 && ps.byVendor.A.paid === 1100 && ps.byVendor.A.remaining === 900 && ps.byVendor.B.remaining === 400 && ps.total === 2500 && ps.paid === 1200 && ps.remaining === 1300 && JSON.parse(ev("JSON.stringify(renoPaySummary(__pi, [{ vendor: 'B', amount: 700 }]).byVendor.B.remaining)")) === -200, ps);
   const good = '{"vendor":"A設計","date":"2026-10-20","items":[{"name":"櫃子","qty":2,"unit":"組","listPrice":"1,000","dealPrice":900},{"name":"折讓","dealPrice":-500}]}';
   rn.__t = good;
   const p1 = JSON.parse(ev("JSON.stringify(parseRenoImport(__t))"));

@@ -1,13 +1,13 @@
 // ====== 裝潢報價頁 ======
 // WEBAPP_URL / api() / 登入流程 / showConfirm 等共用邏輯在 shared.js。
 // 價格欄位是「單價」，小計＝數量 × 單價；優惠價沒填就當沒優惠（＝原價），原價沒填就當只有成交價。
-// 統計一律不含「不買」(dropped)。
+// 統計一律不含「備選」(dropped)。
 
 const RENO_STATUSES = [
   { key: "quoted", label: "報價中" },
   { key: "signed", label: "已簽約" },
   { key: "paid", label: "已付款" },
-  { key: "dropped", label: "不買" },
+  { key: "dropped", label: "備選" },
 ];
 const RENO_PAY_KINDS = [
   { key: "deposit", label: "定金" },
@@ -63,7 +63,7 @@ function renoSummarize(items) {
   return out;
 }
 
-// 付款：每家商家的總額（不含「不買」）− 付款合計 = 尚餘（負數 = 多付）
+// 付款：每家商家的總額（不含「備選」）− 付款合計 = 尚餘（負數 = 多付）
 function renoPaySummary(items, payments) {
   const out = { total: 0, paid: 0, remaining: 0, byVendor: {} };
   const slot = v => (out.byVendor[v] = out.byVendor[v] || { total: 0, paid: 0, remaining: 0 });
@@ -178,7 +178,7 @@ function renderRenoSummary() {
     ? `已付 ${renoMoney(pay.paid)}　·　尚餘 ${renoMoney(pay.remaining)}（依各家付款紀錄）`
     : "還沒有付款紀錄（在商家卡片上按「＋ 付款」記定金、期款、尾款）"));
   host.appendChild(el("p", "progress-line",
-    `已簽約＋已付款的品項 ${renoMoney(by.signed.deal + by.paid.deal)}　·　報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）` + (by.dropped.count ? `　·　不買 ${by.dropped.count} 項（不計入）` : "")));
+    `已簽約＋已付款的品項 ${renoMoney(by.signed.deal + by.paid.deal)}　·　報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）` + (by.dropped.count ? `　·　備選 ${by.dropped.count} 項（不計入）` : "")));
 }
 
 function renderRenoVendorSelect() {
