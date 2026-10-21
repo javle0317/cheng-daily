@@ -856,6 +856,12 @@ console.log("裝潢報價：小計、總額（不含備選）、匯入檢查與�
   check("parseRenoImport：千分位、負數折讓可以；沒數量 = 1", p1.problems.length === 0 && p1.items[0].listPrice === 1000 && p1.items[1].dealPrice === -500 && p1.items[1].qty === 1, p1);
   const bad = t => { rn.__t = t; return JSON.parse(ev("JSON.stringify(parseRenoImport(__t))")).problems.length > 0; };
   check("parseRenoImport：缺商家、壞日期、沒價格、價格不是數字、重複品項、壞狀態都擋", bad('{"vendor":"","date":"2026-10-20","items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"10/20","items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x"}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x","dealPrice":"12abc"}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x","dealPrice":1},{"name":"x","dealPrice":2}]}') && bad('{"vendor":"A","date":"2026-10-20","items":[{"name":"x","dealPrice":1,"status":"nope"}]}'));
+  rn.__t = '{"vendor":"A","date":"2026-10-20","payments":[{"kind":"deposit","amount":"24,000","date":"2026-09-14","note":"刷卡"},{"kind":"final","amount":100}],"items":[{"name":"x","dealPrice":1}]}';
+  const pp = JSON.parse(ev("JSON.stringify(parseRenoImport(__t))"));
+  check("parseRenoImport：payments 解析（千分位、日期可省略）；壞類型、金額 0、壞日期、非陣列都擋", pp.problems.length === 0 && pp.payments.length === 2 && pp.payments[0].amount === 24000 && pp.payments[1].date === "" && bad('{"vendor":"A","date":"2026-10-20","payments":[{"kind":"nope","amount":1}],"items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"2026-10-20","payments":[{"kind":"deposit","amount":0}],"items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"2026-10-20","payments":[{"kind":"deposit","amount":5,"date":"9/14"}],"items":[{"name":"x","dealPrice":1}]}') && bad('{"vendor":"A","date":"2026-10-20","payments":"x","items":[{"name":"x","dealPrice":1}]}'), pp);
+  rn.__t = '{"vendor":"A","date":"2026-10-20","payments":[{"kind":"deposit","amount":"24,000","date":"2026-09-14"},{"kind":"final","amount":100}],"items":[{"name":"x","dealPrice":1}]}';
+  rn.__ep = [{ vendor: "A", kind: "deposit", amount: 24000, date: "2026-09-14" }];
+  check("renoImportPlan：已經有的同一筆付款不算新增", JSON.parse(ev("JSON.stringify(renoImportPlan([], parseRenoImport(__t), __ep).newPayments.length)")) === 1);
   check("parseRenoImport：類別只能是 裝潢／家具／家電／其他；沒給就是空字串", bad('{"vendor":"A","date":"2026-10-20","category":"電器","items":[{"name":"x","dealPrice":1}]}') && JSON.parse((rn.__t = '{"vendor":"A","date":"2026-10-20","category":"家電","items":[{"name":"x","dealPrice":1}]}', ev("JSON.stringify(parseRenoImport(__t).category)"))) === "家電" && JSON.parse((rn.__t = good, ev("JSON.stringify(parseRenoImport(__t).category)"))) === "");
   check("parseRenoImport：不是 JSON／沒有 items 回 null", (rn.__t = "abc", ev("parseRenoImport(__t)") === null) && (rn.__t = '{"vendor":"A"}', ev("parseRenoImport(__t)") === null));
   rn.__t = good;
@@ -904,8 +910,13 @@ console.log("裝潢報價：小計、總額（不含備選）、匯入檢查與�
   check("importRenoQuote 帶 category：寫進 RenoVendors；再匯入沒給類別不會被清掉", r.vendors.length === 1 && r.vendors[0].category === "家具" && (r = be.importRenoQuote("德國優客", "2026-09-20", "", [{ name: "床墊", dealPrice: 78000 }]), r.vendors.length === 1 && r.vendors[0].category === "家具"), r.vendors);
   r = be.setRenoCategory("德國優客", "家電");
   check("setRenoCategory：改類別是更新同一列（不新增）；壞類別、空商家丟錯", r.vendors.length === 1 && r.vendors[0].category === "家電" && throws(() => be.setRenoCategory("德國優客", "電器")) && throws(() => be.setRenoCategory("", "家具")) && throws(() => be.importRenoQuote("X", "2026-10-01", "", [{ name: "y", dealPrice: 1 }], "亂寫")));
+  r = be.importRenoQuote("德國優客", "2026-09-14", "", [{ name: "床墊", dealPrice: 78000 }], "", [{ kind: "deposit", amount: 24000, date: "2026-09-14", note: "刷卡" }]);
+  r = be.importRenoQuote("德國優客", "2026-09-14", "", [{ name: "床墊", dealPrice: 78000 }], "", JSON.stringify([{ kind: "deposit", amount: 24000, date: "2026-09-14" }, { kind: "final", amount: 54000 }]));
+  check("importRenoQuote 帶 payments：寫入付款；同商家同類型同金額同日期再匯入不重複（只多一筆尾款）", r.payments.filter(x => x.vendor === "德國優客").length === 2 && r.payments.some(x => x.kind === "final" && x.date === ""), r.payments);
+  const nPay = book.RenoPayments.values.length;
+  check("importRenoQuote：付款驗證不過（壞類型、金額 0）整批不寫", throws(() => be.importRenoQuote("德國優客", "2026-09-14", "", [{ name: "新品", dealPrice: 1 }], "", [{ kind: "nope", amount: 5 }])) && throws(() => be.importRenoQuote("德國優客", "2026-09-14", "", [{ name: "新品", dealPrice: 1 }], "", [{ kind: "deposit", amount: 0 }])) && book.RenoPayments.values.length === nPay && !book.RenoItems.values.some(row => row[2] === "新品"));
   r = be.deleteRenoVendor("德國優客");
-  check("deleteRenoVendor：類別那一列一併刪", r.vendors.length === 0);
+  check("deleteRenoVendor：類別那一列一併刪", r.vendors.length === 0 && r.payments.every(x => x.vendor !== "德國優客"));
   be.importRenoQuote("B工班", "2026-10-02", "", [{ name: "水電", dealPrice: 50000 }]);
   r = be.addRenoPayment({ vendor: "B工班", kind: "deposit", amount: "10,000", date: "2026-10-03", note: "現金" });
   r = be.addRenoPayment({ vendor: "B工班", kind: "installment", amount: 5000, date: "" });

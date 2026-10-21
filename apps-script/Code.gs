@@ -259,7 +259,7 @@ function dispatch_(p) {
       case "getReno":
         return respond({ ok: true, data: getReno() });
       case "importRenoQuote":
-        return respond({ ok: true, data: importRenoQuote(p.vendor, p.date, p.note, p.items, p.category) });
+        return respond({ ok: true, data: importRenoQuote(p.vendor, p.date, p.note, p.items, p.category, p.payments) });
       case "setRenoCategory":
         return respond({ ok: true, data: setRenoCategory(p.vendor, p.category) });
       case "setRenoStatus":
@@ -314,7 +314,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-21.4";
+var BACKEND_VERSION = "2026-10-21.5";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -2396,7 +2396,7 @@ function renoSame_(row, f) {
     String(row.note) === f.note && (f.status === "" || String(row.status) === f.status);
 }
 
-function importRenoQuote(vendor, date, note, items, category) {
+function importRenoQuote(vendor, date, note, items, category, payments) {
   if (typeof items === "string") {
     try { items = JSON.parse(items); } catch (e) { throw new Error("匯入資料格式錯誤"); }
   }
@@ -2413,6 +2413,7 @@ function importRenoQuote(vendor, date, note, items, category) {
     seen[f.name] = true;
     return f;
   });
+  var pays = renoPaymentFields_(payments);
   var itemSheet = renoItemsSheet_();
   var logSheet = renoLogSheet_();
   var existing = sheetToObjects(itemSheet);
@@ -2436,7 +2437,44 @@ function importRenoQuote(vendor, date, note, items, category) {
     appendRowSafe_(logSheet, [Utilities.getUuid(), id, v, f.name, rounds[id], d, f.qty, f.unit, f.listPrice, f.dealPrice, f.note || roundNote, now]);
   });
   if (cat) setRenoCategory_(v, cat);
+  addRenoPaymentsDedup_(v, pays);
   return getReno();
+}
+
+// 匯入時順便帶的付款（單上有定金／已付款時）：先全部驗證，不過就整批不寫
+function renoPaymentFields_(payments) {
+  if (typeof payments === "string" && payments) {
+    try { payments = JSON.parse(payments); } catch (e) { throw new Error("付款資料格式錯誤"); }
+  }
+  if (!payments) return [];
+  if (!Array.isArray(payments)) throw new Error("付款資料格式錯誤");
+  if (payments.length > 50) throw new Error("一次最多匯入 50 筆付款");
+  return payments.map(function (x, i) {
+    var label = "第 " + (i + 1) + " 筆付款";
+    var amount = numArg_(x && x.amount, label + "金額", {});
+    if (amount === 0) throw new Error(label + "金額不能是 0");
+    return {
+      kind: enumArg_(x && x.kind, label + "類型", RENO_PAY_KINDS),
+      amount: amount,
+      date: dateArg_(x && x.date, label, { optional: true }),
+      note: textArg_(x && x.note, label + "備註", { max: 200 }),
+    };
+  });
+}
+
+// 同一商家、同類型、同金額、同日期視為同一筆，重複匯入同一份單子不會記兩次
+function addRenoPaymentsDedup_(vendor, pays) {
+  if (!pays.length) return;
+  var sheet = renoPaymentsSheet_();
+  var existing = sheetToObjects(sheet);
+  pays.forEach(function (x) {
+    var dup = existing.some(function (e) {
+      return e.vendor === vendor && e.kind === x.kind && Number(e.amount) === x.amount && String(e.date) === x.date;
+    });
+    if (dup) return;
+    appendRowSafe_(sheet, [Utilities.getUuid(), vendor, x.kind, x.amount, x.date, x.note, new Date()]);
+    existing.push({ vendor: vendor, kind: x.kind, amount: x.amount, date: x.date });
+  });
 }
 
 function setRenoStatus(ids, status) {

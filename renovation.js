@@ -143,14 +143,32 @@ function parseRenoImport(text) {
     items.push({ name, qty, unit: String(it.unit || "").trim(), listPrice, dealPrice, note: String(it.note || "").trim(), status });
   });
   if (!items.length && !problems.length) problems.push("items 是空的");
+  const payments = [];
+  if (data.payments !== undefined && !Array.isArray(data.payments)) problems.push("payments 要是陣列");
+  (Array.isArray(data.payments) ? data.payments : []).forEach((x, i) => {
+    const tag = `第 ${i + 1} 筆付款`;
+    const kind = String((x && x.kind) || "").trim();
+    const amount = x && x.amount !== undefined && x.amount !== "" ? parseStrictNumber(x.amount) : null;
+    const pdate = String((x && x.date) || "").trim();
+    const bad = [];
+    if (!RENO_PAY_KINDS.some(k => k.key === kind)) bad.push(`類型「${kind}」不是 deposit／installment／final／other`);
+    if (amount === null || amount === 0) bad.push("金額要是數字且不能是 0");
+    if (pdate && !/^\d{4}-\d{2}-\d{2}$/.test(pdate)) bad.push(`日期「${pdate}」格式要 yyyy-MM-dd`);
+    if (bad.length) { problems.push(`${tag}：${bad.join("；")}`); return; }
+    payments.push({ kind, amount, date: pdate, note: String((x && x.note) || "").trim() });
+  });
   const category = String(data.category || "").trim();
   if (category && !RENO_CATEGORIES.includes(category)) problems.push(`類別「${category}」不是 ${RENO_CATEGORIES.join("／")}`);
-  return { vendor, date, note: String(data.note || "").trim(), category, items, problems };
+  return { vendor, date, note: String(data.note || "").trim(), category, payments, items, problems };
 }
 
 // 匯入前預覽：哪些是新增、哪些有調價、哪些沒變（跟後端 importRenoQuote 的比對規則一致：商家＋品項名稱）
-function renoImportPlan(existing, parsed) {
-  const plan = { added: [], changed: [], same: [] };
+function renoImportPlan(existing, parsed, existingPayments) {
+  const plan = { added: [], changed: [], same: [], newPayments: [] };
+  (parsed.payments || []).forEach(x => {
+    const dup = (existingPayments || []).some(e => e.vendor === parsed.vendor && e.kind === x.kind && Number(e.amount) === x.amount && String(e.date || "") === x.date);
+    if (!dup) plan.newPayments.push(x);
+  });
   parsed.items.forEach(f => {
     const row = existing.find(r => r.vendor === parsed.vendor && r.name === f.name);
     if (!row) { plan.added.push(f); return; }
@@ -531,15 +549,16 @@ document.getElementById("renoImportForm").addEventListener("submit", async (e) =
   const parsed = parseRenoImport(document.getElementById("renoImportText").value);
   if (!parsed) { msg.textContent = "格式不對，請整段貼上對話裡給你的資料（要有 vendor、date、items）"; return; }
   if (parsed.problems.length) { msg.textContent = "⚠️ 有問題，整批沒有匯入：" + parsed.problems.slice(0, 5).join("；") + (parsed.problems.length > 5 ? `…（共 ${parsed.problems.length} 處）` : ""); return; }
-  const plan = renoImportPlan(reno.items, parsed);
-  if (!plan.added.length && !plan.changed.length) { msg.textContent = `「${parsed.vendor}」這 ${plan.same.length} 個品項都跟現有的一樣，沒有要更新的`; return; }
+  const plan = renoImportPlan(reno.items, parsed, reno.payments);
+  if (!plan.added.length && !plan.changed.length && !plan.newPayments.length) { msg.textContent = `「${parsed.vendor}」這 ${plan.same.length} 個品項都跟現有的一樣，沒有要更新的`; return; }
   const lines = [`確定匯入「${parsed.vendor}」（${parsed.date}）？`, `新增 ${plan.added.length} 項、價格或數量有變 ${plan.changed.length} 項、沒變略過 ${plan.same.length} 項`];
+  if (plan.newPayments.length) lines.push(`新增付款 ${plan.newPayments.length} 筆：` + plan.newPayments.map(x => `${(RENO_PAY_KINDS.find(k => k.key === x.kind) || {}).label} ${renoMoney(x.amount)}${x.date ? "（" + x.date + "）" : ""}`).join("、"));
   plan.changed.slice(0, 5).forEach(c => lines.push(`・${c.name}：${renoMoney(c.before.deal)} → ${renoMoney(c.after.deal)}`));
   if (plan.changed.length > 5) lines.push(`…（共 ${plan.changed.length} 項有變）`);
   if (!(await showConfirm(lines.join("\n")))) return;
   setFormBusy(form, true);
   try {
-    applyReno(await api("importRenoQuote", { vendor: parsed.vendor, date: parsed.date, note: parsed.note, category: parsed.category, items: JSON.stringify(parsed.items) }));
+    applyReno(await api("importRenoQuote", { vendor: parsed.vendor, date: parsed.date, note: parsed.note, category: parsed.category, payments: JSON.stringify(parsed.payments), items: JSON.stringify(parsed.items) }));
     renderReno();
     closeRenoImport();
     showToast(`已匯入：新增 ${plan.added.length}、更新 ${plan.changed.length}`);
