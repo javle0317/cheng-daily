@@ -207,22 +207,23 @@ function renderRenoVendor(vendor, all, shown) {
   const box = el("div", "reno-vendor");
   const sum = renoSummarize(shown);
   const head = el("div", "reno-vendor-head");
-  head.appendChild(el("h3", "reno-vendor-name", vendor));
+  const nameRow = el("div", "reno-vendor-namerow");
+  nameRow.appendChild(el("h3", "reno-vendor-name", vendor));
+  const delV = el("button", "ghost-btn reno-del", "刪除");
+  delV.type = "button";
+  delV.title = "刪除這個商家的全部品項";
+  delV.addEventListener("click", async () => {
+    if (!(await showConfirm(`確定刪除「${vendor}」的全部 ${all.length} 個品項和報價紀錄？`))) return;
+    await runRenoWrite(box, () => api("deleteRenoVendor", { vendor }), "刪除失敗");
+  });
+  nameRow.appendChild(delV);
+  head.appendChild(nameRow);
   const tot = el("div", "reno-vendor-total");
   tot.appendChild(el("strong", "", renoMoney(sum.deal)));
   if (sum.saved > 0) tot.appendChild(el("span", "reno-vendor-orig", `原價 ${renoMoney(sum.list)}，省 ${renoMoney(sum.saved)}`));
   head.appendChild(tot);
   box.appendChild(head);
 
-  const tools = el("div", "reno-vendor-tools");
-  const delV = el("button", "ghost-btn reno-del", "刪除商家");
-  delV.type = "button";
-  delV.addEventListener("click", async () => {
-    if (!(await showConfirm(`確定刪除「${vendor}」的全部 ${all.length} 個品項和報價紀錄？`))) return;
-    await runRenoWrite(box, () => api("deleteRenoVendor", { vendor }), "刪除失敗");
-  });
-  tools.appendChild(delV);
-  box.appendChild(tools);
 
   const list = el("ul", "item-list reno-items");
   shown.forEach(it => list.appendChild(renderRenoItem(it)));
