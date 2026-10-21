@@ -15,12 +15,14 @@ const RENO_PAY_KINDS = [
   { key: "final", label: "尾款" },
   { key: "other", label: "其他" },
 ];
-const reno = { items: [], log: [], payments: [], filter: "all", vendor: "all" };
+const RENO_CATEGORIES = ["裝潢", "家具", "家電", "其他"]; // 商家層級；沒設定的商家算「裝潢」（跟後端 RENO_CATEGORIES 一致）
+const reno = { items: [], log: [], payments: [], vendors: [], filter: "all", vendor: "all", category: "all" };
 
 function applyReno(data) {
   reno.items = (data && data.items) || [];
   reno.log = (data && data.log) || [];
   reno.payments = (data && data.payments) || [];
+  reno.vendors = (data && data.vendors) || [];
 }
 
 window.loadPageData = async function () {
@@ -78,6 +80,29 @@ function renoPaySummary(items, payments) {
   return out;
 }
 
+function renoVendorCategory(vendors, vendor) {
+  const row = vendors.find(v => v.vendor === vendor);
+  return row && RENO_CATEGORIES.includes(row.category) ? row.category : "裝潢";
+}
+
+// 每個類別的合計（只列有品項的類別，依 RENO_CATEGORIES 的順序）：優惠價、原價、已付、尚餘
+function renoCategorySummary(items, payments, vendors) {
+  const pay = renoPaySummary(items, payments);
+  const out = {};
+  Object.keys(pay.byVendor).forEach(v => {
+    const cat = renoVendorCategory(vendors, v);
+    const b = pay.byVendor[v];
+    const c = (out[cat] = out[cat] || { deal: 0, list: 0, paid: 0, remaining: 0 });
+    c.deal += b.total; c.paid += b.paid; c.remaining += b.remaining;
+  });
+  items.forEach(it => {
+    if (it.status === "dropped") return;
+    const c = out[renoVendorCategory(vendors, it.vendor)];
+    if (c) c.list += renoLine(it).list;
+  });
+  return RENO_CATEGORIES.filter(c => out[c]).map(c => Object.assign({ category: c }, out[c]));
+}
+
 // 匯入：{ vendor, date, note?, items: [{ name, qty?, unit?, listPrice?, dealPrice?, note?, status? }] }
 function parseRenoImport(text) {
   let data;
@@ -118,7 +143,9 @@ function parseRenoImport(text) {
     items.push({ name, qty, unit: String(it.unit || "").trim(), listPrice, dealPrice, note: String(it.note || "").trim(), status });
   });
   if (!items.length && !problems.length) problems.push("items 是空的");
-  return { vendor, date, note: String(data.note || "").trim(), items, problems };
+  const category = String(data.category || "").trim();
+  if (category && !RENO_CATEGORIES.includes(category)) problems.push(`類別「${category}」不是 ${RENO_CATEGORIES.join("／")}`);
+  return { vendor, date, note: String(data.note || "").trim(), category, items, problems };
 }
 
 // 匯入前預覽：哪些是新增、哪些有調價、哪些沒變（跟後端 importRenoQuote 的比對規則一致：商家＋品項名稱）
@@ -172,6 +199,11 @@ function renderRenoSummary() {
   stat("原價總額", renoMoney(s.list));
   stat("省下", renoMoney(s.saved), s.saved > 0 ? "good" : "");
   host.appendChild(grid);
+  const cats = renoCategorySummary(reno.items, reno.payments, reno.vendors);
+  if (cats.length > 1) {
+    cats.forEach(c => host.appendChild(el("p", "progress-line reno-cat-line",
+      `${c.category}　${renoMoney(c.deal)}（原價 ${renoMoney(c.list)}）　·　已付 ${renoMoney(c.paid)}　·　尚餘 ${renoMoney(c.remaining)}`)));
+  }
   const by = s.byStatus;
   const pay = renoPaySummary(reno.items, reno.payments);
   host.appendChild(el("p", "progress-line", pay.paid || reno.payments.length
@@ -181,17 +213,38 @@ function renderRenoSummary() {
     `已簽約＋已付款的品項 ${renoMoney(by.signed.deal + by.paid.deal)}　·　報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）` + (by.dropped.count ? `　·　備選 ${by.dropped.count} 項（不計入）` : "")));
 }
 
-function renderRenoVendorSelect() {
-  const sel = document.getElementById("renoVendorSelect");
+function renoVendorList() {
   const vendors = [];
   reno.items.forEach(it => { if (!vendors.includes(it.vendor)) vendors.push(it.vendor); });
-  if (reno.vendor !== "all" && !vendors.includes(reno.vendor)) reno.vendor = "all"; // 選的商家被刪光了
+  return vendors;
+}
+
+// 類別、商家兩個下拉：類別選了之後，商家下拉只列那個類別的商家；只有 1 個類別／1 家商家時不顯示
+function renderRenoVendorSelect() {
+  const all = renoVendorList();
+  const catSel = document.getElementById("renoCategorySelect");
+  const cats = RENO_CATEGORIES.filter(c => all.some(v => renoVendorCategory(reno.vendors, v) === c));
+  if (reno.category !== "all" && !cats.includes(reno.category)) reno.category = "all";
+  catSel.innerHTML = "";
+  catSel.appendChild(new Option("全部類別", "all"));
+  cats.forEach(c => catSel.appendChild(new Option(c, c)));
+  catSel.value = reno.category;
+  catSel.classList.toggle("hidden", cats.length < 2);
+
+  const sel = document.getElementById("renoVendorSelect");
+  const vendors = all.filter(v => reno.category === "all" || renoVendorCategory(reno.vendors, v) === reno.category);
+  if (reno.vendor !== "all" && !vendors.includes(reno.vendor)) reno.vendor = "all";
   sel.innerHTML = "";
   sel.appendChild(new Option(`全部商家（${vendors.length}）`, "all"));
   vendors.forEach(v => sel.appendChild(new Option(v, v)));
   sel.value = reno.vendor;
   sel.classList.toggle("hidden", vendors.length < 2);
 }
+document.getElementById("renoCategorySelect").addEventListener("change", (e) => {
+  reno.category = e.target.value;
+  renderRenoVendorSelect();
+  renderRenoVendors();
+});
 document.getElementById("renoVendorSelect").addEventListener("change", (e) => {
   reno.vendor = e.target.value;
   renderRenoVendors();
@@ -211,11 +264,11 @@ function renderRenoFilter() {
 function renderRenoVendors() {
   const host = document.getElementById("renoVendors");
   host.innerHTML = "";
-  const vendors = [];
-  reno.items.forEach(it => { if (!vendors.includes(it.vendor)) vendors.push(it.vendor); });
+  const vendors = renoVendorList();
   let any = false;
   vendors.forEach(vendor => {
     if (reno.vendor !== "all" && vendor !== reno.vendor) return;
+    if (reno.category !== "all" && renoVendorCategory(reno.vendors, vendor) !== reno.category) return;
     const all = reno.items.filter(it => it.vendor === vendor);
     const shown = all.filter(it => reno.filter === "all" || (it.status || "quoted") === reno.filter);
     if (!shown.length) return;
@@ -231,6 +284,13 @@ function renderRenoVendor(vendor, all, shown) {
   const head = el("div", "reno-vendor-head");
   const nameRow = el("div", "reno-vendor-namerow");
   nameRow.appendChild(el("h3", "reno-vendor-name", vendor));
+  const catPick = el("select", "reno-status reno-cat-pick");
+  catPick.setAttribute("aria-label", "類別");
+  RENO_CATEGORIES.forEach(c => catPick.appendChild(new Option(c, c)));
+  const curCat = renoVendorCategory(reno.vendors, vendor);
+  catPick.value = curCat;
+  catPick.addEventListener("change", () => runRenoWrite(box, () => api("setRenoCategory", { vendor, category: catPick.value }), "更新失敗", () => { catPick.value = curCat; }));
+  nameRow.appendChild(catPick);
   const delV = el("button", "ghost-btn reno-del", "刪除");
   delV.type = "button";
   delV.title = "刪除這個商家的全部品項";
@@ -456,7 +516,7 @@ document.getElementById("renoImportForm").addEventListener("submit", async (e) =
   if (!(await showConfirm(lines.join("\n")))) return;
   setFormBusy(form, true);
   try {
-    applyReno(await api("importRenoQuote", { vendor: parsed.vendor, date: parsed.date, note: parsed.note, items: JSON.stringify(parsed.items) }));
+    applyReno(await api("importRenoQuote", { vendor: parsed.vendor, date: parsed.date, note: parsed.note, category: parsed.category, items: JSON.stringify(parsed.items) }));
     renderReno();
     closeRenoImport();
     showToast(`已匯入：新增 ${plan.added.length}、更新 ${plan.changed.length}`);

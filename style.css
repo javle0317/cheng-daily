@@ -1340,3 +1340,6 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .reno-pay-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .reno-pay-row + .reno-pay-foot { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
 .reno-pay-remaining { font-weight: 600; }
+.reno-cat-line { margin: 2px 0; }
+.reno-cat-pick { font-size: 12px; padding: 2px 4px; }
+.reno-vendor-namerow { flex-wrap: wrap; }
