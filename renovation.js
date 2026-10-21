@@ -9,7 +9,7 @@ const RENO_STATUSES = [
   { key: "paid", label: "已付款" },
   { key: "dropped", label: "不買" },
 ];
-const reno = { items: [], log: [], filter: "all" };
+const reno = { items: [], log: [], filter: "all", vendor: "all" };
 
 function applyReno(data) {
   reno.items = (data && data.items) || [];
@@ -129,6 +129,7 @@ function el(tag, cls, text) {
 
 function renderReno() {
   renderRenoSummary();
+  renderRenoVendorSelect();
   renderRenoFilter();
   renderRenoVendors();
 }
@@ -158,6 +159,22 @@ function renderRenoSummary() {
   lines.forEach(t => host.appendChild(el("p", "progress-line", t)));
 }
 
+function renderRenoVendorSelect() {
+  const sel = document.getElementById("renoVendorSelect");
+  const vendors = [];
+  reno.items.forEach(it => { if (!vendors.includes(it.vendor)) vendors.push(it.vendor); });
+  if (reno.vendor !== "all" && !vendors.includes(reno.vendor)) reno.vendor = "all"; // 選的商家被刪光了
+  sel.innerHTML = "";
+  sel.appendChild(new Option(`全部商家（${vendors.length}）`, "all"));
+  vendors.forEach(v => sel.appendChild(new Option(v, v)));
+  sel.value = reno.vendor;
+  sel.classList.toggle("hidden", vendors.length < 2);
+}
+document.getElementById("renoVendorSelect").addEventListener("change", (e) => {
+  reno.vendor = e.target.value;
+  renderRenoVendors();
+});
+
 function renderRenoFilter() {
   const host = document.getElementById("renoFilter");
   host.innerHTML = "";
@@ -176,6 +193,7 @@ function renderRenoVendors() {
   reno.items.forEach(it => { if (!vendors.includes(it.vendor)) vendors.push(it.vendor); });
   let any = false;
   vendors.forEach(vendor => {
+    if (reno.vendor !== "all" && vendor !== reno.vendor) return;
     const all = reno.items.filter(it => it.vendor === vendor);
     const shown = all.filter(it => reno.filter === "all" || (it.status || "quoted") === reno.filter);
     if (!shown.length) return;
