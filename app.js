@@ -16,6 +16,7 @@ let state = {
   events: [],
   habits: [],
   habitLogs: [],
+  habitNotes: [],
   recurringEvents: [],
   recurringExceptions: [],
   shoppingList: [],
@@ -256,6 +257,7 @@ function applyData(data) {
   if (data.events) state.events = data.events;
   if (data.habits) state.habits = data.habits;
   if (data.habitLogs) state.habitLogs = data.habitLogs;
+  if (data.habitNotes) state.habitNotes = data.habitNotes;
   if (data.recurringEvents) state.recurringEvents = data.recurringEvents;
   if (data.recurringExceptions) state.recurringExceptions = data.recurringExceptions;
   if (data.shoppingList) { state.shoppingList = data.shoppingList; state.shoppingLoaded = true; }
@@ -266,7 +268,7 @@ function applyData(data) {
 // 與 logoutBtn 監聽都在 shared.js，這裡只提供 shared.js 需要呼叫的進入點。
 window.loadPageData = async function () {
   // 清單（購物/想法）要打開 📝 才看得到，登入時先不讀，打開時再載入
-  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,recurringEvents,recurringExceptions,holidays" }));
+  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,habitNotes,recurringEvents,recurringExceptions,holidays" }));
   renderAll();
   refreshCalSync(); // Google 行事曆同步狀態（沒設定 CALENDAR_ID 就不顯示），不擋登入
   refreshPetPending(); // 寵物圖示上的「待登記」紅點，同樣不擋登入
@@ -535,6 +537,23 @@ function appendStreakBadge(li, streakEl, habitId, streak, detail) {
   return pop;
 }
 
+function getHabitNote(habitId) {
+  const n = state.habitNotes.find(x => x.habitId === habitId);
+  return n ? String(n.detail || "") : "";
+}
+
+// 有填細節的習慣才出現 ⓘ，點了開彈窗看步驟
+function setupHabitInfoBtn(li, habit) {
+  const btn = li.querySelector(".habit-info-btn");
+  if (!getHabitNote(habit.id)) { btn.remove(); return; }
+  btn.classList.remove("hidden");
+  btn.addEventListener("click", () => {
+    document.getElementById("habitInfoTitle").textContent = splitTextAndLink(habit.name).restText;
+    document.getElementById("habitInfoBody").textContent = getHabitNote(habit.id);
+    document.getElementById("habitInfoModal").classList.remove("hidden");
+  });
+}
+
 function renderDailyHabits() {
   const section = document.getElementById("dailyHabitSection");
   const list = document.getElementById("dailyHabitList");
@@ -564,6 +583,7 @@ function renderDailyHabits() {
       <input type="checkbox" ${done ? "checked" : ""}>
       <span class="item-text"></span>
       <span class="item-time"></span>
+      <button class="habit-info-btn hidden" title="細節" aria-label="習慣細節" type="button">ⓘ</button>
       <button class="event-shopping-btn habit-edit-btn" title="編輯" type="button">✏️</button>
       <button class="delete-btn" title="刪除">✕</button>
     `;
@@ -573,6 +593,7 @@ function renderDailyHabits() {
     // 運動挑戰：抽卡前標題是習慣名稱，抽卡後換成抽到的內容
     li.querySelector(".item-text").textContent = (challengeLog && challengeLog.exercise) ? challengeLog.exercise : habitName;
     li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
+    setupHabitInfoBtn(li, habit);
     const streak = computeStreak(habit);
     const stats = computeHabitStats(habit);
     const streakEl = li.querySelector(".item-time");
@@ -675,6 +696,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
       <button class="period-add-btn" type="button"></button>
       <span class="item-text"></span>
       <span class="item-time"></span>
+      <button class="habit-info-btn hidden" title="細節" aria-label="習慣細節" type="button">ⓘ</button>
       <button class="event-shopping-btn habit-edit-btn" title="編輯" type="button">✏️</button>
       <button class="delete-btn" title="刪除">✕</button>
       <div class="period-meta"></div>
@@ -682,6 +704,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
     const { restText: habitName, url: habitUrl } = splitTextAndLink(habit.name);
     li.querySelector(".item-text").textContent = habitName;
     li.querySelector(".habit-edit-btn").addEventListener("click", () => openHabitEdit(habit));
+    setupHabitInfoBtn(li, habit);
 
     const unitLabel = frequency === "weekly" ? "本週" : "本月";
     const addBtn = li.querySelector(".period-add-btn");
@@ -1623,6 +1646,7 @@ function openHabitEdit(habit) {
   editingHabit = habit;
   const isDaily = habit.frequency === "daily";
   document.getElementById("habitEditName").value = habit.name;
+  document.getElementById("habitEditDetail").value = getHabitNote(habit.id);
   document.getElementById("habitEditTarget").value = habit.target || 1;
   document.getElementById("habitEditWorkdaysOnly").checked = habit.workdaysOnly === true || habit.workdaysOnly === "TRUE";
   document.getElementById("habitEditTargetLabel").style.display = isDaily ? "none" : "";
@@ -1634,6 +1658,11 @@ function closeHabitEdit() {
   document.getElementById("habitEditModal").classList.add("hidden");
   editingHabit = null;
 }
+
+document.getElementById("habitInfoCloseBtn").addEventListener("click", () => document.getElementById("habitInfoModal").classList.add("hidden"));
+document.getElementById("habitInfoModal").addEventListener("click", (e) => {
+  if (e.target.id === "habitInfoModal") e.target.classList.add("hidden");
+});
 
 document.getElementById("habitEditCloseBtn").addEventListener("click", closeHabitEdit);
 document.getElementById("habitEditModal").addEventListener("click", (e) => {
@@ -1647,9 +1676,10 @@ document.getElementById("habitEditForm").addEventListener("submit", async (e) =>
   if (!name) return;
   const target = document.getElementById("habitEditTarget").value || 1;
   const workdaysOnly = document.getElementById("habitEditWorkdaysOnly").checked;
+  const detail = document.getElementById("habitEditDetail").value.trim();
   setFormBusy(e.target, true);
   try {
-    applyData(await api("updateHabit", { id: editingHabit.id, name, workdaysOnly, target }));
+    applyData(await api("updateHabit", { id: editingHabit.id, name, workdaysOnly, target, detail }));
     closeHabitEdit();
     renderDailyHabits();
     renderWeeklyHabits();

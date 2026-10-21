@@ -712,6 +712,14 @@ a.ghost-btn {
 .bill-row .item-text { flex: 0 0 auto; white-space: nowrap; }
 .bill-row .item-time { white-space: nowrap; }
 
+.habit-info-btn {
+  border: none; background: none; padding: 2px 4px; cursor: pointer;
+  font-size: 16px; line-height: 1; color: var(--text-dim);
+}
+.habit-info-btn:hover { color: var(--accent); }
+.habit-info-body { white-space: pre-wrap; line-height: 1.7; font-size: 15px; overflow-wrap: anywhere; }
+#habitEditDetail { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
+
 .streak-badge { cursor: pointer; user-select: none; }
 .streak-detail {
   flex-basis: 100%;

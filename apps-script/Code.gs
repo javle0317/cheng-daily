@@ -12,10 +12,11 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這十九個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
+ *   HabitNotes      欄位: habitId | detail | updatedAt（ensureSheet 自動建立；習慣的細節說明／步驟，一個習慣一列，沒填就沒有那一列）
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
  *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空。舊的 cardId 欄位已經沒有用到，可以刪除）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
@@ -163,7 +164,7 @@ function dispatch_(p) {
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
       case "updateHabit":
-        return respond({ ok: true, data: updateHabit(p.id, p.name, p.workdaysOnly, p.target) });
+        return respond({ ok: true, data: updateHabit(p.id, p.name, p.workdaysOnly, p.target, p.detail) });
       case "deleteHabit":
         return respond({ ok: true, data: deleteHabit(p.id) });
       case "addRecurringEvent":
@@ -293,7 +294,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-18.1";
+var BACKEND_VERSION = "2026-10-21.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -389,6 +390,7 @@ function getData(keys) {
   Object.keys(DATA_SHEETS_).forEach(function (k) {
     if (!keys || keys.indexOf(k) >= 0) out[k] = sheetToObjects(getSheet(DATA_SHEETS_[k]));
   });
+  if (!keys || keys.indexOf("habitNotes") >= 0) out.habitNotes = sheetToObjects(habitNotesSheet_());
   if (!keys || keys.indexOf("holidays") >= 0) out.holidays = getHolidaysSafe_();
   return out;
 }
@@ -1112,6 +1114,27 @@ function deleteCreditCardBill(id) {
   return getCreditCardBills();
 }
 
+// 習慣的「細節」（該做到什麼、步驟）放獨立分頁，不動 Habits 的欄位
+function habitNotesSheet_() {
+  return ensureSheet("HabitNotes", ["habitId", "detail", "updatedAt"]);
+}
+
+// 空字串 = 刪掉那一列
+function setHabitNote_(habitId, detail) {
+  var text = textArg_(detail, "習慣細節", { max: 2000 });
+  var sheet = habitNotesSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === habitId) {
+      if (!text) { sheet.deleteRow(i + 1); return; }
+      setTextSafe_(sheet.getRange(i + 1, 2), text);
+      sheet.getRange(i + 1, 3).setValue(new Date());
+      return;
+    }
+  }
+  if (text) appendRowSafe_(sheet, [habitId, text, new Date()]);
+}
+
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
   frequency = enumArg_(frequency, "頻率", ["daily", "weekly", "monthly"]);
@@ -1130,9 +1153,10 @@ function addHabit(name, frequency, workdaysOnly, target) {
 // 編輯習慣：可改名稱、daily 的「只算工作日」、weekly/monthly 的目標次數。
 // 故意不開放改 frequency——HabitLog 的 periodKey 格式依頻率而定（日期/週一/月份），
 // 改了之前的紀錄就對不起來，要換頻率請刪掉重加。daily 的 target 固定 1。
-function updateHabit(id, name, workdaysOnly, target) {
+function updateHabit(id, name, workdaysOnly, target, detail) {
   var sheet = getSheet("Habits");
   var newName = textArg_(name, "習慣名稱", { required: true, max: 200 });
+  if (detail !== undefined) textArg_(detail, "習慣細節", { max: 2000 }); // 先驗證，不過就整筆不寫
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][0] === id) {
@@ -1141,10 +1165,11 @@ function updateHabit(id, name, workdaysOnly, target) {
       setTextSafe_(sheet.getRange(i + 1, 2), newName);
       sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? boolArg_(workdaysOnly) : values[i][3]);
       sheet.getRange(i + 1, 5).setValue(finalTarget);
+      if (detail !== undefined) setHabitNote_(id, detail);
       break;
     }
   }
-  return getData(["habits"]);
+  return getData(["habits", "habitNotes"]);
 }
 
 function deleteHabit(id) {
@@ -1153,10 +1178,11 @@ function deleteHabit(id) {
   for (var i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
+      setHabitNote_(id, "");
       break;
     }
   }
-  return getData(["habits"]);
+  return getData(["habits", "habitNotes"]);
 }
 
 // 讀取現有列、決定要遞增/刪除還是新增一列、再寫回去——這整段「讀了再寫」如果

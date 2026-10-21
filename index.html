@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261019000513">
+<link rel="stylesheet" href="style.css?v=20261021114836">
 </head>
 <body data-page="home">
 
@@ -157,9 +157,20 @@
           <input id="habitEditWorkdaysOnly" type="checkbox">
           只算工作日
         </label>
+        <textarea id="habitEditDetail" rows="5" maxlength="2000" placeholder="細節（選填）：該做到什麼、步驟…，填了列上會出現 ⓘ"></textarea>
         <p class="progress-line">頻率不能修改（紀錄會對不起來），要換請刪掉重加</p>
         <button id="habitEditSubmitBtn" type="submit">儲存</button>
       </form>
+    </div>
+  </div>
+
+  <div id="habitInfoModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="habitInfoTitle"></h2>
+        <button id="habitInfoCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <div id="habitInfoBody" class="habit-info-body"></div>
     </div>
   </div>
 
@@ -350,7 +361,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261019000513"></script>
-  <script src="app.js?v=20261019000513"></script>
+  <script src="shared.js?v=20261021114836"></script>
+  <script src="app.js?v=20261021114836"></script>
 </body>
 </html>
