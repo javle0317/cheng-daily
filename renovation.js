@@ -215,18 +215,6 @@ function renderRenoVendor(vendor, all, shown) {
   box.appendChild(head);
 
   const tools = el("div", "reno-vendor-tools");
-  const bulk = el("select", "reno-status");
-  bulk.setAttribute("aria-label", "整家設定狀態");
-  bulk.appendChild(new Option("整家設為…", ""));
-  RENO_STATUSES.forEach(s => bulk.appendChild(new Option(s.label, s.key)));
-  bulk.addEventListener("change", async () => {
-    const st = bulk.value;
-    if (!st) return;
-    bulk.value = "";
-    if (!(await showConfirm(`確定把「${vendor}」的 ${all.length} 個品項全部設為「${statusLabel(st)}」？`))) return;
-    await runRenoWrite(box, () => api("setRenoStatus", { ids: JSON.stringify(all.map(i => i.id)), status: st }), "更新失敗");
-  });
-  tools.appendChild(bulk);
   const delV = el("button", "ghost-btn reno-del", "刪除商家");
   delV.type = "button";
   delV.addEventListener("click", async () => {
