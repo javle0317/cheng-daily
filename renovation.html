@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261021160139">
+<link rel="stylesheet" href="style.css?v=20261021170424">
 </head>
 <body data-page="reno">
 
@@ -79,6 +79,41 @@
     </div>
   </div>
 
+  <div id="renoPayModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2 id="renoPayTitle">記一筆付款</h2>
+        <button id="renoPayClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="renoPayForm" class="entry-form entry-form-rows modal-form">
+        <div class="form-row">
+          <label class="mf">類型
+            <select id="renoPayKind">
+              <option value="deposit">定金</option>
+              <option value="installment">期款</option>
+              <option value="final">尾款</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label class="mf">日期（選填）
+            <input id="renoPayDate" type="date">
+          </label>
+        </div>
+        <label class="mf">金額
+          <input id="renoPayAmount" type="number" inputmode="decimal" placeholder="付了多少">
+        </label>
+        <label class="mf">備註（選填）
+          <input id="renoPayNote" type="text" maxlength="200" autocomplete="off">
+        </label>
+        <p id="renoPayMsg" class="import-msg" role="status"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="renoPaySubmit" type="submit">記下</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="renoHistoryModal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -102,7 +137,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261021160139"></script>
-  <script src="renovation.js?v=20261021160139"></script>
+  <script src="shared.js?v=20261021170424"></script>
+  <script src="renovation.js?v=20261021170424"></script>
 </body>
 </html>

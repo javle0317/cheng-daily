@@ -841,6 +841,10 @@ console.log("裝潢報價：小計、總額（不含不買）、匯入檢查與�
   ];
   const sum = JSON.parse(ev("JSON.stringify(renoSummarize(__items))"));
   check("renoSummarize：不含「不買」；原價／優惠價／省下；已簽約、已付款各自合計（折讓用負數）", sum.list === 1600 && sum.deal === 1380 && sum.saved === 220 + 0 && sum.byStatus.signed.deal === 700 && sum.byStatus.paid.deal === 500 && sum.byStatus.quoted.deal === 180 && sum.byStatus.dropped.count === 1 && sum.byStatus.dropped.deal === 0, sum);
+  rn.__pi = [{ vendor: "A", status: "quoted", qty: 2, dealPrice: 1000 }, { vendor: "A", status: "dropped", dealPrice: 9999 }, { vendor: "B", status: "signed", dealPrice: 500 }];
+  rn.__pp = [{ vendor: "A", amount: 800 }, { vendor: "A", amount: 300 }, { vendor: "B", amount: 100 }];
+  const ps = JSON.parse(ev("JSON.stringify(renoPaySummary(__pi, __pp))"));
+  check("renoPaySummary：各家總額（不含不買）− 付款 = 尚餘；多付為負數；總計加總", ps.byVendor.A.total === 2000 && ps.byVendor.A.paid === 1100 && ps.byVendor.A.remaining === 900 && ps.byVendor.B.remaining === 400 && ps.total === 2500 && ps.paid === 1200 && ps.remaining === 1300 && JSON.parse(ev("JSON.stringify(renoPaySummary(__pi, [{ vendor: 'B', amount: 700 }]).byVendor.B.remaining)")) === -200, ps);
   const good = '{"vendor":"A設計","date":"2026-10-20","items":[{"name":"櫃子","qty":2,"unit":"組","listPrice":"1,000","dealPrice":900},{"name":"折讓","dealPrice":-500}]}';
   rn.__t = good;
   const p1 = JSON.parse(ev("JSON.stringify(parseRenoImport(__t))"));
@@ -889,10 +893,20 @@ console.log("裝潢報價：小計、總額（不含不買）、匯入檢查與�
   check("setRenoStatus：改狀態；壞狀態丟錯", r.items.find(i => i.id === floor.id).status === "signed" && throws(() => be.setRenoStatus(JSON.stringify([floor.id]), "nope")));
   check("importRenoQuote 驗證：沒價格、重複品項、壞日期、空商家都丟錯，且不寫入", (() => { const before = book.RenoItems.values.length; const t = throws(() => be.importRenoQuote("A設計", "2026-10-20", "", [{ name: "x" }])) && throws(() => be.importRenoQuote("A設計", "2026-10-20", "", [{ name: "x", dealPrice: 1 }, { name: "x", dealPrice: 2 }])) && throws(() => be.importRenoQuote("A設計", "10/20", "", [{ name: "x", dealPrice: 1 }])) && throws(() => be.importRenoQuote("", "2026-10-20", "", [{ name: "x", dealPrice: 1 }])); return t && book.RenoItems.values.length === before; })());
   be.importRenoQuote("B工班", "2026-10-02", "", [{ name: "水電", dealPrice: 50000 }]);
+  r = be.addRenoPayment({ vendor: "B工班", kind: "deposit", amount: "10,000", date: "2026-10-03", note: "現金" });
+  r = be.addRenoPayment({ vendor: "B工班", kind: "installment", amount: 5000, date: "" });
+  check("addRenoPayment：多筆付款、日期可空；分頁自動建立", r.payments.length === 2 && r.payments[0].kind === "deposit" && Number(r.payments[0].amount) === 10000 && r.payments[1].date === "" && !!book.RenoPayments, r.payments);
+  check("addRenoPayment 驗證：沒商家、壞類型、金額 0／非數字、壞日期都丟錯", throws(() => be.addRenoPayment({ vendor: "", kind: "deposit", amount: 1 })) && throws(() => be.addRenoPayment({ vendor: "B工班", kind: "nope", amount: 1 })) && throws(() => be.addRenoPayment({ vendor: "B工班", kind: "deposit", amount: 0 })) && throws(() => be.addRenoPayment({ vendor: "B工班", kind: "deposit", amount: "abc" })) && throws(() => be.addRenoPayment({ vendor: "B工班", kind: "deposit", amount: 1, date: "10/03" })));
+  const payId = r.payments[0].id;
+  r = be.deleteRenoPayment(payId);
+  check("deleteRenoPayment：只刪那一筆", r.payments.length === 1 && Number(r.payments[0].amount) === 5000);
+  be.addRenoPayment({ vendor: "B工班", kind: "final", amount: 100 });
   r = be.deleteRenoItem(cab.id);
   check("deleteRenoItem：品項和它的紀錄一起刪，別的不動", !r.items.some(i => i.id === cab.id) && !r.log.some(l => l.itemId === cab.id) && r.items.length === 3);
   r = be.deleteRenoVendor("A設計");
-  check("deleteRenoVendor：整家的品項與紀錄都刪，B 工班還在", r.items.length === 1 && r.items[0].vendor === "B工班" && r.log.every(l => l.vendor === "B工班"), r);
+  check("deleteRenoVendor：整家的品項與紀錄都刪，B 工班（含它的付款）還在", r.items.length === 1 && r.items[0].vendor === "B工班" && r.log.every(l => l.vendor === "B工班") && r.payments.length === 2, r);
+  r = be.deleteRenoVendor("B工班");
+  check("deleteRenoVendor：付款紀錄一併刪", r.payments.length === 0 && r.items.length === 0);
   be.Utilities.getUuid = origUuid; be.Utilities.formatDate = origFmt; be.SpreadsheetApp.getActiveSpreadsheet = origSS;
 }
 

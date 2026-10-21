@@ -12,13 +12,14 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十二個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十三個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitNotes      欄位: habitId | detail | updatedAt（ensureSheet 自動建立；習慣的細節說明／步驟，一個習慣一列，沒填就沒有那一列）
  *   RenoItems       欄位: id | vendor | name | qty | unit | listPrice | dealPrice | status | note | createdAt | updatedAt（ensureSheet 自動建立；裝潢報價的品項現況，價格是「單價」，小計＝qty × 單價；status: quoted/signed/paid/dropped）
  *   RenoQuoteLog    欄位: id | itemId | vendor | name | round | date | qty | unit | listPrice | dealPrice | note | createdAt（ensureSheet 自動建立；每次報價內容有變就新增一列，不覆蓋，history 靠這個；vendor/name 冗餘存一份，品項刪了紀錄仍看得懂）
+ *   RenoPayments    欄位: id | vendor | kind | amount | date | note | createdAt（ensureSheet 自動建立；裝潢每家商家的付款紀錄，可多筆；kind: deposit定金/installment期款/final尾款/other其他；date 可空；尚餘＝該商家品項總額 − 付款合計，由前端算）
  *   HabitLog        欄位: id | habitId | periodKey | count | createdAt | exercise | synced
  *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空。舊的 cardId 欄位已經沒有用到，可以刪除）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
@@ -260,6 +261,10 @@ function dispatch_(p) {
         return respond({ ok: true, data: importRenoQuote(p.vendor, p.date, p.note, p.items) });
       case "setRenoStatus":
         return respond({ ok: true, data: setRenoStatus(p.ids, p.status) });
+      case "addRenoPayment":
+        return respond({ ok: true, data: addRenoPayment(p) });
+      case "deleteRenoPayment":
+        return respond({ ok: true, data: deleteRenoPayment(p.id) });
       case "deleteRenoItem":
         return respond({ ok: true, data: deleteRenoItem(p.id) });
       case "deleteRenoVendor":
@@ -306,7 +311,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-21.2";
+var BACKEND_VERSION = "2026-10-21.3";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -2317,8 +2322,29 @@ var RENO_STATUSES = ["quoted", "signed", "paid", "dropped"];
 function renoItemsSheet_() { return ensureSheet("RenoItems", RENO_ITEM_HEADERS); }
 function renoLogSheet_() { return ensureSheet("RenoQuoteLog", RENO_LOG_HEADERS); }
 
+var RENO_PAYMENT_HEADERS = ["id", "vendor", "kind", "amount", "date", "note", "createdAt"];
+var RENO_PAY_KINDS = ["deposit", "installment", "final", "other"];
+function renoPaymentsSheet_() { return ensureSheet("RenoPayments", RENO_PAYMENT_HEADERS); }
+
 function getReno() {
-  return { items: sheetToObjects(renoItemsSheet_()), log: sheetToObjects(renoLogSheet_()) };
+  return { items: sheetToObjects(renoItemsSheet_()), log: sheetToObjects(renoLogSheet_()), payments: sheetToObjects(renoPaymentsSheet_()) };
+}
+
+function addRenoPayment(p) {
+  var vendor = textArg_(p.vendor, "商家", { required: true, max: 100 });
+  var kind = enumArg_(p.kind, "付款類型", RENO_PAY_KINDS);
+  var amount = numArg_(p.amount, "金額", {});
+  if (amount === 0) throw new Error("金額不能是 0");
+  var date = dateArg_(p.date, "付款", { optional: true });
+  var note = textArg_(p.note, "備註", { max: 200 });
+  appendRowSafe_(renoPaymentsSheet_(), [Utilities.getUuid(), vendor, kind, amount, date, note, new Date()]);
+  return getReno();
+}
+
+function deleteRenoPayment(id) {
+  id = textArg_(id, "付款", { required: true, max: 100 });
+  deleteRenoRows_(renoPaymentsSheet_(), 0, function (v) { return v === id; });
+  return getReno();
 }
 
 function renoFields_(it, label) {
@@ -2414,6 +2440,7 @@ function deleteRenoVendor(vendor) {
   var v = textArg_(vendor, "商家", { required: true, max: 100 });
   deleteRenoRows_(renoItemsSheet_(), 1, function (x) { return x === v; });
   deleteRenoRows_(renoLogSheet_(), 2, function (x) { return x === v; });
+  deleteRenoRows_(renoPaymentsSheet_(), 1, function (x) { return x === v; });
   return getReno();
 }
 

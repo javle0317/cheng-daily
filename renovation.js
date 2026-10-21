@@ -9,11 +9,18 @@ const RENO_STATUSES = [
   { key: "paid", label: "已付款" },
   { key: "dropped", label: "不買" },
 ];
-const reno = { items: [], log: [], filter: "all", vendor: "all" };
+const RENO_PAY_KINDS = [
+  { key: "deposit", label: "定金" },
+  { key: "installment", label: "期款" },
+  { key: "final", label: "尾款" },
+  { key: "other", label: "其他" },
+];
+const reno = { items: [], log: [], payments: [], filter: "all", vendor: "all" };
 
 function applyReno(data) {
   reno.items = (data && data.items) || [];
   reno.log = (data && data.log) || [];
+  reno.payments = (data && data.payments) || [];
 }
 
 window.loadPageData = async function () {
@@ -53,6 +60,21 @@ function renoSummarize(items) {
     out.deal += l.deal;
   });
   out.saved = out.list - out.deal;
+  return out;
+}
+
+// 付款：每家商家的總額（不含「不買」）− 付款合計 = 尚餘（負數 = 多付）
+function renoPaySummary(items, payments) {
+  const out = { total: 0, paid: 0, remaining: 0, byVendor: {} };
+  const slot = v => (out.byVendor[v] = out.byVendor[v] || { total: 0, paid: 0, remaining: 0 });
+  items.forEach(it => { if (it.status !== "dropped") slot(it.vendor).total += renoLine(it).deal; });
+  payments.forEach(p => { slot(p.vendor).paid += Number(p.amount) || 0; });
+  Object.keys(out.byVendor).forEach(v => {
+    const b = out.byVendor[v];
+    b.remaining = b.total - b.paid;
+    out.total += b.total; out.paid += b.paid;
+  });
+  out.remaining = out.total - out.paid;
   return out;
 }
 
@@ -151,12 +173,12 @@ function renderRenoSummary() {
   stat("省下", renoMoney(s.saved), s.saved > 0 ? "good" : "");
   host.appendChild(grid);
   const by = s.byStatus;
-  const committed = by.signed.deal + by.paid.deal;
-  const lines = [
-    `已簽約＋已付款 ${renoMoney(committed)}（已付 ${renoMoney(by.paid.deal)}，待付 ${renoMoney(by.signed.deal)}）`,
-    `報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）` + (by.dropped.count ? `　·　不買 ${by.dropped.count} 項（不計入）` : ""),
-  ];
-  lines.forEach(t => host.appendChild(el("p", "progress-line", t)));
+  const pay = renoPaySummary(reno.items, reno.payments);
+  host.appendChild(el("p", "progress-line", pay.paid || reno.payments.length
+    ? `已付 ${renoMoney(pay.paid)}　·　尚餘 ${renoMoney(pay.remaining)}（依各家付款紀錄）`
+    : "還沒有付款紀錄（在商家卡片上按「＋ 付款」記定金、期款、尾款）"));
+  host.appendChild(el("p", "progress-line",
+    `已簽約＋已付款的品項 ${renoMoney(by.signed.deal + by.paid.deal)}　·　報價中 ${renoMoney(by.quoted.deal)}（${by.quoted.count} 項）` + (by.dropped.count ? `　·　不買 ${by.dropped.count} 項（不計入）` : "")));
 }
 
 function renderRenoVendorSelect() {
@@ -223,12 +245,46 @@ function renderRenoVendor(vendor, all, shown) {
   if (sum.saved > 0) tot.appendChild(el("span", "reno-vendor-orig", `原價 ${renoMoney(sum.list)}，省 ${renoMoney(sum.saved)}`));
   head.appendChild(tot);
   box.appendChild(head);
+  box.appendChild(renderRenoPayments(vendor, all));
 
 
   const list = el("ul", "item-list reno-items");
   shown.forEach(it => list.appendChild(renderRenoItem(it)));
   box.appendChild(list);
   return box;
+}
+
+function renderRenoPayments(vendor, all) {
+  const wrap = el("div", "reno-pay");
+  const ps = reno.payments.filter(p => p.vendor === vendor)
+    .sort((a, b) => String(a.date || "9999").localeCompare(String(b.date || "9999")));
+  const b = renoPaySummary(all, ps).byVendor[vendor] || { total: 0, paid: 0, remaining: 0 };
+  ps.forEach(p => {
+    const row = el("div", "reno-pay-row");
+    const kind = (RENO_PAY_KINDS.find(k => k.key === p.kind) || RENO_PAY_KINDS[3]).label;
+    row.appendChild(el("span", "reno-pay-main", `${kind}${p.date ? "　" + String(p.date).slice(5).replace("-", "/") : ""}${p.note ? "　" + p.note : ""}`));
+    row.appendChild(el("strong", "", renoMoney(p.amount)));
+    const del = el("button", "delete-btn", "✕");
+    del.type = "button";
+    del.title = "刪除這筆付款";
+    del.addEventListener("click", async () => {
+      if (!(await showConfirm(`確定刪除這筆付款（${kind} ${renoMoney(p.amount)}）？`))) return;
+      await runRenoWrite(row, () => api("deleteRenoPayment", { id: p.id }), "刪除失敗");
+    });
+    row.appendChild(del);
+    wrap.appendChild(row);
+  });
+  const foot = el("div", "reno-pay-foot");
+  const text = ps.length
+    ? (b.remaining < 0 ? `已付 ${renoMoney(b.paid)}，多付 ${renoMoney(-b.remaining)}` : `已付 ${renoMoney(b.paid)}　·　尚餘 ${renoMoney(b.remaining)}`)
+    : `尚餘 ${renoMoney(b.remaining)}（還沒付款）`;
+  foot.appendChild(el("span", "reno-pay-remaining", text));
+  const add = el("button", "ghost-btn reno-del", "＋ 付款");
+  add.type = "button";
+  add.addEventListener("click", () => openRenoPay(vendor, b.remaining));
+  foot.appendChild(add);
+  wrap.appendChild(foot);
+  return wrap;
 }
 
 function renderRenoItem(it) {
@@ -325,6 +381,50 @@ function openRenoHistory(it) {
 document.getElementById("renoHistoryClose").addEventListener("click", () => document.getElementById("renoHistoryModal").classList.add("hidden"));
 document.getElementById("renoHistoryModal").addEventListener("click", (e) => {
   if (e.target.id === "renoHistoryModal") e.target.classList.add("hidden");
+});
+
+// ====== 記付款 ======
+let renoPayVendor = null;
+function openRenoPay(vendor, remaining) {
+  renoPayVendor = vendor;
+  document.getElementById("renoPayTitle").textContent = `記一筆付款｜${vendor}`;
+  document.getElementById("renoPayKind").value = reno.payments.some(p => p.vendor === vendor) ? "installment" : "deposit";
+  document.getElementById("renoPayDate").value = toDateStr(new Date());
+  document.getElementById("renoPayAmount").value = "";
+  document.getElementById("renoPayAmount").placeholder = remaining > 0 ? `尚餘 ${Math.round(remaining)}` : "付了多少";
+  document.getElementById("renoPayNote").value = "";
+  document.getElementById("renoPayMsg").textContent = "";
+  document.getElementById("renoPayModal").classList.remove("hidden");
+}
+function closeRenoPay() {
+  document.getElementById("renoPayModal").classList.add("hidden");
+  renoPayVendor = null;
+}
+document.getElementById("renoPayClose").addEventListener("click", closeRenoPay);
+document.getElementById("renoPayModal").addEventListener("click", (e) => {
+  if (e.target.id === "renoPayModal") closeRenoPay();
+});
+document.getElementById("renoPayForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!renoPayVendor) return;
+  const form = e.target;
+  const msg = document.getElementById("renoPayMsg");
+  const amount = parseStrictNumber(document.getElementById("renoPayAmount").value);
+  if (amount === null || amount === 0) { msg.textContent = "請填金額（數字，不能是 0）"; return; }
+  setFormBusy(form, true);
+  try {
+    applyReno(await api("addRenoPayment", {
+      vendor: renoPayVendor, kind: document.getElementById("renoPayKind").value, amount,
+      date: document.getElementById("renoPayDate").value, note: document.getElementById("renoPayNote").value.trim(),
+    }));
+    renderReno();
+    closeRenoPay();
+    showToast("已記下付款");
+  } catch (err) {
+    msg.textContent = "記錄失敗：" + err.message;
+  } finally {
+    setFormBusy(form, false);
+  }
 });
 
 // ====== 匯入 ======

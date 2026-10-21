@@ -1334,3 +1334,9 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .reno-chg.up { color: var(--status-critical); }
 #renoImportText { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; }
 .reno-vendor-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; font: inherit; padding: 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
+.reno-pay { margin: 4px 0 8px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); font-size: 14px; }
+.reno-pay-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.reno-pay-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.reno-pay-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.reno-pay-row + .reno-pay-foot { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.reno-pay-remaining { font-weight: 600; }
