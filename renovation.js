@@ -16,7 +16,7 @@ const RENO_PAY_KINDS = [
   { key: "other", label: "其他" },
 ];
 const RENO_CATEGORIES = ["裝潢", "家具", "家電", "其他"]; // 商家層級；沒設定的商家算「裝潢」（跟後端 RENO_CATEGORIES 一致）
-const reno = { items: [], log: [], payments: [], vendors: [], filter: "all", vendor: "all", category: "all" };
+const reno = { items: [], log: [], payments: [], vendors: [], filter: "all", vendor: "all", category: "all", open: new Set() };
 
 function applyReno(data) {
   reno.items = (data && data.items) || [];
@@ -278,39 +278,62 @@ function renderRenoVendors() {
   if (reno.items.length && !any) host.appendChild(el("p", "progress-line", "這個狀態下沒有品項"));
 }
 
+// 商家小卡：平常只看到「商家名＋優惠後總額」，點標題列展開看付款與品項（展開狀態記在 reno.open；
+// 商家下拉選了單一商家時直接展開）。類別下拉與「刪除」在展開後的第一列，避免點到就收合。
 function renderRenoVendor(vendor, all, shown) {
   const box = el("div", "reno-vendor");
   const sum = renoSummarize(shown);
+  const open = reno.open.has(vendor) || reno.vendor !== "all";
   const head = el("div", "reno-vendor-head");
+  head.setAttribute("role", "button");
+  head.tabIndex = 0;
+  head.setAttribute("aria-expanded", open ? "true" : "false");
   const nameRow = el("div", "reno-vendor-namerow");
+  nameRow.appendChild(el("span", "reno-chev" + (open ? " open" : ""), "▸"));
   nameRow.appendChild(el("h3", "reno-vendor-name", vendor));
+  const cat = renoVendorCategory(reno.vendors, vendor);
+  if (cat !== "裝潢" || reno.vendors.length) nameRow.appendChild(el("span", "reno-cat-tag", cat));
+  head.appendChild(nameRow);
+  const tot = el("div", "reno-vendor-total");
+  tot.appendChild(el("strong", "", renoMoney(sum.deal)));
+  const pay = renoPaySummary(all, reno.payments.filter(p => p.vendor === vendor)).byVendor[vendor];
+  const hasPay = reno.payments.some(p => p.vendor === vendor);
+  if (hasPay && pay) tot.appendChild(el("span", "reno-vendor-orig", pay.remaining < 0 ? `已付 ${renoMoney(pay.paid)}，多付 ${renoMoney(-pay.remaining)}` : `已付 ${renoMoney(pay.paid)}　尚餘 ${renoMoney(pay.remaining)}`));
+  else if (sum.saved > 0) tot.appendChild(el("span", "reno-vendor-orig", `原價 ${renoMoney(sum.list)}，省 ${renoMoney(sum.saved)}`));
+  head.appendChild(tot);
+  const toggle = () => {
+    if (reno.open.has(vendor)) reno.open.delete(vendor); else reno.open.add(vendor);
+    renderRenoVendors();
+  };
+  head.addEventListener("click", toggle);
+  head.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  box.appendChild(head);
+  if (!open) return box;
+
+  const body = el("div", "reno-vendor-body");
+  const tools = el("div", "reno-vendor-tools");
   const catPick = el("select", "reno-status reno-cat-pick");
   catPick.setAttribute("aria-label", "類別");
   RENO_CATEGORIES.forEach(c => catPick.appendChild(new Option(c, c)));
-  const curCat = renoVendorCategory(reno.vendors, vendor);
-  catPick.value = curCat;
-  catPick.addEventListener("change", () => runRenoWrite(box, () => api("setRenoCategory", { vendor, category: catPick.value }), "更新失敗", () => { catPick.value = curCat; }));
-  nameRow.appendChild(catPick);
-  const delV = el("button", "ghost-btn reno-del", "刪除");
+  catPick.value = cat;
+  catPick.addEventListener("change", () => runRenoWrite(box, () => api("setRenoCategory", { vendor, category: catPick.value }), "更新失敗", () => { catPick.value = cat; }));
+  tools.appendChild(el("span", "reno-sub", "類別"));
+  tools.appendChild(catPick);
+  const delV = el("button", "ghost-btn reno-del", "刪除商家");
   delV.type = "button";
   delV.title = "刪除這個商家的全部品項";
   delV.addEventListener("click", async () => {
     if (!(await showConfirm(`確定刪除「${vendor}」的全部 ${all.length} 個品項和報價紀錄？`))) return;
     await runRenoWrite(box, () => api("deleteRenoVendor", { vendor }), "刪除失敗");
   });
-  nameRow.appendChild(delV);
-  head.appendChild(nameRow);
-  const tot = el("div", "reno-vendor-total");
-  tot.appendChild(el("strong", "", renoMoney(sum.deal)));
-  if (sum.saved > 0) tot.appendChild(el("span", "reno-vendor-orig", `原價 ${renoMoney(sum.list)}，省 ${renoMoney(sum.saved)}`));
-  head.appendChild(tot);
-  box.appendChild(head);
-  box.appendChild(renderRenoPayments(vendor, all));
-
-
+  tools.appendChild(delV);
+  body.appendChild(tools);
+  if (sum.saved > 0) body.appendChild(el("p", "progress-line", `原價 ${renoMoney(sum.list)}，省 ${renoMoney(sum.saved)}`));
+  body.appendChild(renderRenoPayments(vendor, all));
   const list = el("ul", "item-list reno-items");
   shown.forEach(it => list.appendChild(renderRenoItem(it)));
-  box.appendChild(list);
+  body.appendChild(list);
+  box.appendChild(body);
   return box;
 }
 
