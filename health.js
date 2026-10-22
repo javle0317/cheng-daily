@@ -248,6 +248,12 @@ function renderAlertBanner() {
   banner.className = `bp-alert bp-alert-${level}`;
 }
 
+// 取收縮壓等於 sys 的那次量測（多筆取最後一筆），顯示「收縮/舒張」
+function bpPair(readings, sys) {
+  const r = readings.filter(x => Number(x.systolic) === sys).pop();
+  return `${sys}/${Number(r.diastolic)}`;
+}
+
 function renderStats() {
   const container = document.getElementById("bpStatsRow");
   const readings = getFilteredReadings();
@@ -261,8 +267,8 @@ function renderStats() {
   const diastolics = readings.map(r => Number(r.diastolic));
   const tiles = [
     { label: "平均", value: `${Math.round(avg(systolics))}/${Math.round(avg(diastolics))}` },
-    { label: "最高收縮壓", value: `${Math.max(...systolics)}` },
-    { label: "最低收縮壓", value: `${Math.min(...systolics)}` },
+    { label: "最高血壓", value: bpPair(readings, Math.max(...systolics)) },
+    { label: "最低血壓", value: bpPair(readings, Math.min(...systolics)) },
     { label: "量測次數", value: `${readings.length}` },
   ];
   tiles.forEach(t => {
