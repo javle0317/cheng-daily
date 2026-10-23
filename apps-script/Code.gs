@@ -314,7 +314,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-21.5";
+var BACKEND_VERSION = "2026-10-23.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -1946,7 +1946,7 @@ function deleteRecipe(id) {
 // ====== 寵物頁（pets.html）======
 // 新分頁，用 ensureSheet 自動建立。欄位與順序寫死，不能改名或調整。
 var PET_LOG_HEADERS = ["id", "pet", "type", "date", "title", "amount", "note", "sourceEventId", "createdAt", "finishedAt"];
-var PET_LOG_TYPES = ["food", "litter", "vet", "medicine", "grooming", "other"];
+var PET_LOG_TYPES = ["food", "litter", "vet", "medicine", "grooming", "daycare", "other"];
 var PET_SKIP_HEADERS = ["id", "eventId", "createdAt"];
 
 function petLogSheet_() {

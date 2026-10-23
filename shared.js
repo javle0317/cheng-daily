@@ -15,6 +15,7 @@ const PET_TYPES = [
   { key: "vet", label: "看醫生", icon: "🏥", titleLabel: "看什麼（例如：耳朵發炎）", noteLabel: "醫囑／重要事項（選填）" },
   { key: "medicine", label: "用藥／疫苗", icon: "💊", titleLabel: "藥品或疫苗名稱", noteLabel: "備註（用法、劑量、下次施打日）" },
   { key: "grooming", label: "美容", icon: "✂️", titleLabel: "項目", noteLabel: "備註（選填）" },
+  { key: "daycare", label: "安親", icon: "🏡", titleLabel: "項目（例如：全日安親）", noteLabel: "備註（選填）" },
   { key: "other", label: "其他", icon: "📝", titleLabel: "項目", noteLabel: "備註（選填）" },
 ];
 const PET_ICON = { "林萌": "🐕", "咪嚕": "🐈" };
@@ -37,7 +38,7 @@ function guessPetType(title) {
 
 // 前端需要的後端最低版本（Code.gs 的 BACKEND_VERSION）。後端比這個舊 = Dean 還沒把新版 Code.gs 部署成新版本，
 // 會跳一次提醒，不用等到畫面出現怪現象才發現。改了後端行為、前端依賴時，兩邊一起加版本。
-const BACKEND_MIN_VERSION = "2026-10-21.5";
+const BACKEND_MIN_VERSION = "2026-10-23.1";
 let backendWarned = false;
 
 function toDateStr(d) {
@@ -423,7 +424,7 @@ const APP_NAV = [
   { key: "health", href: "health.html", label: "健康", title: "健康記錄", svg: '<path d="M2.8 12.5h4.2l2.2-5.5 4.2 10.5 2.4-6.2 1.2 1.2h4.2"/>' },
   { key: "bills", href: "bills.html", label: "帳單", title: "信用卡帳單與水電瓦斯", svg: '<rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M6.5 15h3.5"/>' },
   { key: "pets", href: "pets.html", label: "寵物", title: "寵物", badge: "petPendingDot", linkId: "petLink", svg: '<circle cx="6.5" cy="10.5" r="1.8"/><circle cx="10" cy="6.5" r="1.8"/><circle cx="14" cy="6.5" r="1.8"/><circle cx="17.5" cy="10.5" r="1.8"/><path d="M12 12.5c-2.8 0-5 2.2-5 4.4 0 1.5 1.2 2.1 2.6 2.1.9 0 1.5-.4 2.4-.4s1.5.4 2.4.4c1.4 0 2.6-.6 2.6-2.1 0-2.2-2.2-4.4-5-4.4z"/>' },
-  { key: "reno", href: "renovation.html", label: "裝潢", title: "裝潢報價", svg: '<path d="M5 20V9.5L12 4l7 5.5V20M9 20v-6h6v6"/>' },
+  { key: "reno", href: "renovation.html", label: "裝潢", title: "裝潢報價", svg: '<path d="M14.5 5.5a4 4 0 0 0-5 5L4 16l4 4 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2.5-.5-.5-2.5z"/>' },
   { key: "recipes", href: "recipes.html", label: "飲食", title: "食譜與想吃的店", svg: '<path d="M6 3v5a2 2 0 0 0 4 0V3M8 3v18"/><ellipse cx="16.5" cy="7.5" rx="2.6" ry="4.5"/><path d="M16.5 12v9"/>' },
 ];
 

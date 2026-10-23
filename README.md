@@ -170,7 +170,7 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 | id | pet | type | date | title | amount | note | sourceEventId | createdAt | finishedAt |
 |----|-----|------|------|-------|--------|------|---------------|-----------|------------|
 
-- `pet`：`PET_NAMES` 其中之一（前端在 `shared.js`、後端在 `Code.gs`，兩邊都要加）；`type`：`food` 飼料／`litter` 貓砂／`vet` 看醫生／`medicine` 用藥疫苗／`grooming` 美容／`other`（寫死在 `PET_LOG_TYPES`）
+- `pet`：`PET_NAMES` 其中之一（前端在 `shared.js`、後端在 `Code.gs`，兩邊都要加）；`type`：`food` 飼料／`litter` 貓砂／`vet` 看醫生／`medicine` 用藥疫苗／`grooming` 美容／`daycare` 安親／`other`（寫死在 `PET_LOG_TYPES`）
 - `title` 是品項或就醫原因（「主食罐 12 入」「耳朵發炎」）；`amount` 選填；`sourceEventId` 是從舊 Events 搬來時的來源事件 id，用來避免重複搬
 - 跟 Events 的分工：Events 的寵物事件是**行事曆預約／提醒**（會同步到 Google 行事曆與 LINE），PetLog 是**實際發生的歷史**（買了什麼、看了什麼），用來算間隔
 - `note`：備註，依類型提示不同（看醫生＝醫囑／重要事項，飼料＝到期日等）
