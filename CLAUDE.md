@@ -8,6 +8,7 @@
 - 改了 `Code.gs`：要手動貼進 Apps Script 重新部署新版本，並同步 `BACKEND_VERSION` 與 `shared.js` 的 `BACKEND_MIN_VERSION`。
 - 新增頁面：在 `shared.js` 的 `APP_NAV` 加一筆並在該頁 `<body>` 加 `data-page`（全站共用導覽；不要每頁自己手寫連結）。
 - 純邏輯有回歸檢查：`node scripts/regression-check.js`。
+- 寫死在程式裡的家庭專屬值（人名、寵物名、習慣 id、銀行、年齡／目標體重…）列在 README 的「新手改名清單」；新增這類寫死的值時，同步補進那份清單。
 - 本機預覽：`python3 -m http.server 8791`（`.claude/launch.json`）。
 - 做完一項改動：**直接 commit 並 push 到 main**，不用再問（Dean 直接在線上檢查）。commit 前先跑 `node scripts/regression-check.js`。
 - 文件跟著程式走：改了行為、版面、欄位、慣例，同一個 commit 內一併更新 README.md（對應段落）與本檔相關條目，避免文件飄移；純內部重構不用。

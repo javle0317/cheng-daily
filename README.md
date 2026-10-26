@@ -281,6 +281,68 @@ Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後�
 `health.html`（跟 `index.html` 共用 `shared.js`/`style.css`），GitHub Pages 會
 自動一起部署，不用額外設定，從主頁面右上角的 ❤️ 連過去即可。
 
+## 新手改名清單（拿這個 repo 做自己的版本）
+
+這個 repo 原本是一個家庭自用的版本，有些名字、ID、網址是寫死在程式裡的。Fork（或 Use as template）之後，照下面逐項改成自己的；沒改也不會壞，只是會看到別人家的名字或失去某些特殊行為。**不要沿用原作者的 Sheet、`WEBAPP_URL`、密碼**：你要有自己的 Sheet、自己的 Apps Script 部署（上面「部署步驟」1～6）。
+
+### 一定要改
+
+| 項目 | 在哪裡 | 要做什麼 |
+|---|---|---|
+| 後端網址 | [shared.js](shared.js) 最上面的 `WEBAPP_URL` | 換成你自己部署出來的 `.../exec`（步驟 4）。不換就會連到別人的後端 |
+| Script Properties | Apps Script「指令碼屬性」 | 至少設 `PASSWORD`；要桌布頁再設 `WALLPAPER_TOKEN`；要 LINE 通知再設 `LINE_TOKEN`／`LINE_MY_ID`／`LINE_WIFE_ID`（沒設就不會發通知）；不需要的功能（`CHALLENGE_*`、`CALENDAR_ID`）不設 = 功能關閉 |
+| 練字／語言的連結 | [app.js](app.js) 的 `LINGO_URL` | 指向原作者的英日語練習站。沒有自己的就把它指到你想連的網址，或到 `app.js` 用到 `LINGO_URL` 的地方（習慣列的「字」「語」連結）拿掉 |
+
+### 家人與寵物名字
+
+人物與寵物的名字／圖示／顏色在好幾處，**要一起改，不然下拉選單、圖表、後端驗證會對不上**：
+
+- [app.js](app.js) 最上面的 `OWNER_META`（`me`／`wife`／寵物各一筆的 `label`、`icon`、`color`）。
+- [shared.js](shared.js) 的 `PET_NAMES`、`PET_ICON`，以及 [apps-script/Code.gs](apps-script/Code.gs) 的 `PET_NAMES`（兩邊要一致；沒有寵物就留空陣列，寵物頁可以不用）。
+- [index.html](index.html) 的兩組擁有者下拉選單（新增事件、新增循環行程各一組）。
+- `Code.gs` 的 `CAL_OWNER_LABELS`（同步到 Google 行事曆時事件前面的標籤）。
+- **`me`／`wife` 這兩個值不要改**：它們是存在 Sheet 的資料 key，只改畫面上的 `label` 就好（你自己就是 `me`，另一半是 `wife`）。
+- 改了寵物名字，[scripts/regression-check.js](scripts/regression-check.js) 裡的測試資料也寫死了「林萌」「咪嚕」，記得一起換，不然回歸檢查會失敗。
+
+### 有特殊行為的習慣 ID
+
+幾個習慣的 id 寫死在程式裡，要跟**你自己 Sheet 的 Habits 那一列**一致才會有特殊行為（運動挑戰、練字連結、語言連結、週活動自動打卡）：
+
+- [app.js](app.js)：`CHALLENGE_HABIT_ID`、`LANG_HABIT_ID`、`PRACTICE_HABIT_ID`
+- [apps-script/Code.gs](apps-script/Code.gs)：`CHALLENGE_HABIT_ID`、`BODY_HABIT_ID`（`app.js` 與 `Code.gs` 的 `CHALLENGE_HABIT_ID` 要相同）
+
+不需要這些功能就**不用改**：新 Sheet 裡沒有這些 id，它們就不會觸發，習慣都當一般習慣用。要的話：先在 Habits 分頁建好那個習慣，把它的 `id` 貼進對應常數。運動挑戰需要另一個朋友的挑戰站（`CHALLENGE_*`），沒有就別設。
+
+### 個人數值與標準
+
+- [health-body.js](health-body.js)：`TARGET_WEIGHT`（目標體重）、`ACTUAL_AGE`（實際年齡，生日過了手動更新）；體脂率、腰臀比的分級用的是**男性**標準，女性要改該檔的分級門檻。
+- [health-labs.js](health-labs.js)：驗血參考範圍採原作者自己報告上的範圍，改成你的報告單範圍（匯入時報告上有的範圍會優先）。
+- 血壓警示門檻在 [health.js](health.js)，依你的醫師建議調整。
+- 時區與假日：`Code.gs` 的 `TIME_ZONE`（預設 `Asia/Taipei`）、`HOLIDAY_CALENDAR_ID`（預設台灣國定假日；不在台灣要換成當地的 Google 假日行事曆）。
+
+### 信用卡銀行清單
+
+[bills.html](bills.html) 有兩處寫死銀行：新增帳單的「銀行」下拉，以及帳單紀錄的篩選下拉（含「已停用」那幾個）。換成你的銀行；Sheet 裡存的是銀行名稱字串，所以名稱前後要一致。
+
+### 名稱與外觀
+
+- App 名稱「承日常」：[manifest.webmanifest](manifest.webmanifest) 的 `name`／`short_name`，以及每個 `.html` 的 `<title>`、`apple-mobile-web-app-title`、鎖定畫面的 `<h1>`（用編輯器全域取代即可）。
+- 圖示：改 [icons/icon.svg](icons/icon.svg) 後跑 `sh scripts/make-icons.sh` 重新產生各尺寸 PNG（需要本機 Chrome）。
+- 行事曆同步建立的 Google 行事曆叫「承日常」（見下方「同步到 Google 行事曆」），可以改名，ID 放 `CALENDAR_ID`。
+
+### 可以整段拿掉的東西
+
+- 裝潢報價頁（`renovation.html/js`、`APP_NAV` 一筆、`Code.gs` 的 Reno 區塊）：一次性專案，不需要就一起移除（見「裝潢報價」）。
+- 寵物頁、血壓／體組成／驗血、食譜與想吃的店：不用的話從 `shared.js` 的 `APP_NAV` 拿掉那一筆就不會出現在導覽（對應的 Sheet 分頁可以不建）。
+- `.claude/skills/cheng-daily-import/`（匯入格式的 skill）與 [CLAUDE.md](CLAUDE.md) 是原作者的工作筆記，裡面有原作者家庭的脈絡；你可以改成自己的，或整個刪掉。
+
+### 改完要做的檢查
+
+1. `node scripts/regression-check.js` 要全過。
+2. `sh scripts/install-hooks.sh`（pre-commit 會自動更新 `?v=` 版本參數）。
+3. 本機預覽：`python3 -m http.server 8791`，用你自己的密碼登入，各頁走一遍。
+4. **這個 repo 是公開的**：Sheet ID、密碼、token、真實資料都不要寫進程式或 commit，一律放 Script Properties 或 Sheet。
+
 ## 快取版本參數
 
 HTML 裡 `style.css` 和各個 `.js` 的網址都帶 `?v=時間戳`，避免改版後瀏覽器/GitHub Pages
