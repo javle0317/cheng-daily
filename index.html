@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="承日常">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141f" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261023084748">
+</head>
+<body data-page="home">
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>承日常</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>承日常</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header multi">
+      <div>
+        <p id="todayEyebrow" class="eyebrow"></p>
+        <h1 id="todayDate"></h1>
+        <p id="progressLine" class="progress-line progress-link" role="button" tabindex="0" title="跳到今日待辦"></p>
+      </div>
+      <div class="header-actions">
+        <button id="shoppingBtn" class="ghost-btn" title="清單" aria-label="清單"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/></svg></button>
+        <span id="navIcons" class="nav-icons"></span>
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section id="habitsCard" class="card habits-card hidden">
+        <h2>習慣與目標 <span id="selectedDateLabel"></span></h2>
+        <div id="habitDateBar" class="habit-date-bar">
+          <button id="habitPrevDay" class="ghost-btn" type="button" aria-label="前一天（補打卡）" title="前一天（補打卡）">‹</button>
+          <span id="habitDateText" class="habit-date-text"></span>
+          <button id="habitNextDay" class="ghost-btn" type="button" aria-label="後一天" title="後一天">›</button>
+          <button id="habitTodayBtn" class="ghost-btn hidden" type="button">回到今天</button>
+        </div>
+        <p id="habitBackfillNote" class="habit-backfill-note hidden">你正在補登過去的日子：勾選會記在這一天，不是今天。</p>
+
+        <div id="dailyHabitSection">
+          <h3 class="sub-heading">每日習慣</h3>
+          <ul id="dailyHabitList" class="item-list"></ul>
+        </div>
+
+        <div id="weeklyHabitSection">
+          <h3 class="sub-heading">每週目標</h3>
+          <ul id="weeklyHabitList" class="item-list"></ul>
+        </div>
+
+        <div id="monthlyHabitSection">
+          <h3 class="sub-heading">每月目標</h3>
+          <ul id="monthlyHabitList" class="item-list"></ul>
+        </div>
+      </section>
+
+      <!-- ====== 檢視優先區 ====== -->
+
+      <section class="card calendar-card">
+        <div class="calendar-nav">
+          <button id="todayBtn" class="ghost-btn" title="回到今天">今天</button>
+          <div class="calendar-nav-center">
+            <button id="prevMonth" class="ghost-btn">‹</button>
+            <h2 id="monthLabel"></h2>
+            <button id="nextMonth" class="ghost-btn">›</button>
+          </div>
+          <button class="ghost-btn calendar-nav-spacer" aria-hidden="true" tabindex="-1">今天</button>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+        <div class="cal-sync-row">
+          <span id="calSyncAlert" class="cal-sync-alert hidden"></span>
+          <button id="calSyncIcon" type="button" class="cal-sync-icon hidden" title="Google 行事曆同步" aria-label="Google 行事曆同步">☁️</button>
+        </div>
+      </section>
+
+      <section class="card today-events-card">
+        <h2>今日事件 <span id="selectedDateLabel2"></span><button id="addEventBtn" type="button" class="ghost-btn add-btn" title="新增事件" aria-label="新增事件">＋</button></h2>
+        <ul id="eventList" class="item-list"></ul>
+      </section>
+
+      <section class="card goals-card">
+        <h2>今日待辦 <span id="selectedDateLabel3"></span></h2>
+        <form id="goalForm" class="inline-form">
+          <input id="goalInput" type="text" placeholder="新增一個待辦…" required>
+          <button type="submit">新增</button>
+        </form>
+        <ul id="goalList" class="item-list"></ul>
+      </section>
+
+
+
+
+      <!-- ====== 新增/管理區（依使用頻率排：記事、花費常用；循環行程、習慣不常用） ====== -->
+
+      <section class="card new-recurring-card">
+        <h2>循環行程<button id="addRecurringBtn" type="button" class="ghost-btn add-btn" title="新增循環行程" aria-label="新增循環行程">＋</button></h2>
+        <ul id="recurringList" class="item-list"></ul>
+      </section>
+
+      <section class="card new-habit-card">
+        <h2>新增習慣</h2>
+        <form id="habitForm" class="entry-form">
+          <input id="habitName" type="text" placeholder="習慣名稱…" required>
+          <select id="habitFrequency">
+            <option value="daily">每日</option>
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+          </select>
+          <input id="habitTarget" type="number" min="1" value="1" placeholder="目標次數">
+          <label id="habitWorkdaysLabel" class="checkbox-label">
+            <input id="habitWorkdaysOnly" type="checkbox">
+            僅工作日
+          </label>
+          <button id="habitSubmitBtn" type="submit" disabled>新增</button>
+        </form>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="habitEditModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>編輯習慣</h2>
+        <button id="habitEditCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="habitEditForm" class="entry-form">
+        <input id="habitEditName" type="text" placeholder="習慣名稱…" required>
+        <label id="habitEditTargetLabel" class="checkbox-label">
+          目標次數
+          <input id="habitEditTarget" type="number" min="1" value="1">
+        </label>
+        <label id="habitEditWorkdaysLabel" class="checkbox-label">
+          <input id="habitEditWorkdaysOnly" type="checkbox">
+          只算工作日
+        </label>
+        <textarea id="habitEditDetail" rows="5" maxlength="2000" placeholder="細節（選填）：該做到什麼、步驟…，填了列上會出現 ⓘ"></textarea>
+        <p class="progress-line">頻率不能修改（紀錄會對不起來），要換請刪掉重加</p>
+        <button id="habitEditSubmitBtn" type="submit">儲存</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="habitInfoModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="habitInfoTitle"></h2>
+        <button id="habitInfoCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <div id="habitInfoBody" class="habit-info-body"></div>
+    </div>
+  </div>
+
+  <div id="eventModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="emHeading">新增事件</h2>
+        <button id="emCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="eventModalForm" class="entry-form entry-form-rows modal-form">
+        <label class="mf">標題<input id="emTitle" type="text" placeholder="項目…" required maxlength="200"></label>
+        <div class="form-row">
+          <label class="mf">日期<input id="emDate" type="date" required></label>
+          <label class="mf">對象
+            <select id="emOwner">
+              <option value="shared">🤝 一起</option>
+              <option value="me">🧑 承承</option>
+              <option value="wife">👩 君君</option>
+              <option value="林萌">🐕 林萌</option>
+              <option value="咪嚕">🐈 咪嚕</option>
+            </select>
+          </label>
+        </div>
+        <div class="mf">時間（選填）
+          <span class="time-range">
+            <label>開始 <input id="emTime" type="time"></label>
+            <label>結束 <input id="emEndTime" type="time"></label>
+          </span>
+        </div>
+        <label class="mf">備註／地點<input id="emNote" type="text" placeholder="備註/地點…" maxlength="2000"></label>
+        <div id="emPetBox" class="em-pet-box hidden">
+          <label class="checkbox-label"><input id="emPetLog" type="checkbox"> 要登記到寵物紀錄嗎？</label>
+          <p id="emPetHint" class="progress-line"></p>
+          <div id="emPetFields" class="form-row hidden">
+            <label class="mf">類型<select id="emPetType"></select></label>
+            <label class="mf">金額（選填）<input id="emPetAmount" type="text" inputmode="decimal" placeholder="金額"></label>
+          </div>
+        </div>
+        <p id="emHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="emDeleteBtn" class="ghost-btn danger-btn hidden" type="button">刪除</button>
+          <span class="spacer"></span>
+          <button id="emCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="emSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="petQuickModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>記到寵物紀錄</h2>
+        <button id="pqClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petQuickForm" class="entry-form entry-form-rows modal-form">
+        <p id="pqInfo" class="sub-heading"></p>
+        <div class="form-row">
+          <label class="mf">類型<select id="pqType"></select></label>
+          <label class="mf">金額（選填）<input id="pqAmount" type="text" inputmode="decimal" placeholder="金額"></label>
+        </div>
+        <label class="mf">備註（選填）<input id="pqNote" type="text" maxlength="500" autocomplete="off"></label>
+        <p id="pqHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="pqSubmit" type="submit">記下來</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="recurringModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="rmHeading">新增循環行程</h2>
+        <button id="rmCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="recurringModalForm" class="entry-form entry-form-rows modal-form">
+        <p id="rmNotice" class="progress-line hidden">這是循環行程，修改會套用到之後每一次。</p>
+        <label class="mf">標題<input id="rmTitle" type="text" placeholder="項目…" required maxlength="200"></label>
+        <div class="form-row">
+          <label class="mf">對象
+            <select id="rmOwner">
+              <option value="shared">🤝 一起</option>
+              <option value="me">🧑 承承</option>
+              <option value="wife">👩 君君</option>
+              <option value="林萌">🐕 林萌</option>
+              <option value="咪嚕">🐈 咪嚕</option>
+            </select>
+          </label>
+          <label class="mf">頻率
+            <select id="rmFrequency">
+              <option value="weekly">每週</option>
+              <option value="monthly">每月</option>
+            </select>
+          </label>
+          <label id="rmWeekWrap" class="mf">星期
+            <select id="rmDayOfWeek">
+              <option value="0">週日</option>
+              <option value="1">週一</option>
+              <option value="2">週二</option>
+              <option value="3">週三</option>
+              <option value="4">週四</option>
+              <option value="5">週五</option>
+              <option value="6">週六</option>
+            </select>
+          </label>
+          <label id="rmMonthWrap" class="mf hidden">幾號<input id="rmDayOfMonth" type="number" min="1" max="31" placeholder="1–31"></label>
+        </div>
+        <div class="mf">時間（選填）
+          <span class="time-range">
+            <label>開始 <input id="rmTime" type="time"></label>
+            <label>結束 <input id="rmEndTime" type="time"></label>
+          </span>
+        </div>
+        <label class="mf">截止日（選填，含當天；空白 = 無限期）<input id="rmEndDate" type="date"></label>
+        <label class="mf">備註／地點<input id="rmNote" type="text" placeholder="備註/地點…" maxlength="2000"></label>
+        <button id="rmSkipBtn" class="ghost-btn hidden" type="button"></button>
+        <p id="rmHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="rmDeleteBtn" class="ghost-btn danger-btn hidden" type="button">刪除</button>
+          <span class="spacer"></span>
+          <button id="rmCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="rmSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="shoppingModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>清單</h2>
+        <button id="shoppingCloseBtn" class="ghost-btn">✕</button>
+      </div>
+      <div class="list-tabs">
+        <button type="button" class="list-tab active" data-category="shopping">🛒 購物</button>
+        <button type="button" class="list-tab" data-category="idea">💡 想法</button>
+      </div>
+      <form id="shoppingForm" class="inline-form">
+        <textarea id="shoppingInput" rows="1" placeholder="新增購買項目…" required></textarea>
+        <button type="submit">新增</button>
+      </form>
+      <ul id="shoppingList" class="item-list"></ul>
+      <button id="clearDoneBtn" type="button" class="ghost-btn clear-done-btn hidden">清除已完成</button>
+    </div>
+  </div>
+
+  <div id="listEditModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="leHeading">編輯項目</h2>
+        <button id="leCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="listEditForm" class="entry-form entry-form-rows modal-form">
+        <label class="mf">內容<textarea id="leText" rows="3" required maxlength="5000"></textarea></label>
+        <p id="leHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="leCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="leSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="calSyncModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <h3 class="cal-sync-title">Google 行事曆同步</h3>
+      <p id="calSyncText"></p>
+      <pre id="calSyncPreview" class="cal-sync-preview hidden"></pre>
+      <div class="dialog-actions">
+        <button id="calPreviewBtn" class="ghost-btn" type="button">預覽</button>
+        <button id="calSyncBtn" class="ghost-btn" type="button">立即同步</button>
+        <button id="calSyncCloseBtn" type="button">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js?v=20261023084748"></script>
+  <script src="app.js?v=20261023084748"></script>
+</body>
+</html>

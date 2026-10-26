@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- 承日常 主畫面圖示：藏青底、磚紅略傾斜的印章、象牙色「承」、黃銅細線。
+       iPhone 會自己套圓角，所以這裡是滿版方形，內容留在中間 80%。字體 Noto Serif TC 700（產生 PNG 時要連網載入）。 -->
+  <rect width="180" height="180" fill="#223A6E"/>
+  <g transform="rotate(-4 90 90)">
+    <rect x="42" y="42" width="96" height="96" rx="12" fill="#C4533B"/>
+    <rect x="49" y="49" width="82" height="82" rx="7" fill="none" stroke="#F6F0E0" stroke-width="2" opacity=".6"/>
+    <text x="90" y="92" text-anchor="middle" dominant-baseline="central" font-family="'Noto Serif TC','Songti TC',serif" font-weight="700" font-size="64" fill="#F6F0E0">承</text>
+  </g>
+  <line x1="46" y1="152" x2="134" y2="152" stroke="#C9A04A" stroke-width="2.5"/>
+</svg>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="承日常">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141f" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>寵物 · 承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261023084748">
+</head>
+<body data-page="pets">
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>承日常</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>承日常</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1>寵物</h1>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <main class="grid dense pets-main">
+      <div class="pet-switch" id="petSwitch" role="tablist" aria-label="選擇寵物"></div>
+      <div class="pet-switch pet-tabs" id="petTabs" role="tablist" aria-label="分頁">
+        <button type="button" class="pet-tab on" data-tabbtn="log" role="tab">紀錄</button>
+        <button type="button" class="pet-tab" data-tabbtn="labs" role="tab">驗血</button>
+      </div>
+      <div class="health-toolbar pet-toolbar" data-tab="log">
+        <button id="openPetLogForm" type="button" class="add-primary">＋ 新增紀錄</button>
+        <button id="openPetMigrate" type="button" class="ghost-btn hidden">待登記</button>
+      </div>
+
+      <section class="card pet-summary-card" data-tab="log">
+        <h2>概況</h2>
+        <div id="petSummary" class="pet-tiles"></div>
+      </section>
+
+      <section class="card pet-log-card" data-tab="log">
+        <div class="bp-list-header">
+          <h2>紀錄</h2>
+          <select id="petMonthFilter" class="hidden" aria-label="月份"></select>
+          <select id="petTypeFilter" aria-label="類型"></select>
+        </div>
+        <p id="petMonthTotal" class="progress-line"></p>
+        <div id="petLogList"></div>
+      </section>
+      <div class="health-toolbar pet-toolbar hidden" data-tab="labs">
+        <button id="openPetLabForm" type="button" class="add-primary">＋ 新增驗血</button>
+      </div>
+
+      <section id="petLabTrendCard" class="card hidden" data-tab="labs">
+        <div class="bp-list-header">
+          <h2>趨勢</h2>
+          <select id="petLabItem" aria-label="項目"></select>
+        </div>
+        <div id="petLabChart"></div>
+        <div class="pet-pref-line">
+          <span id="petLabPrefLine" class="progress-line"></span>
+          <button id="petLabPrefBtn" type="button" class="ghost-btn hidden">個人化設定</button>
+        </div>
+        <div id="petLabExplain" class="lab-explain"></div>
+      </section>
+
+      <section class="card hidden" data-tab="labs">
+        <div class="bp-list-header">
+          <h2>最近一次</h2>
+          <button id="petLabShowAll" type="button" class="ghost-btn hidden"></button>
+        </div>
+        <p id="petLabLatestInfo" class="progress-line"></p>
+        <div id="petLabLatest" class="lab-latest pet-lab-latest"></div>
+        <p class="health-disclaimer">標示依每份報告上印的參考範圍判斷；你和醫師確認過「這隻沒關係」的項目，可以在趨勢圖旁的「個人化設定」調整。分級僅供參考，請以醫師診斷為準。</p>
+      </section>
+
+      <section class="card hidden" data-tab="labs">
+        <h2>歷史紀錄</h2>
+        <div id="petLabList"></div>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="petLogModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2 id="petLogTitle">新增紀錄</h2>
+        <button id="petLogClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petLogForm" class="entry-form entry-form-rows modal-form">
+        <div class="form-row">
+          <label class="mf">寵物
+            <select id="petLogPet"></select>
+          </label>
+          <label class="mf">類型
+            <select id="petLogType"></select>
+          </label>
+        </div>
+        <label class="mf">日期
+          <input id="petLogDate" type="date" required>
+        </label>
+        <label class="mf"><span id="petLogTitleLabel">品項</span>
+          <input id="petLogItem" type="text" maxlength="100" required autocomplete="off">
+        </label>
+        <label class="mf">金額（選填）
+          <input id="petLogAmount" type="number" min="0" inputmode="decimal" placeholder="金額">
+        </label>
+        <label class="mf"><span id="petLogNoteLabel">備註（選填）</span>
+          <textarea id="petLogNote" rows="3" maxlength="500"></textarea>
+        </label>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="petLogSubmit" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="petMigrateModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>待登記</h2>
+        <button id="petMigrateClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <p class="progress-line">這些是行事曆裡寵物已經發生、還沒登記到寵物紀錄的事件。確認類型、取消不要的，再按「搬進寵物紀錄」；不用登記的勾起來按「略過」，之後就不會再列出。原本的事件都不會被刪除。</p>
+      <label class="checkbox-label"><input id="petMigrateAll" type="checkbox"> 顯示全部寵物事件（含標題看不出類型的；還沒到的預約不會列）</label>
+      <ul id="petMigrateList" class="item-list pet-migrate-list"></ul>
+      <div class="dialog-actions modal-actions">
+        <span id="petMigrateCount" class="progress-line"></span>
+        <span class="spacer"></span>
+        <button id="petMigrateSkip" type="button" class="ghost-btn">略過勾選的</button>
+        <button id="petMigrateSubmit" type="button">搬進寵物紀錄</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="petLabModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增驗血紀錄</h2>
+        <button id="petLabClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petLabForm" class="entry-form entry-form-rows modal-form">
+        <details class="more-fields">
+          <summary>貼上匯入（從報告照片）</summary>
+          <textarea id="petLabImportText" rows="4" placeholder="貼上對話裡給你的驗血資料（JSON）…"></textarea>
+          <button id="petLabImportBtn" type="button" class="ghost-btn">填入表單</button>
+        </details>
+        <p id="petLabImportMsg" class="import-msg" role="status"></p>
+        <div class="form-row">
+          <label class="mf">寵物
+            <select id="petLabPet"></select>
+          </label>
+          <label class="mf">日期
+            <input id="petLabDate" type="date" required>
+          </label>
+        </div>
+        <div id="petLabRows"></div>
+        <datalist id="petLabNames"></datalist>
+        <button id="petLabAddRow" type="button" class="ghost-btn">＋ 加一個項目</button>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="petLabSubmit" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="petPrefModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>個人化設定</h2>
+        <button id="petPrefClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="petPrefForm" class="entry-form entry-form-rows modal-form">
+        <p id="petPrefItem" class="sub-heading"></p>
+        <label class="checkbox-label"><input type="radio" name="petPrefMode" value="ok" checked> 醫師說無妨：照樣顯示偏高／偏低，但不用紅黃燈警示</label>
+        <label class="checkbox-label"><input type="radio" name="petPrefMode" value="range"> 自訂這隻的範圍（取代報告上的範圍）</label>
+        <div class="form-row">
+          <label class="mf">範圍下限
+            <input id="petPrefLow" type="text" inputmode="decimal" placeholder="可留空">
+          </label>
+          <label class="mf">範圍上限
+            <input id="petPrefHigh" type="text" inputmode="decimal" placeholder="可留空">
+          </label>
+        </div>
+        <label class="mf">備註（選填）
+          <input id="petPrefNote" type="text" maxlength="200" placeholder="例如：2026/10 醫師說這隻本來就偏低" autocomplete="off">
+        </label>
+        <p id="petPrefHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="petPrefClear" type="button" class="ghost-btn danger-btn hidden">取消設定</button>
+          <span class="spacer"></span>
+          <button id="petPrefSave" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js?v=20261023084748"></script>
+  <script src="health-charts.js?v=20261023084748"></script>
+  <script src="pets.js?v=20261023084748"></script>
+  <script src="pets-labs.js?v=20261023084748"></script>
+</body>
+</html>

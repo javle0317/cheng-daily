@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="承日常">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141f" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>信用卡帳單 · 承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261023084748">
+</head>
+<body data-page="bills">
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>承日常</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>承日常</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1>信用卡帳單</h1>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <main class="grid dense">
+      <div class="health-toolbar"><button id="openBillForm" type="button" class="add-primary">＋ 新增帳單</button></div>
+
+      <section id="billUnpaidCard" class="card bill-unpaid-card hidden">
+        <h2>待繳款</h2>
+        <ul id="billUnpaidList" class="item-list"></ul>
+      </section>
+
+      <section class="card bp-chart-card">
+        <div class="calendar-nav">
+          <button id="billYearPrev" class="ghost-btn">‹</button>
+          <h2 id="billYearLabel"></h2>
+          <button id="billYearNext" class="ghost-btn">›</button>
+        </div>
+        <div class="bp-chart-controls">
+          <label class="checkbox-label">
+            <input id="billCompareLastYear" type="checkbox">
+            跟去年比較
+          </label>
+          <select id="billCompareExtraYear">
+            <option value="">+ 再加一個年份</option>
+          </select>
+        </div>
+
+        <div id="billStatsRow" class="bp-stats-row"></div>
+        <div id="billYearChart"></div>
+
+        <div class="bp-list-header">
+          <h3 class="sub-heading">各銀行比較</h3>
+          <select id="billBankChartMonth"></select>
+        </div>
+        <div id="billBankChart"></div>
+      </section>
+
+      <section class="card utility-card">
+        <h2>水電瓦斯<button id="openUtilForm" type="button" class="ghost-btn add-btn" title="新增帳單" aria-label="新增水電瓦斯帳單">＋</button></h2>
+        <div id="utilTypes" class="seg-switch" role="tablist" aria-label="類型"></div>
+        <div id="utilModes" class="seg-switch seg-small hidden" role="tablist" aria-label="圖表內容"></div>
+        <p class="progress-line">只看趨勢，不加進上面信用卡帳單的合計（水電多半已經刷卡）。「月均」＝帳單 ÷ 計費月數（兩個月一期的帳單除以 2，才能跟一個月一期的比）；每度單價＝金額 ÷ 用量。</p>
+        <div id="utilChart"></div>
+        <div id="utilChartTools" class="util-chart-tools hidden"><button id="utilChartToggle" type="button" class="ghost-btn"></button></div>
+        <p id="utilStats" class="progress-line"></p>
+        <div id="utilYoY"></div>
+        <div id="utilList"></div>
+      </section>
+
+      <section class="card bill-list-card">
+        <div class="bp-list-header">
+          <h2>帳單紀錄</h2>
+          <select id="billListMonth" class="hidden" aria-label="帳單月份"></select>
+          <select id="billListFilter">
+            <option value="all">全部銀行</option>
+            <option value="聯邦">聯邦</option>
+            <option value="國泰">國泰</option>
+            <option value="中信">中信</option>
+            <option value="富邦">富邦</option>
+            <option value="兆豐">兆豐</option>
+            <option value="玉山">玉山</option>
+            <option value="星展">星展（已停用）</option>
+            <option value="富邦貸">富邦貸（已停用）</option>
+            <option value="中信貸">中信貸（已停用）</option>
+          </select>
+        </div>
+        <div id="billList"></div>
+      </section>
+
+
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="billFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增帳單</h2>
+        <button id="billFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="billForm" class="entry-form entry-form-rows modal-form">
+        <div class="form-row">
+          <label class="mf">銀行
+            <select id="billBank">
+              <option value="聯邦">聯邦</option>
+              <option value="國泰">國泰</option>
+              <option value="中信">中信</option>
+              <option value="富邦">富邦</option>
+              <option value="兆豐">兆豐</option>
+              <option value="玉山">玉山</option>
+            </select>
+          </label>
+          <label class="mf">帳單年月
+            <input id="billBillingMonth" type="month" required>
+          </label>
+        </div>
+        <label class="mf">繳費截止日
+          <input id="billDate" type="date" required>
+        </label>
+        <div class="form-row">
+          <label class="mf">帳單全額
+            <input id="billFullAmount" type="number" min="0" inputmode="decimal" placeholder="金額" required>
+          </label>
+          <label class="mf">最低應繳
+            <input id="billLowestAmount" type="number" min="0" inputmode="decimal" placeholder="金額" required>
+          </label>
+        </div>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="billSubmitBtn" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="utilModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2 id="utilModalTitle">新增帳單</h2>
+        <button id="utilClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="utilForm" class="entry-form entry-form-rows modal-form">
+        <details id="utilImportBox" class="more-fields">
+          <summary>批次貼上匯入（歷史帳單）</summary>
+          <textarea id="utilImportText" rows="4" placeholder="貼上對話裡給你的帳單資料（JSON）…"></textarea>
+          <button id="utilImportBtn" type="button" class="ghost-btn">檢查並匯入</button>
+        </details>
+        <p id="utilImportMsg" class="import-msg" role="status"></p>
+        <div class="form-row">
+          <label class="mf">類型
+            <select id="utilType"></select>
+          </label>
+          <label class="mf">帳單月份
+            <input id="utilMonth" type="month" required>
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="mf">金額（只記用量時可留空）
+            <input id="utilAmount" type="number" min="0" inputmode="decimal" placeholder="帳單金額">
+          </label>
+          <label class="mf">計費月數
+            <select id="utilMonths">
+              <option value="1">1 個月</option>
+              <option value="2">2 個月</option>
+            </select>
+          </label>
+        </div>
+        <label class="mf">用量（度，選填）
+          <input id="utilUsage" type="text" inputmode="decimal" placeholder="帳單上的度數">
+        </label>
+        <label class="mf">備註（選填）
+          <input id="utilNote" type="text" maxlength="100" autocomplete="off">
+        </label>
+        <p id="utilHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <span class="spacer"></span>
+          <button id="utilSubmit" type="submit" disabled>新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js?v=20261023084748"></script>
+  <script src="health-charts.js?v=20261023084748"></script>
+  <script src="bills.js?v=20261023084748"></script>
+  <script src="utilities.js?v=20261023084748"></script>
+</body>
+</html>

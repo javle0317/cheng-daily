@@ -1,0 +1,7 @@
+#!/bin/sh
+# 只要這次 commit 有改到前端的 js/css，就自動更新 HTML 的版本參數並一起 commit。
+# 安裝：sh scripts/install-hooks.sh
+if git diff --cached --name-only | grep -E '^[^/]+\.(js|css)$' >/dev/null; then
+  sh scripts/bump-version.sh >/dev/null
+  git add ./*.html
+fi

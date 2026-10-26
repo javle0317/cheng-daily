@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="承日常">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141f" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>健康 · 承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261023084748">
+</head>
+<body data-page="health">
+
+  <div id="lockScreen" class="lock-screen">
+    <div id="lockLoading" class="lock-card hidden">
+      <h1>承日常</h1>
+      <p>登入中…</p>
+    </div>
+    <form id="lockForm" class="lock-card">
+      <h1>承日常</h1>
+      <input id="passwordInput" type="password" placeholder="輸入密碼" autocomplete="off" required>
+      <button type="submit">解鎖</button>
+      <p id="lockError" class="error-text"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="app-header">
+      <div>
+        <h1>健康</h1>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="ghost-btn">登出</button>
+      </div>
+    </header>
+
+    <nav class="health-tabs">
+      <button type="button" class="health-tab-btn active" data-tab="bp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5s-6 6.3-6 10.4a6 6 0 0 0 12 0C18 9.8 12 3.5 12 3.5z"/></svg>血壓</button>
+      <button type="button" class="health-tab-btn" data-tab="body"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 10a4 4 0 0 1 7 0M12 10l1.8-2"/></svg>體組成</button>
+      <button type="button" class="health-tab-btn" data-tab="labs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 3.5h5M10.5 3.5v6L5.5 18a1.8 1.8 0 0 0 1.600 2.5h9.8A1.8 1.8 0 0 0 18.5 18l-5-8.5v-6"/><path d="M8.5 14.5h7"/></svg>驗血</button>
+    </nav>
+
+    <main class="grid dense">
+      <div class="health-toolbar" data-tab="bp"><button id="openBpForm" type="button" class="add-primary">＋ 記一筆血壓</button></div>
+
+      <div class="health-toolbar hidden" data-tab="body"><button id="openBodyForm" type="button" class="add-primary">＋ 記錄體組成</button></div>
+
+      <div class="health-toolbar hidden" data-tab="labs"><button id="openLabForm" type="button" class="add-primary">＋ 新增驗血</button></div>
+
+      <section class="card bp-chart-card" data-tab="bp">
+        <div class="calendar-nav">
+          <button id="bpPeriodPrev" class="ghost-btn">‹</button>
+          <h2 id="bpPeriodLabel"></h2>
+          <button id="bpPeriodNext" class="ghost-btn">›</button>
+        </div>
+        <div class="bp-chart-controls">
+          <select id="bpGranularity">
+            <option value="month">本月（日趨勢）</option>
+            <option value="year">本年（月平均）</option>
+          </select>
+          <label class="checkbox-label">
+            <input id="bpCompareToggle" type="checkbox">
+            分起床/睡前比較（只看收縮壓）
+          </label>
+        </div>
+
+        <p id="bpAlertBanner" class="bp-alert hidden"></p>
+
+        <div id="bpStatsRow" class="bp-stats-row"></div>
+
+        <div id="bpChart"></div>
+        <div id="bpPulseChart"></div>
+
+      </section>
+
+      <section class="card bp-list-card" data-tab="bp">
+        <div class="bp-list-header">
+          <h2 id="bpListTitle">每日量測紀錄</h2>
+          <select id="bpListFilter">
+            <option value="all">全部</option>
+            <option value="morning">起床</option>
+            <option value="evening">睡前</option>
+          </select>
+        </div>
+        <div id="bpList"></div>
+      </section>
+
+
+      <!-- ====== 體組成（體脂計，Sheet 分頁名稱 InBody）====== -->
+      <section class="card health-main-card hidden" data-tab="body">
+        <div class="bp-list-header">
+          <h2>體重與體組成 <button type="button" id="bodyInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
+          <select id="bodyRange">
+            <option value="all">全部</option>
+            <option value="1y">近 1 年</option>
+            <option value="3m">近 3 個月</option>
+          </select>
+        </div>
+        <div id="bodyInfoBox" class="info-box hidden">BMI 依國健署成人標準（24 過重、27 輕度肥胖、30 中度、35 重度）；體脂率 25% 以上為肥胖是國健署標準，10–20% 標準、20–25% 偏高是一般體脂計慣用分法；腰臀比 0.9 以上依 WHO 男性腹部肥胖標準；內臟脂肪等級與身體年齡是體脂計廠商的算法，每個品牌分界不同，請以你的體脂計報告標示為準。僅供參考。</div>
+        <p id="bodyLatestMeta" class="progress-line"></p>
+        <div id="bodyStatsRow" class="bp-stats-row"></div>
+        <div id="bodyProgress" class="body-progress"></div>
+        <div class="bp-list-header">
+          <h3 class="sub-heading">趨勢</h3>
+          <select id="bodyChartItem"></select>
+        </div>
+        <p id="bodyChartMeta" class="progress-line"></p>
+        <div id="bodyChart"></div>
+      </section>
+
+      <section class="card health-list-card hidden" data-tab="body">
+        <h2>體組成紀錄</h2>
+        <div id="bodyList"></div>
+      </section>
+
+      <!-- ====== 驗血 ====== -->
+      <section class="card health-main-card hidden" data-tab="labs">
+        <h2>各項目最近一次 <button type="button" id="labInfoBtn" class="info-btn" title="說明" aria-label="分級說明">ⓘ</button></h2>
+        <div id="labInfoBox" class="info-box hidden">參考範圍採你驗血報告上的標示；分級（🟢正常 🟡注意 🟠偏高 🔴嚴重）：血糖與 HbA1c 依 ADA、血脂（總膽固醇、三酸甘油酯、HDL、LDL）依台灣血脂指引、eGFR 依 KDIGO；AST/ALT、肌酸酐、BUN、尿酸、TSH、CK、鈉、鉀的「注意/偏高」分界是依報告參考範圍推估，不是正式指引。LDL 的目標值預設 130（一般成人），有高血壓、糖尿病或腎臟病等風險時醫師的目標常更低（如 115、100、70），請在下方「LDL 目標」選成醫師設定的值（只記在這台裝置）。單次數值不能做診斷，僅供參考。</div>
+        <label class="inline-field">LDL 目標
+          <select id="labLdlTarget">
+            <option value="130">&lt;130（一般成人）</option>
+            <option value="115">&lt;115（中度風險）</option>
+            <option value="100">&lt;100（高風險）</option>
+            <option value="70">&lt;70（極高風險）</option>
+          </select>
+        </label>
+        <div id="labLatest" class="lab-latest"></div>
+        <div class="bp-list-header">
+          <h3 class="sub-heading">趨勢</h3>
+          <select id="labChartItem"></select>
+        </div>
+        <div id="labChart"></div>
+        <div id="labExplain" class="lab-explain"></div>
+      </section>
+
+      <section class="card health-list-card hidden" data-tab="labs">
+        <h2>驗血紀錄</h2>
+        <div id="labList"></div>
+      </section>
+    </main>
+
+    <p id="statusLine" class="status-line"></p>
+  </div>
+
+  <div id="bpFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增血壓紀錄</h2>
+        <button id="bpFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="bpForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <select id="bpDate" required></select>
+            <select id="bpPeriod">
+              <option value="morning">起床</option>
+              <option value="evening">睡前</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <input id="bpSystolic" type="number" min="0" placeholder="收縮壓" required>
+            <input id="bpDiastolic" type="number" min="0" placeholder="舒張壓" required>
+            <input id="bpPulse" type="number" min="0" placeholder="脈搏" required>
+          </div>
+          <div class="form-row">
+            <input id="bpNote" type="text" maxlength="200" placeholder="備註（選填）：懷疑原因，例如晚餐吃火鍋" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <button id="bpSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+    </div>
+  </div>
+
+  <div id="bodyFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增體組成紀錄</h2>
+        <button id="bodyFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="bodyForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <input id="bodyDate" type="date" required>
+            <input id="bodyWeight" type="number" step="any" min="0" inputmode="decimal" placeholder="體重 kg（必填）" required>
+          </div>
+          <div class="form-row">
+            <input id="bodyFatInput" type="number" step="any" min="0" inputmode="decimal" placeholder="體脂率 %">
+            <input id="bodySkeletal" type="number" step="any" min="0" inputmode="decimal" placeholder="骨骼肌量 kg">
+          </div>
+          <div class="form-row">
+            <input id="bodyVisceral" type="number" step="any" min="0" inputmode="decimal" placeholder="內臟脂肪">
+            <input id="bodyAge" type="number" step="any" min="0" inputmode="decimal" placeholder="身體年齡">
+          </div>
+          <details class="more-fields">
+            <summary>更多欄位</summary>
+            <div class="form-row">
+              <input id="bodyHeight" type="number" step="any" min="0" inputmode="decimal" placeholder="身高 cm">
+              <input id="bodyFatMass" type="number" step="any" min="0" inputmode="decimal" placeholder="體脂重量 kg">
+            </div>
+            <div class="form-row">
+              <input id="bodyMuscle" type="number" step="any" min="0" inputmode="decimal" placeholder="全身肌肉量 kg">
+              <input id="bodyWater" type="number" step="any" min="0" inputmode="decimal" placeholder="體水分 kg">
+            </div>
+            <div class="form-row">
+              <input id="bodyProtein" type="number" step="any" min="0" inputmode="decimal" placeholder="蛋白質 kg">
+              <input id="bodyBmr" type="number" step="any" min="0" inputmode="decimal" placeholder="基礎代謝率 kcal">
+            </div>
+            <div class="form-row">
+              <input id="bodyWhr" type="number" step="any" min="0" inputmode="decimal" placeholder="腰臀比">
+            </div>
+          </details>
+          <details class="more-fields">
+            <summary>貼上匯入（從體脂計報告）</summary>
+            <textarea id="bodyImportText" rows="4" placeholder="貼上對話裡給你的體組成資料（JSON）…"></textarea>
+            <button id="bodyImportBtn" type="button" class="ghost-btn">填入表單</button>
+            <p id="bodyImportMsg" class="progress-line"></p>
+          </details>
+          <p id="bodyBmiPreview" class="progress-line"></p>
+          <div class="form-row">
+            <button id="bodySubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+    </div>
+  </div>
+
+  <div id="labFormModal" class="modal-overlay hidden">
+    <div class="modal-card form-modal">
+      <div class="modal-header">
+        <h2>新增驗血紀錄</h2>
+        <button id="labFormClose" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="labForm" class="entry-form entry-form-rows">
+          <div class="form-row">
+            <input id="labDate" type="date" required>
+          </div>
+          <details class="more-fields">
+            <summary>貼上匯入（從報告照片）</summary>
+            <textarea id="labImportText" rows="4" placeholder="貼上對話裡給你的驗血資料（JSON）…"></textarea>
+            <button id="labImportBtn" type="button" class="ghost-btn">填入表單</button>
+            <p id="labImportMsg" class="progress-line"></p>
+          </details>
+          <div id="labFormFields"></div>
+          <div class="lab-group-title">其他項目（報告上有、上面沒列的）</div>
+          <div id="labExtraRows"></div>
+          <datalist id="labExtraNames"></datalist>
+          <button id="labAddExtraBtn" type="button" class="ghost-btn">＋ 新增一個項目</button>
+          <p class="progress-line">只填這次有驗的項目就好，其他留空。其他項目請照報告填名稱、數值、單位和報告上印的參考範圍（沒有就留空）。</p>
+          <div class="form-row">
+            <button id="labSubmitBtn" type="submit" disabled>新增</button>
+          </div>
+        </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="dialogModal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <p id="dialogMessage"></p>
+      <input id="dialogInput" type="text" class="hidden">
+      <div class="dialog-actions">
+        <button id="dialogCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="dialogOkBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared.js?v=20261023084748"></script>
+  <script src="health-charts.js?v=20261023084748"></script>
+  <script src="health.js?v=20261023084748"></script>
+  <script src="health-body.js?v=20261023084748"></script>
+  <script src="health-labs.js?v=20261023084748"></script>
+  <script>initAuth();</script>
+</body>
+</html>

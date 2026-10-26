@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>鎖定畫面桌布 · 承日常</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* 給 iOS 捷徑截圖當鎖定畫面桌布用：固定深色，不跟系統主題。上方約 40% 留空給時鐘與小工具。 */
+:root { --bg: #10141f; --text: #e9e4d6; --dim: #8b90a0; --line: #2a3042; --accent: #d9b66b; --pop: #e8786a; }
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--bg); color: var(--text); font-family: "Noto Serif TC", serif; }
+/* 左右內縮 14%：設成桌布時 iOS 會把比較寬的裁切圖左右各裁掉約 11%。上方留白用 vh，頁面可用高度會被瀏覽器工具列壓縮，所以比例要比螢幕小。 */
+html, body { height: 100%; overflow: hidden; }
+body { padding: 24vh 14vw 0; }
+.month-title { font-size: 15px; letter-spacing: .12em; color: var(--accent); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; text-align: center; }
+.dow { font-size: 10px; color: var(--dim); padding-bottom: 4px; }
+.cell { font-size: 13px; height: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.cell.holiday, .cell.sun { color: var(--pop); }
+.cell.today span { background: var(--accent); color: var(--bg); border-radius: 50%; width: 22px; height: 22px; line-height: 22px; font-weight: 700; }
+.cell i { position: absolute; bottom: 1px; width: 4px; height: 4px; border-radius: 50%; background: var(--dim); }
+.cell.today i { display: none; }
+h2 { font-size: 12px; letter-spacing: .15em; color: var(--dim); font-weight: 500; margin: 12px 0 5px; padding-top: 8px; border-top: 1px solid var(--line); }
+ul { list-style: none; padding: 0; }
+li { font-size: 14px; line-height: 1.55; display: flex; gap: 8px; }
+li .t { color: var(--accent); min-width: 44px; font-variant-numeric: tabular-nums; }
+li.empty, li.more { color: var(--dim); }
+li.habit::before { content: "○"; color: var(--accent); }
+#setup { position: fixed; inset: 0; background: var(--bg); padding: 30vh 24px; display: none; }
+#setup.show { display: block; }
+#setup input, #setup button { width: 100%; font-size: 16px; padding: 12px; margin-top: 12px; border-radius: 8px; border: 1px solid var(--line); background: #1a2030; color: var(--text); }
+#err { color: var(--pop); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <main id="main"></main>
+
+  <form id="setup">
+    <p>第一次使用：貼上桌布唯讀 token（Script Property 的 WALLPAPER_TOKEN）。只存在這個瀏覽器裡。</p>
+    <input id="tokenInput" type="password" placeholder="token" autocomplete="off" required>
+    <button type="submit">儲存</button>
+    <p id="err"></p>
+  </form>
+
+  <script src="wallpaper.js?v=20261023084748"></script>
+</body>
+</html>
