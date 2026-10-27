@@ -362,6 +362,8 @@ HTML 裡 `style.css` 和各個 `.js` 的網址都帶 `?v=時間戳`，避免改�
 - 勾選框要樂觀更新（先同步 `done` 樣式），失敗時還原 `checked` 與樣式。
 - 之後新增任何欄位或按鈕，只要會送後端，都照這個規則做。
 
+**名稱過長一律單行 `...` 省略，不撐版面。** `style.css` 的 `.truncate`、`.item-text`、`.reno-vendor-name` 已套用；新的名稱欄位加 `.truncate`（flex 子元素要有 `min-width: 0`，已含在該 class）。電腦滑過時 `shared.js` 會自動補 `title` 顯示全名；手機（`hover: none`）點一下展開／再點收合（`.expanded`），在按鈕、連結、`[role=button]`、`.clickable`、`#shoppingList` 內不攔截。裝潢商家卡的標題列本身是按鈕，所以展開商家後直接顯示全名。
+
 ## 密碼保護的原理
 
 前端不會做假的驗證邏輯（那種在瀏覽器看原始碼就能繞過）。所有讀寫都要帶密碼呼叫

@@ -428,6 +428,23 @@ const APP_NAV = [
   { key: "recipes", href: "recipes.html", label: "飲食", title: "食譜與想吃的店", svg: '<path d="M6 3v5a2 2 0 0 0 4 0V3M8 3v18"/><ellipse cx="16.5" cy="7.5" rx="2.6" ry="4.5"/><path d="M16.5 12v9"/>' },
 ];
 
+// 名稱過長會被 CSS 以 ... 省略（style.css 的 .truncate / .item-text）。
+// 電腦：滑過時若被截斷就補 title 顯示全名；手機（沒有 hover）：點一下展開／收合，
+// 但在按鈕、連結、整列可點的元素裡不攔（那邊的點擊另有用途）。
+const TRUNCATE_SEL = ".truncate, .item-text, .reno-vendor-name";
+function isTruncated(el) { return el.scrollWidth > el.clientWidth + 1; }
+document.addEventListener("mouseover", (e) => {
+  const t = e.target.closest && e.target.closest(TRUNCATE_SEL);
+  if (t && !t.title && isTruncated(t)) t.title = t.textContent;
+});
+document.addEventListener("click", (e) => {
+  if (!window.matchMedia("(hover: none)").matches) return;
+  const t = e.target.closest && e.target.closest(TRUNCATE_SEL);
+  if (!t || t.closest("a, button, label, select, [role=button], .clickable, #shoppingList")) return;
+  if (t.classList.contains("expanded")) t.classList.remove("expanded");
+  else if (isTruncated(t)) t.classList.add("expanded");
+});
+
 function navAnchor(item, withLabel, current) {
   const a = document.createElement("a");
   a.href = item.href;

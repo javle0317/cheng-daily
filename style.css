@@ -349,6 +349,13 @@ a.ghost-btn {
 
 .item-text { flex: 1; font-size: 14px; }
 
+/* 名稱太長：單行 ... 省略。電腦 hover 顯示全名（shared.js 補 title）；手機點一下展開（.expanded）。
+   新的名稱欄位加 .truncate 即可；清單（#shoppingList）本來就會換行或自己有 .clamp，不套用。 */
+.truncate, .item-text, .reno-vendor-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.truncate.expanded, .item-text.expanded { white-space: normal; overflow-wrap: anywhere; }
+/* 商家卡展開時標題列整列是按鈕，點名稱不能再當「展開全名」：展開就直接顯示全名 */
+.reno-vendor-head[aria-expanded="true"] .reno-vendor-name { white-space: normal; overflow-wrap: anywhere; }
+
 .item-time {
   font-size: 12px;
   color: var(--text-dim);
@@ -1317,11 +1324,11 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .reno-stat.good .reno-stat-value { color: var(--status-ok, #2e7d4f); }
 .reno-vendor { padding: 12px 0; border-top: 1px solid var(--border); }
 .reno-vendor:first-child { border-top: none; }
-.reno-vendor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.reno-vendor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .reno-vendor-name { margin: 0; font-size: 16px; }
-.reno-vendor-total { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
+.reno-vendor-total { flex-shrink: 0; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
 .reno-vendor-orig { font-size: 12px; color: var(--text-dim); }
-.reno-vendor-namerow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.reno-vendor-namerow { display: flex; align-items: center; gap: 8px; flex: 1 1 7em; min-width: 0; }
 .reno-del { font-size: 12px; padding: 2px 8px; }
 .reno-vendor-head { margin-bottom: 6px; }
 .reno-row { align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1346,9 +1353,9 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .reno-pay-remaining { font-weight: 600; }
 .reno-cat-line { margin: 2px 0; }
 .reno-cat-pick { font-size: 12px; padding: 2px 4px; }
-.reno-vendor-namerow { flex-wrap: wrap; }
 .reno-vendor-head { cursor: pointer; user-select: none; }
 .reno-vendor-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.reno-chev, .reno-cat-tag { flex-shrink: 0; }
 .reno-chev { display: inline-block; transition: transform 0.15s; color: var(--text-dim); }
 .reno-chev.open { transform: rotate(90deg); }
 .reno-cat-tag { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: var(--accent-soft); color: var(--text-dim); }
