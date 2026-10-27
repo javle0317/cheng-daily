@@ -1324,11 +1324,13 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .reno-stat.good .reno-stat-value { color: var(--status-ok, #2e7d4f); }
 .reno-vendor { padding: 12px 0; border-top: 1px solid var(--border); }
 .reno-vendor:first-child { border-top: none; }
-.reno-vendor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.reno-vendor-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 12px; }
 .reno-vendor-name { margin: 0; font-size: 16px; }
-.reno-vendor-total { flex-shrink: 0; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
-.reno-vendor-orig { font-size: 12px; color: var(--text-dim); }
-.reno-vendor-namerow { display: flex; align-items: center; gap: 8px; flex: 1 1 7em; min-width: 0; }
+/* 金額在名稱旁；「已付／原價」說明獨佔第二行靠右，不跟名稱搶寬度 */
+.reno-vendor-total { display: contents; }
+.reno-vendor-total strong { flex-shrink: 0; margin-left: auto; }
+.reno-vendor-orig { flex: 0 0 100%; text-align: right; font-size: 12px; color: var(--text-dim); }
+.reno-vendor-namerow { display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; }
 .reno-del { font-size: 12px; padding: 2px 8px; }
 .reno-vendor-head { margin-bottom: 6px; }
 .reno-row { align-items: center; gap: 8px; flex-wrap: wrap; }
