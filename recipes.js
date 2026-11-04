@@ -194,6 +194,22 @@ function buildTextBlock(title, text) {
   return block;
 }
 
+// 展開的內容（食材／步驟／備註）；展開收合只動這一塊，不重畫整份清單（避免畫面抖動）
+function buildRecipeBody(r) {
+  const body = document.createElement("div");
+  body.className = "recipe-body";
+  if (r.ingredients) body.appendChild(buildTextBlock("食材", r.ingredients));
+  if (r.steps) body.appendChild(buildTextBlock("步驟", r.steps));
+  if (r.notes) body.appendChild(buildTextBlock("備註", r.notes));
+  if (!body.children.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-hint";
+    empty.textContent = "還沒有內容，點 ✏️ 補上食材與步驟";
+    body.appendChild(empty);
+  }
+  return body;
+}
+
 function buildRecipeRow(r) {
   const li = document.createElement("li");
   li.className = "item-row recipe-row";
@@ -209,8 +225,12 @@ function buildRecipeRow(r) {
   name.textContent = r.name;
   head.append(name);
   head.addEventListener("click", () => {
-    if (state.expanded.has(r.id)) state.expanded.delete(r.id); else state.expanded.add(r.id);
-    renderRecipeList();
+    const wasOpen = state.expanded.has(r.id);
+    if (wasOpen) state.expanded.delete(r.id); else state.expanded.add(r.id);
+    head.setAttribute("aria-expanded", wasOpen ? "false" : "true");
+    const existing = li.querySelector(".recipe-body");
+    if (wasOpen) { if (existing) existing.remove(); }
+    else if (!existing) li.appendChild(buildRecipeBody(r));
   });
   li.appendChild(head);
 
@@ -278,20 +298,7 @@ function buildRecipeRow(r) {
   actions.append(spacer, cookBtn, editBtn, delBtn);
   li.appendChild(actions);
 
-  if (open) {
-    const body = document.createElement("div");
-    body.className = "recipe-body";
-    if (r.ingredients) body.appendChild(buildTextBlock("食材", r.ingredients));
-    if (r.steps) body.appendChild(buildTextBlock("步驟", r.steps));
-    if (r.notes) body.appendChild(buildTextBlock("備註", r.notes));
-    if (!body.children.length) {
-      const empty = document.createElement("p");
-      empty.className = "empty-hint";
-      empty.textContent = "還沒有內容，點 ✏️ 補上食材與步驟";
-      body.appendChild(empty);
-    }
-    li.appendChild(body);
-  }
+  if (open) li.appendChild(buildRecipeBody(r));
 
   lockIfPending(li);
   return li;
