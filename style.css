@@ -1172,7 +1172,6 @@ input[type="checkbox"]:checked {
 .recipe-row { flex-direction: column; align-items: stretch; gap: 6px; }
 .recipe-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .recipe-name { font-family: "Noto Serif TC", serif; font-weight: 700; font-size: 16px; }
-.recipe-caret { color: var(--text-dim); }
 .recipe-meta { flex-wrap: wrap; }
 .recipe-actions .spacer { flex: 1; }
 .recipe-stars { display: inline-flex; }

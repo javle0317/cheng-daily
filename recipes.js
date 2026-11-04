@@ -207,10 +207,7 @@ function buildRecipeRow(r) {
   const name = document.createElement("span");
   name.className = "recipe-name";
   name.textContent = r.name;
-  const caret = document.createElement("span");
-  caret.className = "recipe-caret";
-  caret.textContent = open ? "▾" : "▸";
-  head.append(name, caret);
+  head.append(name);
   head.addEventListener("click", () => {
     if (state.expanded.has(r.id)) state.expanded.delete(r.id); else state.expanded.add(r.id);
     renderRecipeList();
