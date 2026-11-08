@@ -529,7 +529,7 @@ function openRenoHistory(it) {
     card.appendChild(tot);
     if (!isLast && latest) {
       const dl = latest.deal - l.deal;
-      card.appendChild(el("div", "reno-chg " + (dl < 0 ? "up" : dl > 0 ? "down" : ""), dl === 0 ? "與最新版小計相同" : `最新版比這一輪${dl < 0 ? "少" : "多"} ${renoMoney(Math.abs(dl))}`));
+      card.appendChild(el("div", "reno-chg " + (dl < 0 ? "down" : dl > 0 ? "up" : ""), dl === 0 ? "與最新版小計相同" : `最新版比這一輪${dl < 0 ? "少" : "多"} ${renoMoney(Math.abs(dl))}`));
     }
     if (r.note) card.appendChild(el("div", "reno-sub", String(r.note)));
     body.appendChild(card);
