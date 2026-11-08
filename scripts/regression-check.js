@@ -832,6 +832,18 @@ console.log("裝潢報價：小計、總額（不含備選）、匯入檢查與�
   const rn = loadFrontend(["shared.js", "renovation.js"], "// ====== Boot ======");
   const ev = code => vm.runInContext(code, rn);
   check("renoLine：數量 × 單價；沒優惠價用原價、沒原價用成交價、沒數量當 1", JSON.stringify(ev("[renoLine({ qty: 3, listPrice: 100, dealPrice: 80 }), renoLine({ qty: 2, listPrice: 50, dealPrice: '' }), renoLine({ qty: '', listPrice: '', dealPrice: 70 })].map(l => [l.list, l.deal])")) === "[[300,240],[100,100],[70,70]]");
+  rn.__di = [
+    { id: "o", vendor: "A", name: "臉盆用單槍龍頭（短、有拉桿）", qty: 2, listPrice: 5000, dealPrice: 4000, updatedAt: "2026-10-01 10:00:00", createdAt: "2026-10-01 10:00:00" },
+    { id: "x", vendor: "B", name: "臉盆用單槍龍頭（短、有拉桿）", qty: 1, listPrice: 1, dealPrice: 1, updatedAt: "2026-10-01 10:00:00" },
+    { id: "n", vendor: "A", name: "臉盆用單槍龍頭(短、有拉桿) ", qty: 1, listPrice: 5000, dealPrice: 3500, updatedAt: "2026-10-20 10:00:00", createdAt: "2026-10-20 10:00:00" },
+  ];
+  rn.__dl = [{ itemId: "o", round: 1, date: "2026-10-01", qty: 2, dealPrice: 4000, createdAt: "2026-10-01 10:00:00" }];
+  const dd = JSON.parse(ev("JSON.stringify(renoDedupeItems(__di, __dl).map(i => [i.id, i.vendor, i.dealPrice, i.ids]))"));
+  check("renoDedupeItems：同商家同名（忽略全半形空白）只留最新那一列，別家同名不受影響", dd.length === 2 && dd[0][0] === "n" && dd[0][2] === 3500 && dd[0][3].join() === "o,n" && dd[1][0] === "x", dd);
+  const vs = JSON.parse(ev("JSON.stringify(renoVersions(renoDedupeItems(__di, __dl)[0], __dl).map(v => [v.n, v.date, v.src.id || '']))"));
+  check("renoVersions：舊列有紀錄就用紀錄，新列沒紀錄就用它自己補成最新版本，依時間排、編號重算", vs.length === 2 && vs[0][0] === 1 && vs[0][1] === "2026-10-01" && vs[1][0] === 2 && vs[1][1] === "2026-10-20", vs);
+  const ov = JSON.parse(ev("JSON.stringify(renoDedupeItems([{ id: 'a', vendor: 'A', name: 'N', qty: 2, dealPrice: 100, updatedAt: '2026-10-01 10:00:00' }], [{ itemId: 'a', qty: 1, dealPrice: 80, createdAt: '2026-10-05 10:00:00' }])[0])"));
+  check("renoDedupeItems：紀錄比品項列新時，價格／數量以紀錄為準", ov.dealPrice === 80 && ov.qty === 1, ov);
   rn.__items = [
     { status: "quoted", qty: 2, listPrice: 100, dealPrice: 90 },
     { status: "signed", qty: 1, listPrice: 1000, dealPrice: 800 },

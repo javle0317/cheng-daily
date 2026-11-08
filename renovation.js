@@ -19,8 +19,8 @@ const RENO_CATEGORIES = ["裝潢", "家具", "家電", "其他"]; // 商家層�
 const reno = { items: [], log: [], payments: [], vendors: [], filter: "all", vendor: "all", category: "all", open: new Set() };
 
 function applyReno(data) {
-  reno.items = (data && data.items) || [];
   reno.log = (data && data.log) || [];
+  reno.items = renoDedupeItems((data && data.items) || [], reno.log);
   reno.payments = (data && data.payments) || [];
   reno.vendors = (data && data.vendors) || [];
 }
@@ -31,6 +31,52 @@ window.loadPageData = async function () {
 };
 
 // ====== 純邏輯（regression-check 會測）======
+// 同商家、同名稱（忽略空白、全形半形、大小寫）只該有一個品項；Sheet 裡如果有重複的列
+// （匯入時名稱寫法微差、同時匯入…），一律以「最新」的那一列為準，舊的列併進它的 ids / olds，
+// 報價紀錄也一起看。最新 = updatedAt（沒有就 createdAt）較晚者；一樣晚就取 Sheet 後面的列。
+// 若報價紀錄裡有比品項列更新的一筆（品項列沒跟上），數量／價格／備註也以紀錄為準。
+function renoNameKey(s) {
+  return String(s === undefined || s === null ? "" : s).normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+}
+function renoStamp(row) {
+  return String(row.updatedAt || row.createdAt || "");
+}
+function renoDedupeItems(items, log) {
+  const groups = new Map();
+  items.forEach((it, i) => {
+    const key = String(it.vendor) + "\u0000" + renoNameKey(it.name);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ it, i });
+  });
+  const out = [];
+  groups.forEach(list => {
+    let best = list[0];
+    list.forEach(x => { if (renoStamp(x.it) >= renoStamp(best.it)) best = x; });
+    const merged = Object.assign({}, best.it);
+    merged.ids = list.map(x => x.it.id);
+    merged.olds = list.filter(x => x !== best).map(x => x.it);
+    const mine = (log || []).filter(l => merged.ids.includes(l.itemId));
+    let newest = null;
+    mine.forEach(l => { if (!newest || String(l.createdAt || "") >= String(newest.createdAt || "")) newest = l; });
+    if (newest && String(newest.createdAt || "") > renoStamp(merged)) {
+      ["qty", "unit", "listPrice", "dealPrice", "note"].forEach(k => { merged[k] = newest[k]; });
+    }
+    out.push({ pos: list[0].i, item: merged });
+  });
+  return out.sort((a, b) => a.pos - b.pos).map(x => x.item);
+}
+
+// 一個品項的所有版本（舊 → 新）：報價紀錄＋自己沒有紀錄的列（含重複的舊列）；版本編號重新依時間排，不用各列自己的 round
+function renoVersions(it, log) {
+  const ids = it.ids || [it.id];
+  const rows = (log || []).filter(l => ids.includes(l.itemId)).map(l => ({ src: l, date: String(l.date || ""), stamp: String(l.createdAt || "") }));
+  [it, ...(it.olds || [])].forEach(o => {
+    if (!(log || []).some(l => l.itemId === o.id)) rows.push({ src: o, date: String(o.createdAt || "").slice(0, 10), stamp: renoStamp(o) });
+  });
+  rows.sort((a, b) => a.date.localeCompare(b.date) || a.stamp.localeCompare(b.stamp));
+  return rows.map((r, i) => Object.assign(r, { n: i + 1 }));
+}
+
 function renoMoney(n) {
   return "NT$ " + Math.round(Number(n) || 0).toLocaleString("en-US");
 }
@@ -411,10 +457,10 @@ function renderRenoItem(it) {
   sel.setAttribute("aria-label", "狀態");
   RENO_STATUSES.forEach(s => sel.appendChild(new Option(s.label, s.key)));
   sel.value = st;
-  sel.addEventListener("change", () => runRenoWrite(li, () => api("setRenoStatus", { ids: JSON.stringify([it.id]), status: sel.value }), "更新失敗", () => { sel.value = st; }));
+  sel.addEventListener("change", () => runRenoWrite(li, () => api("setRenoStatus", { ids: JSON.stringify(it.ids || [it.id]), status: sel.value }), "更新失敗", () => { sel.value = st; }));
   li.appendChild(sel);
 
-  const rounds = reno.log.filter(x => x.itemId === it.id).length;
+  const rounds = renoVersions(it, reno.log).length;
   const hist = el("button", "habit-info-btn", rounds > 1 ? `ⓘ${rounds}` : "ⓘ");
   hist.type = "button";
   hist.title = `報價紀錄（${rounds} 輪）`;
@@ -427,7 +473,11 @@ function renderRenoItem(it) {
   del.title = "刪除";
   del.addEventListener("click", async () => {
     if (!(await showConfirm(`確定刪除「${it.name}」和它的報價紀錄？`))) return;
-    await runRenoWrite(li, () => api("deleteRenoItem", { id: it.id }), "刪除失敗");
+    await runRenoWrite(li, async () => {
+      let data;
+      for (const id of (it.ids || [it.id])) data = await api("deleteRenoItem", { id });
+      return data;
+    }, "刪除失敗");
   });
   li.appendChild(del);
 
@@ -454,15 +504,18 @@ function openRenoHistory(it) {
   document.getElementById("renoHistoryTitle").textContent = `${it.vendor}｜${it.name}`;
   const body = document.getElementById("renoHistoryBody");
   body.innerHTML = "";
-  const rows = reno.log.filter(x => x.itemId === it.id).sort((a, b) => Number(a.round) - Number(b.round));
+  const rows = renoVersions(it, reno.log);
   if (!rows.length) body.appendChild(el("p", "progress-line", "沒有報價紀錄"));
   let prev = null;
-  rows.forEach(r => {
+  const latest = rows.length ? renoLine(rows[rows.length - 1].src) : null;
+  rows.forEach((v, idx) => {
+    const r = v.src;
+    const isLast = idx === rows.length - 1;
     const l = renoLine(r);
     const card = el("div", "reno-round");
     const top = el("div", "reno-round-top");
-    top.appendChild(el("strong", "", `第 ${r.round} 輪`));
-    top.appendChild(el("span", "reno-sub", String(r.date || "")));
+    top.appendChild(el("strong", "", `第 ${v.n} 輪` + (isLast ? "（最新）" : "")));
+    top.appendChild(el("span", "reno-sub", v.date));
     card.appendChild(top);
     const unit = String(r.unit || "");
     card.appendChild(el("div", "", `${l.qty}${unit ? " " + unit : ""} × 優惠 ${renoMoney(l.unitDeal)}` + (l.unitList !== l.unitDeal ? `（原價 ${renoMoney(l.unitList)}）` : "")));
@@ -474,6 +527,10 @@ function openRenoHistory(it) {
       tot.appendChild(chg);
     }
     card.appendChild(tot);
+    if (!isLast && latest) {
+      const dl = latest.deal - l.deal;
+      card.appendChild(el("div", "reno-chg " + (dl < 0 ? "up" : dl > 0 ? "down" : ""), dl === 0 ? "與最新版小計相同" : `最新版比這一輪${dl < 0 ? "少" : "多"} ${renoMoney(Math.abs(dl))}`));
+    }
     if (r.note) card.appendChild(el("div", "reno-sub", String(r.note)));
     body.appendChild(card);
     prev = l;
