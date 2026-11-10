@@ -1363,9 +1363,13 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .reno-vendor-tools { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .reno-vendor-body { padding-top: 4px; }
 
-/* 各銀行比較：本月合計＋逐行金額（手機上直接看得到數字） */
+/* 各銀行比較：本月合計＋逐行（名稱、完整金額、細長條）；手機上數字不縮小 */
+#billBankChart { margin-top: 12px; }
 .bank-total { margin-bottom: 8px; }
+.bank-total .bp-stat-value { font-size: 26px; }
 .bank-rows { list-style: none; margin: 0; padding: 0; }
-.bank-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.bank-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 10px 4px; border-bottom: 1px solid var(--border); font-size: 15px; }
 .bank-row:last-child { border-bottom: 0; }
-.bank-amount { font-variant-numeric: tabular-nums; }
+.bank-amount { font-variant-numeric: tabular-nums; font-weight: 500; }
+.bank-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--series-systolic) 15%, transparent); overflow: hidden; }
+.bank-bar i { display: block; height: 100%; border-radius: 3px; background: var(--series-systolic); }

@@ -307,11 +307,14 @@ function renderBankChart() {
 
   const sorted = [...bills].sort((a, b) => Number(b.fullAmount) - Number(a.fullAmount));
   const total = sorted.reduce((sum, b) => sum + Number(b.fullAmount), 0);
-  const rows = sorted.map(b =>
-    `<li class="bank-row"><span class="bank-name">${escapeHtml(b.bank)}</span><span class="bank-amount">$${formatAmount(b.fullAmount)}</span></li>`
-  ).join("");
+  const maxVal = Math.max(...sorted.map(b => Number(b.fullAmount)), 1);
+  const full = n => "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
+  const rows = sorted.map(b => {
+    const pct = Math.max((Number(b.fullAmount) / maxVal) * 100, 2);
+    return `<li class="bank-row"><span class="bank-name">${escapeHtml(b.bank)}</span><span class="bank-amount">${full(b.fullAmount)}</span><span class="bank-bar"><i style="width:${pct.toFixed(1)}%"></i></span></li>`;
+  }).join("");
   container.innerHTML =
-    `<div class="bp-stat-tile bank-total"><div class="bp-stat-value">$${formatAmount(total)}</div><div class="bp-stat-label">${escapeHtml(formatBillMonth(billingMonth))}合計（${sorted.length} 家）</div></div>` +
+    `<div class="bp-stat-tile bank-total"><div class="bp-stat-value">${full(total)}</div><div class="bp-stat-label">${escapeHtml(formatBillMonth(billingMonth))}合計（${sorted.length} 家）</div></div>` +
     `<ul class="bank-rows">${rows}</ul>`;
 }
 
