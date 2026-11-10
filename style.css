@@ -1373,3 +1373,4 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .bank-amount { font-variant-numeric: tabular-nums; font-weight: 500; }
 .bank-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--series-systolic) 15%, transparent); overflow: hidden; }
 .bank-bar i { display: block; height: 100%; border-radius: 3px; background: var(--series-systolic); }
+.bank-pct { display: inline-block; min-width: 3.2em; margin-right: 8px; text-align: right; font-weight: 400; font-size: 13px; color: var(--muted, #8b90a5); }
