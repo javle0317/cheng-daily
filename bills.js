@@ -306,23 +306,13 @@ function renderBankChart() {
   }
 
   const sorted = [...bills].sort((a, b) => Number(b.fullAmount) - Number(a.fullAmount));
-  const maxVal = Math.max(...sorted.map(b => Number(b.fullAmount)), 1);
-
-  const W = 640, barH = 26, gap = 10;
-  const marginLeft = 52, marginRight = 70, marginTop = 8;
-  const H = marginTop + sorted.length * (barH + gap);
-  const plotW = W - marginLeft - marginRight;
-
-  let svg = `<svg viewBox="0 0 ${W} ${H}" class="bp-svg bp-svg-small" role="img" aria-label="各銀行帳單比較">`;
-  sorted.forEach((b, i) => {
-    const y = marginTop + i * (barH + gap);
-    const w = Math.max((Number(b.fullAmount) / maxVal) * plotW, 2);
-    svg += `<text x="${marginLeft - 6}" y="${y + barH / 2}" class="bp-axis-label" text-anchor="end" dominant-baseline="middle">${escapeHtml(b.bank)}</text>`;
-    svg += `<rect x="${marginLeft}" y="${y}" width="${w}" height="${barH}" fill="var(--series-systolic)" rx="4"><title>${escapeHtml(b.bank)} $${formatAmount(b.fullAmount)}</title></rect>`;
-    svg += `<text x="${marginLeft + w + 6}" y="${y + barH / 2}" class="bp-axis-label" dominant-baseline="middle">$${formatAmount(b.fullAmount)}</text>`;
-  });
-  svg += `</svg>`;
-  container.innerHTML = svg;
+  const total = sorted.reduce((sum, b) => sum + Number(b.fullAmount), 0);
+  const rows = sorted.map(b =>
+    `<li class="bank-row"><span class="bank-name">${escapeHtml(b.bank)}</span><span class="bank-amount">$${formatAmount(b.fullAmount)}</span></li>`
+  ).join("");
+  container.innerHTML =
+    `<div class="bp-stat-tile bank-total"><div class="bp-stat-value">$${formatAmount(total)}</div><div class="bp-stat-label">${escapeHtml(formatBillMonth(billingMonth))}合計（${sorted.length} 家）</div></div>` +
+    `<ul class="bank-rows">${rows}</ul>`;
 }
 
 // 帳單月份 "2026-09" → "2026年09月"
