@@ -5,6 +5,7 @@
 
 const MEAL_LABELS = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐", snack: "點心" };
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"];
+const EX_LABELS = { pickleball: "打球", lowimpact: "低衝擊", strength: "肌力", walk: "走路", other: "其他運動" };
 
 // ---- 純邏輯（回歸檢查會單獨載入這一段）----
 function hhmmToMin(t) {
@@ -52,17 +53,25 @@ function avgWeightIn(readings, endDate, days) {
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
 
-// 每天的餐點合計：只加有填的數字；有餐點沒估熱量就標 partial（合計只是下限，不是完整的一天）
+// 每天的餐點合計：只加有填的數字；有餐點沒估熱量就標 partial（合計只是下限，不是完整的一天）；
+// complete＝使用者勾了「這天的餐都記完了」，沒勾的日子不能當成完整的一天（少拍一餐會讓平均偏低）
 function mealDayTotals(meals) {
   const byDate = {};
   meals.forEach(m => {
-    const d = byDate[m.date] || (byDate[m.date] = { kcal: 0, protein: 0, hasKcal: false, hasProtein: false, partial: false, count: 0 });
+    const d = byDate[m.date] || (byDate[m.date] = { kcal: 0, protein: 0, hasKcal: false, hasProtein: false, partial: false, complete: false, count: 0 });
     d.count++;
+    if (m.complete === true || m.complete === "true" || m.complete === "TRUE") d.complete = true;
     const k = toNum(m.kcal), p = toNum(m.protein);
     if (k === null) d.partial = true; else { d.kcal += k; d.hasKcal = true; }
     if (p !== null) { d.protein += p; d.hasProtein = true; }
   });
   return byDate;
+}
+
+// 打球消耗的粗估（kcal）：6 人一面場輪替，實際跑動約一半時間；以 110 kg 估約每分鐘 3.75 kcal（2 小時 ≈ 450）。只是參考，可手改
+function pickleKcalEstimate(minutes) {
+  const m = Number(minutes);
+  return Number.isFinite(m) && m > 0 ? Math.round(m * 3.75) : null;
 }
 
 function dateAddDays(dateStr, n) {
@@ -73,7 +82,7 @@ function dateAddDays(dateStr, n) {
 
 // ====== UI ======
 (function () {
-  const state = { sleep: [], meals: [], inbody: [], range: 7, chartKey: "sleep", version: 0, loadedDate: "" };
+  const state = { sleep: [], meals: [], exercise: [], inbody: [], range: 7, chartKey: "sleep", version: 0, loadedDate: "" };
   const $ = (id) => document.getElementById(id);
 
   function today() { return toDateStr(new Date()); }
@@ -84,6 +93,7 @@ function dateAddDays(dateStr, n) {
     if (!fromLoader) state.version++;
     state.sleep = data.sleep || state.sleep;
     state.meals = data.meals || state.meals;
+    state.exercise = data.exercise || state.exercise;
     if (data.inbody) {
       state.inbody = data.inbody;
       window.dispatchEvent(new CustomEvent("health:inbody", { detail: data.inbody }));
@@ -157,10 +167,28 @@ function dateAddDays(dateStr, n) {
         sugarDrink: ms.some(m => truthy(m.sugarDrink)),
       });
     });
+    $("dayMealsDone").checked = dayMeals.some(m => truthy(m.complete));
+    const dayEx = state.exercise.filter(x => x.date === date);
+    const pk = dayEx.find(x => x.type === "pickleball");
+    $("exPickleMin").value = pk ? pk.minutes : "";
+    $("exPickleRpe").value = pk ? String(pk.rpe) : "";
+    $("exPickleKcal").value = pk && pk.kcal !== "" ? pk.kcal : "";
+    const ot = dayEx.find(x => x.type !== "pickleball");
+    $("exOtherType").value = ot ? ot.type : "lowimpact";
+    $("exOtherMin").value = ot ? ot.minutes : "";
+    $("exOtherRpe").value = ot ? String(ot.rpe) : "";
+    $("exNote").value = (pk && pk.note) || (ot && ot.note) || "";
     updatePreview();
   }
 
+  function updatePickleHint() {
+    const el = $("exPicklePreview");
+    const est = pickleKcalEstimate($("exPickleMin").value);
+    el.textContent = est === null ? "" : `打球約 ${$("exPickleMin").value} 分鐘，粗估消耗約 ${est} kcal（輪替休息已扣；沒填消耗會自動帶入這個估計值）`;
+  }
+
   function updatePreview() {
+    updatePickleHint();
     const bed = $("dayBed").value, wake = $("dayWake").value, asleep = $("daySleepTime").value;
     const el = $("daySleepPreview");
     if (!bed || !wake) { el.textContent = ""; return; }
@@ -200,10 +228,29 @@ function dateAddDays(dateStr, n) {
       if (protein === null) bad.push(`${MEAL_LABELS[key]}的蛋白質`);
       meals.push({ meal: key, desc, kcal, protein, eatOut: row.querySelector(".meal-eatout").checked, sugarDrink: row.querySelector(".meal-sugar").checked });
     });
+    const exercise = [];
+    const exNote = $("exNote").value.trim();
+    const pkMin = $("exPickleMin").value;
+    if (pkMin !== "") {
+      const mins = parseStrictNumber(pkMin);
+      if (mins === null) bad.push("打球分鐘");
+      const kRaw = $("exPickleKcal").value;
+      const kcal = kRaw === "" ? pickleKcalEstimate(pkMin) : parseStrictNumber(kRaw);
+      if (kRaw !== "" && kcal === null) bad.push("打球消耗");
+      exercise.push({ type: "pickleball", minutes: mins, rpe: $("exPickleRpe").value, kcal: kcal === null ? "" : kcal, note: exNote });
+    }
+    const otMin = $("exOtherMin").value;
+    if (otMin !== "") {
+      const mins = parseStrictNumber(otMin);
+      if (mins === null) bad.push("運動分鐘");
+      exercise.push({ type: $("exOtherType").value, minutes: mins, rpe: $("exOtherRpe").value, kcal: "", note: exNote });
+    }
     if (bad.length) return { error: "這些欄位不是有效數字或不完整：" + bad.join("、") };
     if (meals.length) params.meals = meals;
+    if (exercise.length) params.exercise = exercise;
+    params.mealsComplete = $("dayMealsDone").checked;
     if (!date) return { error: "請選日期" };
-    if (params.weight === undefined && !params.sleep && !params.meals) return { error: "睡眠、體重、餐點至少要填一項" };
+    if (params.weight === undefined && !params.sleep && !params.meals && !params.exercise) return { error: "睡眠、體重、餐點、運動至少要填一項" };
     return { params };
   }
 
@@ -215,6 +262,8 @@ function dateAddDays(dateStr, n) {
     if (params.weight !== undefined) body.weight = params.weight;
     if (params.sleep) body.sleep = JSON.stringify(params.sleep);
     if (params.meals) body.meals = JSON.stringify(params.meals);
+    if (params.exercise) body.exercise = JSON.stringify(params.exercise);
+    body.mealsComplete = params.mealsComplete;
     setFormBusy(e.target, true);
     try {
       apply(await api("addDailyHealth", body));
@@ -229,7 +278,7 @@ function dateAddDays(dateStr, n) {
   });
 
   $("dayDate").addEventListener("change", () => { if ($("dayDate").value) loadDate($("dayDate").value); });
-  ["dayBed", "dayWake", "daySleepTime"].forEach(id => $(id).addEventListener("input", updatePreview));
+  ["dayBed", "dayWake", "daySleepTime", "exPickleMin"].forEach(id => $(id).addEventListener("input", updatePreview));
   $("dayInfoBtn").addEventListener("click", () => $("dayInfoBox").classList.toggle("hidden"));
 
   // ---- 貼上匯入：{ date, weight, sleep:{bedtime,wakeTime,...}, meals:[{meal,desc,kcal,protein,eatOut,sugarDrink,note}] } ----
@@ -246,6 +295,8 @@ function dateAddDays(dateStr, n) {
     ["dayBed", "dayWake", "daySleepTime", "dayQuality", "dayEnergy", "dayCpap", "daySleepNote"].forEach(id => { $(id).value = ""; });
     $("dayNap").checked = false;
     MEAL_ORDER.forEach(k => setMealRow(k, null));
+    $("dayMealsDone").checked = truthy(data.mealsComplete);
+    ["exPickleMin", "exPickleRpe", "exPickleKcal", "exOtherMin", "exOtherRpe", "exNote"].forEach(id => { $(id).value = ""; });
     let filled = 0;
     if (data.weight !== undefined && data.weight !== null && data.weight !== "") {
       const n = parseStrictNumber(data.weight);
@@ -285,11 +336,30 @@ function dateAddDays(dateStr, n) {
       });
       filled++;
     });
+    const exs = Array.isArray(data.exercise) ? data.exercise : [];
+    let otherUsed = false;
+    exs.forEach(x => {
+      const mins = parseStrictNumber(x.minutes);
+      if (mins === null) { problems.push(`運動時間「${x.minutes}」不是有效數字`); return; }
+      if (x.type === "pickleball") {
+        $("exPickleMin").value = mins;
+        $("exPickleRpe").value = x.rpe ? String(x.rpe) : "";
+        $("exPickleKcal").value = x.kcal === undefined || x.kcal === "" ? "" : x.kcal;
+      } else if (["lowimpact", "strength", "walk", "other"].includes(x.type)) {
+        if (otherUsed) { problems.push("表單一天只放得下一筆非打球運動，其餘沒填入"); return; }
+        otherUsed = true;
+        $("exOtherType").value = x.type;
+        $("exOtherMin").value = mins;
+        $("exOtherRpe").value = x.rpe ? String(x.rpe) : "";
+      } else { problems.push(`運動類型「${x.type}」不認得`); return; }
+      if (x.note) $("exNote").value = x.note;
+      filled++;
+    });
     updatePreview();
     const notes = [`已填入 ${filled} 項，請核對後按「儲存」（熱量、蛋白質是估計值）`];
     problems.forEach(t => notes.push("⚠️ " + t));
     const d = $("dayDate").value;
-    if (state.sleep.some(r => r.date === d) || state.meals.some(r => r.date === d)) notes.push("⚠️ 這一天已經有紀錄，儲存會覆蓋有送出的睡眠與餐別");
+    if (state.sleep.some(r => r.date === d) || state.meals.some(r => r.date === d) || state.exercise.some(r => r.date === d)) notes.push("⚠️ 這一天已經有紀錄，儲存會覆蓋有送出的睡眠與餐別");
     msg.textContent = notes.join("；");
   });
 
@@ -354,14 +424,20 @@ function dateAddDays(dateStr, n) {
     const totals = mealDayTotals(state.meals.filter(m => m.date >= start && m.date <= end));
     const days = Object.keys(totals);
     if (days.length) {
-      const kd = days.filter(d => totals[d].hasKcal && !totals[d].partial);
+      const kd = days.filter(d => totals[d].hasKcal && !totals[d].partial && totals[d].complete);
       row.appendChild(makeTile(`飲食紀錄天數`, `${days.length}/${state.range}`));
       if (kd.length) row.appendChild(makeTile(`平均熱量 kcal（${kd.length} 天完整）`, fmtNum(kd.reduce((a, d) => a + totals[d].kcal, 0) / kd.length), null, `目標 ${fmtNum(HEALTH_GOALS.kcal)}`));
-      const pd = days.filter(d => totals[d].hasProtein && !totals[d].partial);
+      const pd = days.filter(d => totals[d].hasProtein && !totals[d].partial && totals[d].complete);
       if (pd.length) row.appendChild(makeTile(`平均蛋白質 g（${pd.length} 天）`, fmtNum(pd.reduce((a, d) => a + totals[d].protein, 0) / pd.length), null, `目標 ${HEALTH_GOALS.protein[0]}–${HEALTH_GOALS.protein[1]}`));
     }
+    const exIn = state.exercise.filter(x => x.date >= start && x.date <= end);
+    if (exIn.length) {
+      const mins = exIn.reduce((a, x) => a + (toNum(x.minutes) || 0), 0);
+      const pk = exIn.filter(x => x.type === "pickleball").length;
+      row.appendChild(makeTile("運動分鐘", fmtNum(mins), null, `${exIn.length} 次${pk ? `（打球 ${pk} 次）` : ""}`));
+    }
     if (!row.children.length) row.innerHTML = `<p class="empty-hint">這段期間還沒有紀錄（沒記的日子就是「未記錄」，不算失敗）</p>`;
-    $("dayStatsMeta").textContent = "熱量與蛋白質只統計「每餐都有估計值」的完整日子；有餐點沒估熱量的日子不計入平均，避免被低估。";
+    $("dayStatsMeta").textContent = "熱量與蛋白質平均只統計「勾了『這天的餐都記完了』且每餐都有估計值」的日子；少記的日子不計入，避免平均被低估。";
   }
 
   function renderGoals() {
@@ -406,7 +482,7 @@ function dateAddDays(dateStr, n) {
     const totals = mealDayTotals(state.meals.filter(m => m.date >= start && m.date <= end));
     const key = state.chartKey;
     return Object.keys(totals)
-      .filter(d => (key === "kcal" ? totals[d].hasKcal : totals[d].hasProtein) && !totals[d].partial)
+      .filter(d => (key === "kcal" ? totals[d].hasKcal : totals[d].hasProtein) && !totals[d].partial && totals[d].complete)
       .map(d => ({ date: d, value: key === "kcal" ? totals[d].kcal : totals[d].protein }));
   }
 
@@ -425,7 +501,7 @@ function dateAddDays(dateStr, n) {
     const box = $("dayList");
     box.innerHTML = "";
     const totals = mealDayTotals(state.meals);
-    const dates = new Set([...state.sleep.map(r => r.date), ...state.meals.map(r => r.date), ...state.inbody.map(r => r.date)]);
+    const dates = new Set([...state.sleep.map(r => r.date), ...state.meals.map(r => r.date), ...state.exercise.map(r => r.date), ...state.inbody.map(r => r.date)]);
     const sorted = [...dates].sort().reverse().slice(0, 30);
     if (!sorted.length) { box.innerHTML = `<p class="empty-hint">還沒有紀錄</p>`; return; }
     const ul = document.createElement("ul");
@@ -444,8 +520,10 @@ function dateAddDays(dateStr, n) {
       const t = totals[date];
       if (t) {
         const k = t.hasKcal ? `${fmtNum(t.kcal)} kcal${t.partial ? "+" : ""}` : "熱量未估計";
-        parts.push(`${t.count} 餐・${k}${t.hasProtein ? `・蛋白 ${fmtNum(t.protein)} g` : ""}`);
+        parts.push(`${t.count} 餐・${k}${t.hasProtein ? `・蛋白 ${fmtNum(t.protein)} g` : ""}${t.complete ? "" : "（未標記記完）"}`);
       }
+      const dayEx = state.exercise.filter(x => x.date === date);
+      if (dayEx.length) parts.push(dayEx.map(x => `${EX_LABELS[x.type] || x.type} ${x.minutes} 分`).join("、"));
       const main = document.createElement("span");
       main.className = "item-text";
       main.textContent = parts.join("　");
@@ -460,6 +538,12 @@ function dateAddDays(dateStr, n) {
         for (const m of dayMeals) last = await api("deleteMeal", { id: m.id });
         return last;
       }, (d) => { state.meals = d; }));
+      const dayEx2 = state.exercise.filter(x => x.date === date);
+      if (dayEx2.length) li.appendChild(delBtn("運動", li, async () => {
+        let last = null;
+        for (const x of dayEx2) last = await api("deleteExercise", { id: x.id });
+        return last;
+      }, (d) => { state.exercise = d; }));
       ul.appendChild(li);
     });
     box.appendChild(ul);
@@ -512,6 +596,7 @@ function dateAddDays(dateStr, n) {
   // 初始化
   const energy = $("dayEnergy");
   for (let i = 1; i <= 10; i++) { const o = document.createElement("option"); o.value = String(i); o.textContent = String(i); energy.appendChild(o); }
+  ["exPickleRpe", "exOtherRpe"].forEach(id => { for (let i = 1; i <= 10; i++) { const o = document.createElement("option"); o.value = String(i); o.textContent = `RPE ${i}`; $(id).appendChild(o); } });
   buildMealRows();
   $("dayDate").value = today();
 
@@ -522,6 +607,7 @@ function dateAddDays(dateStr, n) {
     if (state.version !== v) return;
     state.sleep = daily.sleep || [];
     state.meals = daily.meals || [];
+    state.exercise = daily.exercise || [];
     state.inbody = inbody || [];
     if (!state.loadedDate) loadDate(today());
     renderAll();

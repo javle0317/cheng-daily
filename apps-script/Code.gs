@@ -12,7 +12,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十六個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十七個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -48,9 +48,12 @@
  *                   （睡眠紀錄，健康頁「睡眠」分頁；ensureSheet 自動建立，寫死在 SLEEP_HEADERS；一天一列（date＝起床那天），重送同一天＝覆蓋；
  *                   bedtime／sleepTime／wakeTime 是 HH:mm，sleepTime（實際入睡）選填；hours 由後端算（入睡或上床→起床，跨午夜 +24h）；
  *                   quality 1–5、energy 1–10 選填；cpap 是 yes／no／空白；nap 是白天或晚間有沒有打瞌睡）
- *   MealLog         欄位: id | date | meal | desc | protein | kcal | eatOut | sugarDrink | note | createdAt
+ *   MealLog         欄位: id | date | meal | desc | protein | kcal | eatOut | sugarDrink | note | complete | createdAt
  *                   （飲食紀錄，健康頁「今日」分頁；ensureSheet 自動建立，寫死在 MEAL_HEADERS；meal 是 breakfast／lunch／dinner／snack；
- *                   protein（g）、kcal 是「估計值」選填，空白＝未估計、不是 0；同一天某個餐別重送＝覆蓋那個餐別（snack 可多筆，重送整批覆蓋））
+ *                   protein（g）、kcal 是「估計值」選填，空白＝未估計、不是 0；同一天某個餐別重送＝覆蓋那個餐別（snack 可多筆，重送整批覆蓋；complete 是「這天的餐都記完了」，同一天的列同值，沒勾就不納入每日熱量平均）
+ *   ExerciseLog     欄位: id | date | type | minutes | rpe | kcal | note | createdAt
+ *                   （運動紀錄，健康頁「今日」分頁；ensureSheet 自動建立，寫死在 EXERCISE_HEADERS；type 是 pickleball／lowimpact／strength／walk／other；
+ *                   minutes 必填；rpe 自覺強度 1–10、kcal 估計消耗都選填；同一天同 type 重送＝覆蓋）
  *   PetSkipped      欄位: id | eventId | createdAt
  *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
  *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
@@ -222,6 +225,8 @@ function dispatch_(p) {
         return respond({ ok: true, data: getDailyHealth() });
       case "addDailyHealth":
         return respond({ ok: true, data: addDailyHealth(p) });
+      case "deleteExercise":
+        return respond({ ok: true, data: deleteExercise(p.id) });
       case "deleteMeal":
         return respond({ ok: true, data: deleteMeal(p.id) });
       case "getSleepData":
@@ -2308,7 +2313,7 @@ function deleteSleep(id) {
 // ====== 飲食（MealLog）與「今日健康」單一入口 ======
 // 早上記睡眠＋體重、晚上貼餐點，都走 addDailyHealth 這一個 action（一次送：sleep、weight、meals 至少一項）。
 // 全部驗證過才寫；體重寫進既有的 InBody（同天合併，不另開體重表）；成功後幫「今日健康」習慣打卡（習慣沒建就略過）。
-var MEAL_HEADERS = ["id", "date", "meal", "desc", "protein", "kcal", "eatOut", "sugarDrink", "note", "createdAt"];
+var MEAL_HEADERS = ["id", "date", "meal", "desc", "protein", "kcal", "eatOut", "sugarDrink", "note", "complete", "createdAt"];
 var MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
 var HEALTH_HABIT_ID = "daily-health"; // Habits 分頁裡「今日健康」那一列的 id（要手動在 Sheet 加一列，見 README）
 
@@ -2342,7 +2347,72 @@ function parseJsonArg_(v, label) {
 }
 
 function getDailyHealth() {
-  return { sleep: getSleepData(), meals: getMealData() };
+  return { sleep: getSleepData(), meals: getMealData(), exercise: getExerciseData() };
+}
+
+// ====== 運動（ExerciseLog）======
+// 運動消耗只是參考（估計值），不會加進每日熱量預算；沒記的日子是「未記錄」。
+var EXERCISE_HEADERS = ["id", "date", "type", "minutes", "rpe", "kcal", "note", "createdAt"];
+var EXERCISE_TYPES = ["pickleball", "lowimpact", "strength", "walk", "other"];
+
+function exerciseSheet_() {
+  return ensureSheet("ExerciseLog", EXERCISE_HEADERS);
+}
+
+function getExerciseData() {
+  return sheetToObjects(exerciseSheet_());
+}
+
+function exerciseFields_(x, date) {
+  x = x || {};
+  return {
+    date: date,
+    type: enumArg_(x.type, "運動類型", EXERCISE_TYPES),
+    minutes: numArg_(x.minutes, "運動時間（分鐘）", { int: true, min: 1, max: 600 }),
+    rpe: numArg_(x.rpe, "自覺強度", { emptyValue: "", int: true, min: 1, max: 10 }),
+    kcal: numArg_(x.kcal, "運動消耗", { emptyValue: "", min: 0, max: 5000 }),
+    note: textArg_(x.note, "運動備註", { max: 200 }),
+  };
+}
+
+function writeExercise_(date, fs) {
+  var sheet = exerciseSheet_();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var dc = headers.indexOf("date"), tc = headers.indexOf("type");
+  var replacing = {};
+  fs.forEach(function (f) { replacing[f.type] = true; });
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (normalizeDateCell_(values[i][dc]) === date && replacing[String(values[i][tc])]) sheet.deleteRow(i + 1);
+  }
+  fs.forEach(function (f) {
+    var vals = Object.assign({ id: Utilities.getUuid(), createdAt: new Date() }, f);
+    var row = headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; });
+    var r = sheet.getLastRow() + 1;
+    row.forEach(function (v, idx) {
+      if (headers[idx] === "date" || needsTextGuard_(v)) sheet.getRange(r, idx + 1).setNumberFormat("@");
+    });
+    sheet.getRange(r, 1, 1, row.length).setValues([row]);
+  });
+}
+
+function deleteExercise(id) {
+  id = textArg_(id, "運動紀錄", { required: true, max: 100 });
+  exerciseSheet_();
+  deleteRowById_("ExerciseLog", id);
+  return getExerciseData();
+}
+
+// 「這天的餐都記完了」：同一天所有餐點列寫同一個值
+function setMealsComplete_(date, flag) {
+  var sheet = mealSheet_();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var dc = headers.indexOf("date"), cc = headers.indexOf("complete");
+  if (cc < 0) return;
+  for (var i = 1; i < values.length; i++) {
+    if (normalizeDateCell_(values[i][dc]) === date) sheet.getRange(i + 1, cc + 1).setValue(flag);
+  }
 }
 
 function addDailyHealth(p) {
@@ -2354,7 +2424,12 @@ function addDailyHealth(p) {
   var weight = numArg_(weightRaw, "體重", { emptyValue: "", min: 20, max: 400 });
   var hasWeight = weight !== "";
   var hasMeals = !!(meals && meals.length);
-  if (!hasSleep && !hasWeight && !hasMeals) throw new Error("睡眠、體重、餐點至少要填一項");
+  var exercise = parseJsonArg_(p.exercise, "運動");
+  var hasExercise = !!(exercise && exercise.length);
+  if (!hasSleep && !hasWeight && !hasMeals && !hasExercise) throw new Error("睡眠、體重、餐點、運動至少要填一項");
+  if (exercise && exercise.length > 6) throw new Error("一天最多 6 筆運動");
+  var hasCompleteParam = p.mealsComplete !== undefined && p.mealsComplete !== "";
+  var mealsComplete = boolArg_(p.mealsComplete);
   if (meals && meals.length > 12) throw new Error("一天最多 12 筆餐點");
   // 先全部驗證，過了才寫（任何一項有問題整份不寫）
   var sleepF = hasSleep ? sleepFields_(Object.assign({}, sleep, { date: date })) : null;
@@ -2364,6 +2439,12 @@ function addDailyHealth(p) {
     if (f.meal === "snack") return;
     if (seen[f.meal]) throw new Error("同一天的" + f.meal + "不能重複，請合併成一筆");
     seen[f.meal] = true;
+  });
+  var exFs = hasExercise ? exercise.map(function (x) { return exerciseFields_(x, date); }) : [];
+  var exSeen = {};
+  exFs.forEach(function (f) {
+    if (exSeen[f.type]) throw new Error("同一天同一種運動不能重複，請合併成一筆");
+    exSeen[f.type] = true;
   });
   if (hasWeight) {
     // 先檢查 InBody 缺欄位，避免睡眠寫了體重卻失敗
@@ -2378,8 +2459,10 @@ function addDailyHealth(p) {
     }
   }
   if (mealFs.length) writeMeals_(date, mealFs);
+  if (hasCompleteParam) setMealsComplete_(date, mealsComplete);
+  if (exFs.length) writeExercise_(date, exFs);
   try { markHabitProgress_(HEALTH_HABIT_ID, date); } catch (e) { Logger.log("今日健康打卡失敗：" + e.message); }
-  return { sleep: getSleepData(), meals: getMealData(), inbody: getInBodyData() };
+  return { sleep: getSleepData(), meals: getMealData(), exercise: getExerciseData(), inbody: getInBodyData() };
 }
 
 // 同一天送了哪個餐別（含 snack），那個餐別的舊列就整批覆蓋（先刪舊列再新增）；沒送的餐別不動

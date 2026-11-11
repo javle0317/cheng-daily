@@ -1075,6 +1075,12 @@ console.log("健康「今日」：睡眠、餐點、體重平均");
   ]);
   check("餐點合計：有餐沒估熱量 → partial（不是 0）", totals.d1.partial === true && totals.d1.kcal === 500 && totals.d2.partial === false && totals.d2.kcal === 1300 && totals.d2.protein === 40, totals);
 
+  const tc = th.mealDayTotals([{ date: "a", kcal: 500, complete: "true" }, { date: "b", kcal: 500 }, { date: "c", kcal: 500, complete: false }]);
+  check("餐點合計：沒勾「記完了」的日子不是完整的一天（少拍一餐不能拉低平均）", tc.a.complete === true && tc.b.complete === false && tc.c.complete === false, tc);
+  check("打球消耗粗估：120 分 ≈ 450 kcal、空白或 0 → null（不是 0）", th.pickleKcalEstimate(120) === 450 && th.pickleKcalEstimate("") === null && th.pickleKcalEstimate(0) === null);
+  const ef = be.exerciseFields_({ type: "pickleball", minutes: "120", rpe: "7", kcal: "450" }, "2026-11-12");
+  check("運動欄位：分鐘與強度轉整數、消耗轉數字；選填空白維持空白", ef.minutes === 120 && ef.rpe === 7 && ef.kcal === 450 && be.exerciseFields_({ type: "walk", minutes: "30" }, "2026-11-12").rpe === "");
+  check("運動欄位：不認得的類型、0 分鐘、601 分鐘、RPE 11、小數分鐘都丟錯", [{ type: "yoga" }, { minutes: "0" }, { minutes: "601" }, { rpe: "11" }, { minutes: "30.5" }].every(o => throws(() => be.exerciseFields_(Object.assign({ type: "walk", minutes: "30" }, o), "2026-11-12"))));
   check("後端睡眠時數：跨午夜與同一天", be.sleepHours_("01:00", "08:30") === 7.5 && be.sleepHours_("23:30", "07:00") === 7.5);
   check("後端睡眠時數：起床=上床（0 小時）、超過 16 小時都丟錯", throws(() => be.sleepHours_("01:00", "01:00")) && throws(() => be.sleepHours_("01:00", "17:30")));
   const sf = be.sleepFields_({ date: "2026-11-11", bedtime: "01:30", wakeTime: "08:40", sleepTime: "01:50", quality: "4", energy: "7", cpap: "yes", nap: "true", note: "=x" });
@@ -1088,7 +1094,8 @@ console.log("健康「今日」：睡眠、餐點、體重平均");
   be.getSheet = () => { touched++; throw new Error("不該碰到分頁"); };
   check("今日健康：三項都沒填、壞時間、壞熱量、重複餐別、壞體重都丟錯且沒碰任何分頁",
     [{}, { sleep: JSON.stringify({ bedtime: "25:00", wakeTime: "08:00" }) }, { meals: JSON.stringify([{ meal: "lunch", desc: "飯", kcal: "abc" }]) },
-      { meals: JSON.stringify([{ meal: "lunch", desc: "a" }, { meal: "lunch", desc: "b" }]) }, { weight: "abc" }, { meals: JSON.stringify([{ meal: "brunch", desc: "a" }]) }, { meals: JSON.stringify([{ meal: "lunch", desc: "" }]) }]
+      { meals: JSON.stringify([{ meal: "lunch", desc: "a" }, { meal: "lunch", desc: "b" }]) }, { weight: "abc" }, { meals: JSON.stringify([{ meal: "brunch", desc: "a" }]) }, { meals: JSON.stringify([{ meal: "lunch", desc: "" }]) },
+      { exercise: JSON.stringify([{ type: "pickleball", minutes: "abc" }]) }, { exercise: JSON.stringify([{ type: "walk", minutes: "30" }, { type: "walk", minutes: "20" }]) }]
       .every(o => throws(() => be.addDailyHealth(Object.assign({ date: "2026-11-11" }, o)))) && touched === 0, touched);
   be.ensureSheet = realEnsure; be.getSheet = realGet;
 }

@@ -7,7 +7,7 @@
 // 熱量與蛋白質是每日參考值（不是醫療處方），記滿兩週後可依「吃進熱量＋體重趨勢」調整。
 const HEALTH_GOALS = {
   finalWeight: 90,
-  cycle: { weeks: 8, startDate: "2026-11-11", startWeight: 110, low: 106, high: 108 },
+  cycle: { weeks: 8, startDate: "2026-11-12", startWeight: 110, low: 106, high: 108 },
   kcal: 2200,
   protein: [120, 140],
 };

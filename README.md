@@ -127,14 +127,23 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 
 **MealLog**（餐點，健康頁「今日」分頁；分頁自動建立，欄位寫死在 `MEAL_HEADERS`）
 
-| id | date | meal | desc | protein | kcal | eatOut | sugarDrink | note | createdAt |
-|----|------|------|------|---------|------|--------|------------|------|-----------|
+| id | date | meal | desc | protein | kcal | eatOut | sugarDrink | note | complete | createdAt |
+|----|------|------|------|---------|------|--------|------------|------|----------|-----------|
 
 - `meal` 是 breakfast／lunch／dinner／snack；`desc` 必填；`protein`（g）、`kcal` 是**估計值**、可留空（空白＝未估計）。同一天某個餐別重送＝覆蓋那個餐別（點心可多筆，重送整批覆蓋）
+- `complete`：「這天的餐都記完了」（同一天的列同值）。**沒勾的日子不納入每日熱量／蛋白質平均**，因為少拍一餐會讓平均偏低；列表上會標「未標記記完」
 - **今日健康單一入口**：`addDailyHealth` 一次送 `sleep`、`weight`、`meals`（至少一項），全部驗證過才寫；體重寫進 InBody（同天合併，新的一天一樣會幫週活動習慣打卡），不另開體重表。讀取走 `getDailyHealth`（睡眠＋餐點），刪除走 `deleteSleep`／`deleteMeal`
 - 成功後後端會幫「今日健康」習慣打卡（`HEALTH_HABIT_ID = "daily-health"`）。**要自己在 Sheet 的 Habits 分頁加一列**：`id` = `daily-health`、名稱「今日健康」、`frequency` = daily、`target` = 1；沒加就不打卡、也沒有習慣列上的「記」連結，其他功能照常
 - 統計只用「有紀錄」的日子：沒記的日子是「未記錄」；熱量與蛋白質平均只算「每餐都有估計值」的完整日子，有餐點沒估熱量的日子列表上熱量後面標「+」
-- 目標（`health-charts.js` 的 `HEALTH_GOALS`）：終極目標體重 90 kg、**8 週計畫**（起始日、起始體重、目標區間分開設）、每日熱量 2,200 kcal、蛋白質 120–140 g。這是參考值、不是醫療處方，記滿兩週後可依吃進熱量＋體重趨勢調整
+- 目標（`health-charts.js` 的 `HEALTH_GOALS`）：終極目標體重 90 kg、**8 週計畫**（起始日 2026-11-12、起始體重、目標區間分開設）、每日熱量 2,200 kcal、蛋白質 120–140 g。這是參考值、不是醫療處方，記滿兩週後可依吃進熱量＋體重趨勢調整
+
+**ExerciseLog**（運動，健康頁「今日」分頁；分頁自動建立，欄位寫死在 `EXERCISE_HEADERS`）
+
+| id | date | type | minutes | rpe | kcal | note | createdAt |
+|----|------|------|---------|-----|------|------|-----------|
+
+- `type` 是 pickleball／lowimpact／strength／walk／other；`minutes` 必填整數；`rpe`（1–10）、`kcal`（估計消耗）選填。同一天同 type 重送＝覆蓋。表單固定一列打球、一列其他運動；打球沒填消耗時前端自動帶入粗估（每分鐘 3.75 kcal，`pickleKcalEstimate`，6 人一面場輪替、約 110 kg）
+- 運動消耗只是參考，**不加進每日熱量預算**（每日 2,200 kcal 的估算已包含每週 2 次打球）
 
 **LabResults**（驗血，健康頁「驗血」分頁）
 
