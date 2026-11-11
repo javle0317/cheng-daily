@@ -114,8 +114,27 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 |----|------|--------|--------|-----|---------|---------|----------------|------------|-----------|---------|-----|-------------|---------|-----|-----------|
 
 - 只有 `date`、`weight` 必填，其他可留空；寫入依「表頭名稱」，欄位順序不影響
-- 目標體重（90 kg）和實際年齡寫在 `health-body.js` 最上面的 `TARGET_WEIGHT`、`ACTUAL_AGE`
+- 終極目標體重（90 kg）設在 `health-charts.js` 的 `HEALTH_GOALS`、實際年齡寫在 `health-body.js` 最上面的 `ACTUAL_AGE`
 - 分級：BMI 用國健署成人標準；體脂率、腰臀比用男性標準；內臟脂肪 1-9 標準、10-14 偏高、15+ 高；身體年齡跟實際年齡（`health-body.js` 的 `ACTUAL_AGE`）比。體脂計報告裡其他欄位（礦物質、肌肉率、皮下脂肪、四肢分段、健康評分…）刻意不放：不是從體重算出來的衍生值就是日常很少看
+
+**SleepLog**（睡眠，健康頁「今日」分頁；分頁自動建立，欄位寫死在 `SLEEP_HEADERS`）
+
+| id | date | bedtime | sleepTime | wakeTime | hours | quality | energy | cpap | nap | note | createdAt |
+|----|------|---------|-----------|----------|-------|---------|--------|------|-----|------|-----------|
+
+- 一天一列，`date` 是**起床那天**；同一天再送＝覆蓋。`bedtime`／`wakeTime` 必填（`HH:mm`），`sleepTime`（實際入睡）、`quality`（1–5）、`energy`（白天精神 1–10）、`cpap`（yes／no）、`nap` 選填，空白＝未記錄、不是 0
+- `hours` 由後端算（有入睡時間就從入睡算，否則從上床算；起床不晚於起點就視為跨午夜 +24h；超過 16 小時丟錯）。時間與日期欄存成純文字，避免 Sheets 自動轉型
+
+**MealLog**（餐點，健康頁「今日」分頁；分頁自動建立，欄位寫死在 `MEAL_HEADERS`）
+
+| id | date | meal | desc | protein | kcal | eatOut | sugarDrink | note | createdAt |
+|----|------|------|------|---------|------|--------|------------|------|-----------|
+
+- `meal` 是 breakfast／lunch／dinner／snack；`desc` 必填；`protein`（g）、`kcal` 是**估計值**、可留空（空白＝未估計）。同一天某個餐別重送＝覆蓋那個餐別（點心可多筆，重送整批覆蓋）
+- **今日健康單一入口**：`addDailyHealth` 一次送 `sleep`、`weight`、`meals`（至少一項），全部驗證過才寫；體重寫進 InBody（同天合併，新的一天一樣會幫週活動習慣打卡），不另開體重表。讀取走 `getDailyHealth`（睡眠＋餐點），刪除走 `deleteSleep`／`deleteMeal`
+- 成功後後端會幫「今日健康」習慣打卡（`HEALTH_HABIT_ID = "daily-health"`）。**要自己在 Sheet 的 Habits 分頁加一列**：`id` = `daily-health`、名稱「今日健康」、`frequency` = daily、`target` = 1；沒加就不打卡、也沒有習慣列上的「記」連結，其他功能照常
+- 統計只用「有紀錄」的日子：沒記的日子是「未記錄」；熱量與蛋白質平均只算「每餐都有估計值」的完整日子，有餐點沒估熱量的日子列表上熱量後面標「+」
+- 目標（`health-charts.js` 的 `HEALTH_GOALS`）：終極目標體重 90 kg、**8 週計畫**（起始日、起始體重、目標區間分開設）、每日熱量 2,200 kcal、蛋白質 120–140 g。這是參考值、不是醫療處方，記滿兩週後可依吃進熱量＋體重趨勢調整
 
 **LabResults**（驗血，健康頁「驗血」分頁）
 
@@ -308,14 +327,15 @@ Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後�
 
 幾個習慣的 id 寫死在程式裡，要跟**你自己 Sheet 的 Habits 那一列**一致才會有特殊行為（運動挑戰、練字連結、語言連結、週活動自動打卡）：
 
-- [app.js](app.js)：`CHALLENGE_HABIT_ID`、`LANG_HABIT_ID`、`PRACTICE_HABIT_ID`
-- [apps-script/Code.gs](apps-script/Code.gs)：`CHALLENGE_HABIT_ID`、`BODY_HABIT_ID`（`app.js` 與 `Code.gs` 的 `CHALLENGE_HABIT_ID` 要相同）
+- [app.js](app.js)：`CHALLENGE_HABIT_ID`、`LANG_HABIT_ID`、`PRACTICE_HABIT_ID`、`HEALTH_HABIT_ID`
+- [apps-script/Code.gs](apps-script/Code.gs)：`CHALLENGE_HABIT_ID`、`BODY_HABIT_ID`、`HEALTH_HABIT_ID`（`app.js` 與 `Code.gs` 的 `HEALTH_HABIT_ID` 要相同）（`app.js` 與 `Code.gs` 的 `CHALLENGE_HABIT_ID` 要相同）
 
 不需要這些功能就**不用改**：新 Sheet 裡沒有這些 id，它們就不會觸發，習慣都當一般習慣用。要的話：先在 Habits 分頁建好那個習慣，把它的 `id` 貼進對應常數。運動挑戰需要另一個朋友的挑戰站（`CHALLENGE_*`），沒有就別設。
 
 ### 個人數值與標準
 
-- [health-body.js](health-body.js)：`TARGET_WEIGHT`（目標體重）、`ACTUAL_AGE`（實際年齡，生日過了手動更新）；體脂率、腰臀比的分級用的是**男性**標準，女性要改該檔的分級門檻。
+- [health-charts.js](health-charts.js) 的 `HEALTH_GOALS`：終極目標體重、8 週計畫（起始日、起始體重、目標區間）、每日熱量與蛋白質參考值（健康頁「今日」分頁與體組成頁都讀這裡）。
+- [health-body.js](health-body.js)：`ACTUAL_AGE`（實際年齡，生日過了手動更新）；體脂率、腰臀比的分級用的是**男性**標準，女性要改該檔的分級門檻。
 - [health-labs.js](health-labs.js)：驗血參考範圍採原作者自己報告上的範圍，改成你的報告單範圍（匯入時報告上有的範圍會優先）。
 - 血壓警示門檻在 [health.js](health.js)，依你的醫師建議調整。
 - 時區與假日：`Code.gs` 的 `TIME_ZONE`（預設 `Asia/Taipei`）、`HOLIDAY_CALENDAR_ID`（預設台灣國定假日；不在台灣要換成當地的 Google 假日行事曆）。

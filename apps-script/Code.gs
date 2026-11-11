@@ -12,7 +12,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十四個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十六個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -44,6 +44,13 @@
  *   Places          欄位: id | name | country | city | area | tags | source | note | dishes | mapUrl | status | rating | visitedAt | review | createdAt
  *                   （想吃的店，食譜頁的「想吃的店」分頁；ensureSheet 自動建立，寫死在 PLACE_HEADERS；只有 name 必填，
  *                   country／city／area 是三層地區；status 是 want／visited；mapUrl 是 Google 地圖的店家連結，沒填就不顯示地圖鈕；營業時間不記，建議時段等寫在 note）
+ *   SleepLog        欄位: id | date | bedtime | sleepTime | wakeTime | hours | quality | energy | cpap | nap | note | createdAt
+ *                   （睡眠紀錄，健康頁「睡眠」分頁；ensureSheet 自動建立，寫死在 SLEEP_HEADERS；一天一列（date＝起床那天），重送同一天＝覆蓋；
+ *                   bedtime／sleepTime／wakeTime 是 HH:mm，sleepTime（實際入睡）選填；hours 由後端算（入睡或上床→起床，跨午夜 +24h）；
+ *                   quality 1–5、energy 1–10 選填；cpap 是 yes／no／空白；nap 是白天或晚間有沒有打瞌睡）
+ *   MealLog         欄位: id | date | meal | desc | protein | kcal | eatOut | sugarDrink | note | createdAt
+ *                   （飲食紀錄，健康頁「今日」分頁；ensureSheet 自動建立，寫死在 MEAL_HEADERS；meal 是 breakfast／lunch／dinner／snack；
+ *                   protein（g）、kcal 是「估計值」選填，空白＝未估計、不是 0；同一天某個餐別重送＝覆蓋那個餐別（snack 可多筆，重送整批覆蓋））
  *   PetSkipped      欄位: id | eventId | createdAt
  *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
  *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
@@ -211,6 +218,18 @@ function dispatch_(p) {
         return respond({ ok: true, data: addInBodyReading(p) });
       case "deleteInBodyReading":
         return respond({ ok: true, data: deleteInBodyReading(p.id) });
+      case "getDailyHealth":
+        return respond({ ok: true, data: getDailyHealth() });
+      case "addDailyHealth":
+        return respond({ ok: true, data: addDailyHealth(p) });
+      case "deleteMeal":
+        return respond({ ok: true, data: deleteMeal(p.id) });
+      case "getSleepData":
+        return respond({ ok: true, data: getSleepData() });
+      case "addSleep":
+        return respond({ ok: true, data: addSleep(p) });
+      case "deleteSleep":
+        return respond({ ok: true, data: deleteSleep(p.id) });
       case "getLabData":
         return respond({ ok: true, data: getLabData() });
       case "addLabEntry":
@@ -314,7 +333,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-10-23.1";
+var BACKEND_VERSION = "2026-11-11.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -378,7 +397,7 @@ function sheetToObjects(sheet) {
     headers.forEach(function (h, i) {
       var v = row[i];
       if (Object.prototype.toString.call(v) === "[object Date]") {
-        if (h === "time" || h === "endTime") {
+        if (h === "time" || h === "endTime" || h === "bedtime" || h === "sleepTime" || h === "wakeTime") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
         } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt" || h === "finishedAt" || h === "visitedAt") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
@@ -2197,6 +2216,199 @@ function clearPetLabPref(pet, name) {
     if (String(values[i][headers.indexOf("pet")]) === pet && String(values[i][headers.indexOf("name")]) === name) sheet.deleteRow(i + 1);
   }
   return getPetData();
+}
+
+// ====== 睡眠（SleepLog）======
+// 一天一列，date ＝「起床那天」；同一天再送＝覆蓋（重打一次＝修正）。
+// 睡眠時數由後端算，不信任前端：從「實際入睡」（有填的話）否則「上床」算到起床，起床時間不晚於起點就視為跨午夜（+24h）。
+// 時間欄位一律存成純文字 HH:mm（不然 Sheets 會自動轉成時間型態）。
+var SLEEP_HEADERS = ["id", "date", "bedtime", "sleepTime", "wakeTime", "hours", "quality", "energy", "cpap", "nap", "note", "createdAt"];
+var SLEEP_CPAP = ["yes", "no"];
+
+function sleepSheet_() {
+  return ensureSheet("SleepLog", SLEEP_HEADERS);
+}
+
+function hhmmToMinutes_(t) {
+  var m = /^(\d{2}):(\d{2})$/.exec(String(t));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+// 起點到起床的時數（小數兩位）；起床 <= 起點視為跨午夜。兩者相同＝0 小時不合理，丟錯。
+function sleepHours_(startHHmm, wakeHHmm) {
+  var a = hhmmToMinutes_(startHHmm), b = hhmmToMinutes_(wakeHHmm);
+  if (a === null || b === null) throw new Error("睡眠時間格式錯誤（要 HH:mm）");
+  var diff = b - a;
+  if (diff <= 0) diff += 24 * 60;
+  if (diff === 0 || diff > 16 * 60) throw new Error("睡眠時數不合理（超過 16 小時），請確認上床與起床時間");
+  return Math.round((diff / 60) * 100) / 100;
+}
+
+function sleepFields_(p) {
+  var bed = timeArg_(p.bedtime, "上床");
+  var wake = timeArg_(p.wakeTime, "起床");
+  if (!bed) throw new Error("上床時間不能空白");
+  if (!wake) throw new Error("起床時間不能空白");
+  var asleep = timeArg_(p.sleepTime, "入睡");
+  var start = asleep || bed;
+  return {
+    date: dateArg_(p.date, "睡眠"),
+    bedtime: bed,
+    sleepTime: asleep,
+    wakeTime: wake,
+    hours: sleepHours_(start, wake),
+    quality: numArg_(p.quality, "睡眠品質", { emptyValue: "", int: true, min: 1, max: 5 }),
+    energy: numArg_(p.energy, "白天精神", { emptyValue: "", int: true, min: 1, max: 10 }),
+    cpap: enumArg_(p.cpap, "CPAP", SLEEP_CPAP, { emptyValue: "" }),
+    nap: boolArg_(p.nap),
+    note: textArg_(p.note, "備註", { max: 200 }),
+  };
+}
+
+function getSleepData() {
+  return sheetToObjects(sleepSheet_());
+}
+
+function addSleep(p) {
+  writeSleep_(sleepFields_(p));
+  return getSleepData();
+}
+
+// 寫入（或覆蓋同一天）一列睡眠；呼叫端已驗證過欄位並持有全域鎖
+function writeSleep_(f) {
+  var sheet = sleepSheet_();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var dateCol = headers.indexOf("date");
+  var existingRow = 0;
+  for (var i = 1; i < values.length; i++) {
+    if (normalizeDateCell_(values[i][dateCol]) === f.date) { existingRow = i + 1; break; }
+  }
+  var row = headers.map(function (h) {
+    if (h === "id") return existingRow ? values[existingRow - 1][headers.indexOf("id")] : Utilities.getUuid();
+    if (h === "createdAt") return existingRow ? values[existingRow - 1][headers.indexOf("createdAt")] : new Date();
+    return Object.prototype.hasOwnProperty.call(f, h) ? f[h] : "";
+  });
+  var r = existingRow || sheet.getLastRow() + 1;
+  // 日期與時間欄先設成純文字格式，避免被轉型；備註若以 = + - @ 開頭也一併防護
+  row.forEach(function (v, idx) {
+    var h = headers[idx];
+    if (h === "date" || h === "bedtime" || h === "sleepTime" || h === "wakeTime" || needsTextGuard_(v)) sheet.getRange(r, idx + 1).setNumberFormat("@");
+  });
+  sheet.getRange(r, 1, 1, row.length).setValues([row]);
+}
+
+function deleteSleep(id) {
+  id = textArg_(id, "睡眠紀錄", { required: true, max: 100 });
+  sleepSheet_(); // 確保分頁存在
+  deleteRowById_("SleepLog", id);
+  return getSleepData();
+}
+
+// ====== 飲食（MealLog）與「今日健康」單一入口 ======
+// 早上記睡眠＋體重、晚上貼餐點，都走 addDailyHealth 這一個 action（一次送：sleep、weight、meals 至少一項）。
+// 全部驗證過才寫；體重寫進既有的 InBody（同天合併，不另開體重表）；成功後幫「今日健康」習慣打卡（習慣沒建就略過）。
+var MEAL_HEADERS = ["id", "date", "meal", "desc", "protein", "kcal", "eatOut", "sugarDrink", "note", "createdAt"];
+var MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"];
+var HEALTH_HABIT_ID = "daily-health"; // Habits 分頁裡「今日健康」那一列的 id（要手動在 Sheet 加一列，見 README）
+
+function mealSheet_() {
+  return ensureSheet("MealLog", MEAL_HEADERS);
+}
+
+function getMealData() {
+  return sheetToObjects(mealSheet_());
+}
+
+function mealFields_(m, date) {
+  m = m || {};
+  var f = {
+    date: date,
+    meal: enumArg_(m.meal, "餐別", MEAL_TYPES),
+    desc: textArg_(m.desc, "餐點描述", { required: true, max: 300 }),
+    protein: numArg_(m.protein, "蛋白質", { emptyValue: "", min: 0, max: 500 }),
+    kcal: numArg_(m.kcal, "熱量", { emptyValue: "", min: 0, max: 6000 }),
+    eatOut: boolArg_(m.eatOut),
+    sugarDrink: boolArg_(m.sugarDrink),
+    note: textArg_(m.note, "備註", { max: 200 }),
+  };
+  return f;
+}
+
+function parseJsonArg_(v, label) {
+  if (typeof v !== "string") return v;
+  if (v.trim() === "") return undefined;
+  try { return JSON.parse(v); } catch (e) { throw new Error(label + "資料格式錯誤"); }
+}
+
+function getDailyHealth() {
+  return { sleep: getSleepData(), meals: getMealData() };
+}
+
+function addDailyHealth(p) {
+  var date = dateArg_(p.date, "");
+  var sleep = parseJsonArg_(p.sleep, "睡眠");
+  var meals = parseJsonArg_(p.meals, "餐點");
+  var weightRaw = p.weight;
+  var hasSleep = !!(sleep && (sleep.bedtime || sleep.wakeTime));
+  var weight = numArg_(weightRaw, "體重", { emptyValue: "", min: 20, max: 400 });
+  var hasWeight = weight !== "";
+  var hasMeals = !!(meals && meals.length);
+  if (!hasSleep && !hasWeight && !hasMeals) throw new Error("睡眠、體重、餐點至少要填一項");
+  if (meals && meals.length > 12) throw new Error("一天最多 12 筆餐點");
+  // 先全部驗證，過了才寫（任何一項有問題整份不寫）
+  var sleepF = hasSleep ? sleepFields_(Object.assign({}, sleep, { date: date })) : null;
+  var mealFs = hasMeals ? meals.map(function (m) { return mealFields_(m, date); }) : [];
+  var seen = {};
+  mealFs.forEach(function (f) {
+    if (f.meal === "snack") return;
+    if (seen[f.meal]) throw new Error("同一天的" + f.meal + "不能重複，請合併成一筆");
+    seen[f.meal] = true;
+  });
+  if (hasWeight) {
+    // 先檢查 InBody 缺欄位，避免睡眠寫了體重卻失敗
+    var ibHeaders = getSheet("InBody").getRange(1, 1, 1, getSheet("InBody").getLastColumn()).getValues()[0];
+    if (ibHeaders.indexOf("weight") < 0) throw new Error("InBody 缺少欄位 weight，請先在表頭補上");
+  }
+  if (sleepF) writeSleep_(sleepF);
+  if (hasWeight) {
+    var created = upsertHealthRow_("InBody", INBODY_FIELDS, { date: date, weight: weight });
+    if (created) {
+      try { markHabitProgress_(BODY_HABIT_ID, date); } catch (e) { Logger.log("週活動打卡失敗：" + e.message); }
+    }
+  }
+  if (mealFs.length) writeMeals_(date, mealFs);
+  try { markHabitProgress_(HEALTH_HABIT_ID, date); } catch (e) { Logger.log("今日健康打卡失敗：" + e.message); }
+  return { sleep: getSleepData(), meals: getMealData(), inbody: getInBodyData() };
+}
+
+// 同一天送了哪個餐別（含 snack），那個餐別的舊列就整批覆蓋（先刪舊列再新增）；沒送的餐別不動
+function writeMeals_(date, mealFs) {
+  var sheet = mealSheet_();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var dc = headers.indexOf("date"), mc = headers.indexOf("meal");
+  var replacing = {};
+  mealFs.forEach(function (f) { replacing[f.meal] = true; });
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (normalizeDateCell_(values[i][dc]) === date && replacing[String(values[i][mc])]) sheet.deleteRow(i + 1);
+  }
+  mealFs.forEach(function (f) {
+    var vals = Object.assign({ id: Utilities.getUuid(), createdAt: new Date() }, f);
+    var row = headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; });
+    var r = sheet.getLastRow() + 1;
+    row.forEach(function (v, idx) {
+      if (headers[idx] === "date" || needsTextGuard_(v)) sheet.getRange(r, idx + 1).setNumberFormat("@");
+    });
+    sheet.getRange(r, 1, 1, row.length).setValues([row]);
+  });
+}
+
+function deleteMeal(id) {
+  id = textArg_(id, "餐點", { required: true, max: 100 });
+  mealSheet_();
+  deleteRowById_("MealLog", id);
+  return getMealData();
 }
 
 // ====== 水電瓦斯分項追蹤（UtilityBills）======

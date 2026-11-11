@@ -4,7 +4,7 @@
 // 身體年齡跟實際年齡比。（Dean 男、42 歲；設備是 Tokuyo 體脂計，不是 InBody，
 // 但 Sheet 分頁名稱維持 InBody。）
 (function () {
-  const TARGET_WEIGHT = 90; // 目標體重（kg）
+  const TARGET_WEIGHT = HEALTH_GOALS.finalWeight; // 終極目標體重（kg），設定在 health-charts.js 的 HEALTH_GOALS
   const ACTUAL_AGE = 42; // 實際年齡（歲），身體年齡拿來比；生日過了要手動更新
 
   const state = { readings: [], range: "all", version: 0 };
@@ -468,6 +468,9 @@
     renderList();
     prefillForm();
   }
+
+  // 「今日」分頁登記體重時，把後端回傳的最新體組成直接套用，體組成分頁就不會是舊的
+  window.addEventListener("health:inbody", (e) => { apply(e.detail); renderAll(); });
 
   window.healthLoaders = window.healthLoaders || [];
   window.healthLoaders.push({ tab: "body", load: async () => {

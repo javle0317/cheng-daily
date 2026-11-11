@@ -1374,3 +1374,13 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .bank-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--series-systolic) 15%, transparent); overflow: hidden; }
 .bank-bar i { display: block; height: 100%; border-radius: 3px; background: var(--series-systolic); }
 .bank-pct { display: inline-block; min-width: 3.2em; margin-right: 8px; text-align: right; font-weight: 400; font-size: 13px; color: var(--text-dim); }
+
+/* ====== 健康頁「今日」分頁 ====== */
+.meal-row { padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.meal-row:last-child { border-bottom: 0; }
+.meal-row .form-row { margin-bottom: 6px; }
+.meal-flags { gap: 16px; }
+.check-field { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-dim); }
+.check-field input { width: auto; }
+.goal-box .progress-text { margin: 0 0 6px; font-size: 14px; }
+.goal-box .progress-bar { margin-bottom: 12px; }

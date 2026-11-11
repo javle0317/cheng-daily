@@ -2,6 +2,16 @@
 // 體重（health-body.js）跟驗血（health-labs.js）共用。分級沿用血壓頁的四級色
 // （good / warning / serious / critical），顏色一定搭配文字標籤，不能只靠顏色傳達。
 
+// ====== 個人目標（寫死；換人使用要改這裡，見 README「新手改名清單」）======
+// finalWeight：終極目標；cycle：這一輪「8 週計畫」（起始日、起始體重、目標區間，跟終極目標分開看）；
+// 熱量與蛋白質是每日參考值（不是醫療處方），記滿兩週後可依「吃進熱量＋體重趨勢」調整。
+const HEALTH_GOALS = {
+  finalWeight: 90,
+  cycle: { weeks: 8, startDate: "2026-11-11", startWeight: 110, low: 106, high: 108 },
+  kcal: 2200,
+  protein: [120, 140],
+};
+
 const LEVEL_VAR = {
   good: "var(--status-good)",
   ok: "var(--text-dim)", // 寵物驗血「醫師說無妨」：中性色，不當警示

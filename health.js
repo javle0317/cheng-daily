@@ -28,10 +28,11 @@ window.loadPageData = async function () {
     } },
     ...(window.healthLoaders || []),
   ];
-  let current = "bp";
+  let current = "today";
   try {
     const saved = localStorage.getItem("healthTab");
-    if (["bp", "body", "labs"].includes(saved)) current = saved;
+    if (["today", "bp", "body", "labs"].includes(saved)) current = saved;
+    if (location.hash === "#today") current = "today";
   } catch (e) { /* ignore */ }
   const fail = (rs) => {
     const failed = rs.filter(r => r.status === "rejected");
@@ -92,11 +93,12 @@ document.querySelectorAll(".health-tab-btn").forEach(btn => {
 });
 
 (function initHealthTab() {
-  let tab = "bp";
+  let tab = "today";
   try {
     const saved = localStorage.getItem(HEALTH_TAB_KEY);
-    if (["bp", "body", "labs"].includes(saved)) tab = saved;
+    if (["today", "bp", "body", "labs"].includes(saved)) tab = saved;
   } catch (e) { /* ignore */ }
+  if (location.hash === "#today") tab = "today";
   setHealthTab(tab);
 })();
 

@@ -405,7 +405,7 @@ console.log("匯入 skill（.claude/skills/cheng-daily-import）：每個參考�
 {
   const dir = path.join(root, ".claude/skills/cheng-daily-import");
   const skill = fs.readFileSync(path.join(dir, "SKILL.md"), "utf8");
-  const refs = ["body", "labs", "pet-labs", "utilities", "places", "recipes", "renovation"];
+  const refs = ["body", "labs", "pet-labs", "utilities", "places", "recipes", "renovation", "daily-health"];
   check("SKILL.md 有 name／description，且提到的每個 references 檔都存在", /^---\nname: cheng-daily-import\ndescription: .{40,}\n---/s.test(skill) && refs.every(n => skill.includes(`references/${n}.md`) && fs.existsSync(path.join(dir, "references", n + ".md"))));
   const example = (n) => { const m = /```json\n([\s\S]*?)\n```/.exec(fs.readFileSync(path.join(dir, "references", n + ".md"), "utf8")); return m ? m[1] : null; };
   const ex = Object.fromEntries(refs.map(n => [n, example(n)]));
@@ -436,6 +436,12 @@ console.log("匯入 skill（.claude/skills/cheng-daily-import）：每個參考�
   rn.__t = ex.renovation;
   const rnImp = JSON.parse(vm.runInContext("JSON.stringify(parseRenoImport(__t))", rn));
   check("裝潢報價範例：parseRenoImport 沒有問題、商家／日期／品項都有", rnImp && rnImp.problems.length === 0 && rnImp.vendor && rnImp.date && rnImp.items.length === 2, rnImp);
+  const dh = JSON.parse(ex["daily-health"]);
+  const hhmm = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+  check("今日健康範例：日期格式、睡眠時間 HH:mm、餐別是 health-today.js 認得的、熱量蛋白質是數字",
+    /^\d{4}-\d{2}-\d{2}$/.test(dh.date) && typeof dh.weight === "number" && hhmm(dh.sleep.bedtime) && hhmm(dh.sleep.wakeTime) && hhmm(dh.sleep.sleepTime)
+    && dh.meals.every(m => ["breakfast", "lunch", "dinner", "snack"].includes(m.meal) && m.desc && (m.kcal === undefined || typeof m.kcal === "number") && (m.protein === undefined || typeof m.protein === "number"))
+    && /MEAL_ORDER = \["breakfast", "lunch", "dinner", "snack"\]/.test(read("health-today.js")), dh);
   const claude = read("CLAUDE.md");
   check("CLAUDE.md 不再重複放匯入格式，改指向 skill（只有一份來源）", claude.includes(".claude/skills/cheng-daily-import") && !/```json/.test(claude));
 }
@@ -1049,6 +1055,42 @@ console.log("後端：登記體組成自動幫週活動習慣打卡");
   logs = run(null, [], "2026-10-07");
   check("習慣已被刪除：什麼都不寫", logs.length === 0);
   be.Utilities = realUtilities; be.getSheet = realGetSheet; be.sheetToObjects = realToObjects;
+}
+
+console.log("健康「今日」：睡眠、餐點、體重平均");
+{
+  const th = loadFrontend(["shared.js", "health-charts.js", "health-today.js"], "// ====== UI");
+  check("睡眠時數：01:00→08:30 = 7.5（跨午夜）", th.sleepHoursOf("01:00", "08:30") === 7.5);
+  check("睡眠時數：23:30→07:00 = 7.5（跨午夜）", th.sleepHoursOf("23:30", "07:00") === 7.5);
+  check("睡眠時數：22:00→06:00 = 8", th.sleepHoursOf("22:00", "06:00") === 8);
+  check("睡眠時數：壞格式 → null", th.sleepHoursOf("25", "08:30") === null);
+  const bs = th.bedtimeStats([{ bedtime: "23:30" }, { bedtime: "01:00" }]);
+  check("平均上床：23:30 與 01:00 的平均是 00:15（不被午夜切斷）、前後 45 分", bs.avg === "00:15" && bs.sd === 45, bs);
+  check("平均上床：單筆沒有規律度", th.bedtimeStats([{ bedtime: "01:00" }]).sd === null && th.bedtimeStats([]) === null);
+  const rows = [{ date: "2026-11-05", weight: "110" }, { date: "2026-11-09", weight: "109" }, { date: "2026-11-10", weight: "" }, { date: "2026-10-01", weight: "100" }];
+  check("體重 7 日平均：只算區間內有值的（空白不當 0）", Math.abs(th.avgWeightIn(rows, "2026-11-11", 7) - 109.5) < 1e-9);
+  check("體重 7 日平均：區間內沒紀錄 → null", th.avgWeightIn(rows, "2026-12-30", 7) === null);
+  const totals = th.mealDayTotals([
+    { date: "d1", kcal: 500, protein: 30 }, { date: "d1", kcal: "", protein: "" }, { date: "d2", kcal: 700, protein: 40 }, { date: "d2", kcal: 600, protein: "" },
+  ]);
+  check("餐點合計：有餐沒估熱量 → partial（不是 0）", totals.d1.partial === true && totals.d1.kcal === 500 && totals.d2.partial === false && totals.d2.kcal === 1300 && totals.d2.protein === 40, totals);
+
+  check("後端睡眠時數：跨午夜與同一天", be.sleepHours_("01:00", "08:30") === 7.5 && be.sleepHours_("23:30", "07:00") === 7.5);
+  check("後端睡眠時數：起床=上床（0 小時）、超過 16 小時都丟錯", throws(() => be.sleepHours_("01:00", "01:00")) && throws(() => be.sleepHours_("01:00", "17:30")));
+  const sf = be.sleepFields_({ date: "2026-11-11", bedtime: "01:30", wakeTime: "08:40", sleepTime: "01:50", quality: "4", energy: "7", cpap: "yes", nap: "true", note: "=x" });
+  check("睡眠欄位：有入睡時間就從入睡算（01:50→08:40 = 6.83）、品質精神轉數字", sf.hours === 6.83 && sf.quality === 4 && sf.energy === 7 && sf.nap === true, sf);
+  check("睡眠欄位：沒入睡時間就從上床算、選填空白維持空白（不是 0）", (f => f.hours === 7.17 && f.quality === "" && f.energy === "" && f.cpap === "" && f.nap === false)(be.sleepFields_({ date: "2026-11-11", bedtime: "01:30", wakeTime: "08:40" })));
+  check("睡眠欄位：缺上床／起床、品質 6、精神 0、CPAP 亂填、壞日期都丟錯",
+    [{ bedtime: "" }, { wakeTime: "" }, { quality: "6" }, { energy: "0" }, { cpap: "maybe" }, { date: "2026-13-01" }].every(o => throws(() => be.sleepFields_(Object.assign({ date: "2026-11-11", bedtime: "01:30", wakeTime: "08:40" }, o)))));
+  const realEnsure = be.ensureSheet, realGet = be.getSheet;
+  let touched = 0;
+  be.ensureSheet = () => { touched++; throw new Error("不該碰到分頁"); };
+  be.getSheet = () => { touched++; throw new Error("不該碰到分頁"); };
+  check("今日健康：三項都沒填、壞時間、壞熱量、重複餐別、壞體重都丟錯且沒碰任何分頁",
+    [{}, { sleep: JSON.stringify({ bedtime: "25:00", wakeTime: "08:00" }) }, { meals: JSON.stringify([{ meal: "lunch", desc: "飯", kcal: "abc" }]) },
+      { meals: JSON.stringify([{ meal: "lunch", desc: "a" }, { meal: "lunch", desc: "b" }]) }, { weight: "abc" }, { meals: JSON.stringify([{ meal: "brunch", desc: "a" }]) }, { meals: JSON.stringify([{ meal: "lunch", desc: "" }]) }]
+      .every(o => throws(() => be.addDailyHealth(Object.assign({ date: "2026-11-11" }, o)))) && touched === 0, touched);
+  be.ensureSheet = realEnsure; be.getSheet = realGet;
 }
 
 console.log(failed ? `\n${failed} 項失敗` : "\n全部通過");

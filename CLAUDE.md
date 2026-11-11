@@ -29,6 +29,7 @@
 - `PRACTICE_HABIT_ID`：練字，列上多「字」連結到 lingo 字帖頁（只在 `app.js`）。
 - `LANG_HABIT_ID`：語言練習，列上多「語」連結到 lingo，打卡是手動的（只在 `app.js`）。
 - `BODY_HABIT_ID`：週活動，登記「新的一天」的體組成會自動打卡，同天補填不重複計次（只在 `Code.gs`，`addInBodyReading`）。
+- `HEALTH_HABIT_ID`（`daily-health`，要在 Habits 分頁手動加那一列）：今日健康，列上多「記」連結到 `health.html#today`；儲存今日健康（`addDailyHealth`）會自動打卡（`Code.gs` 與 `app.js` 兩邊都有）。
 
 ## 與 cheng-lingo 的關係
 姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。
@@ -37,7 +38,10 @@
 - 食譜留在這個專案（`recipes.html/js` + Sheet 分頁 `Recipes`），已完成；內容用「貼上匯入」（格式見下）。
 - 完整計畫：`~/.claude/plans/sideproject-cheng-daily-github-dazzling-catmull.md`。
 
-## 「貼上匯入」JSON 格式（體組成、驗血、寵物驗血、水電瓦斯、想吃的店、食譜）
+## 減重追蹤（健康頁「今日」分頁）
+睡眠＋體重＋餐點共用一個入口（`health-today.js`、後端 `addDailyHealth`，Sheet `SleepLog`／`MealLog`）；餐點照片不進 App，由 Claude 估熱量／蛋白質後產 JSON 貼上匯入（skill 的 `references/daily-health.md`）。目標值（終極體重、8 週計畫、每日熱量與蛋白質）集中在 `health-charts.js` 的 `HEALTH_GOALS`。缺資料是「未記錄」不是 0；不做醫療診斷。真實健康資料只放 Sheet，不進 repo。
+
+## 「貼上匯入」JSON 格式（體組成、驗血、寵物驗血、水電瓦斯、想吃的店、食譜、裝潢報價、每日健康）
 使用者傳報告、帳單、截圖、店名、食譜時，要照 App 的匯入格式產出 JSON 給他貼。**格式與規則只有一份來源：`.claude/skills/cheng-daily-import/`**（`SKILL.md` 判斷是哪一種、列共通規則；`references/*.md` 是各種格式）。這個專案裡的 Claude Code 會自動載入它；Claude app 用的是同一份打包成的 `.skill`（`sh scripts/package-skill.sh` 重新打包後上傳）。
 - **改了匯入欄位或規則，就改那份 skill**（不要把格式再抄回這個檔案）；回歸檢查會用 App 真正的匯入解析程式驗證 skill 裡的範例 JSON，改了卻漏改會直接失敗。
 - 修改後記得提醒 Dean 重新打包上傳 Claude app 的 skill。

@@ -512,6 +512,10 @@ const LINGO_URL = "https://javle0317.github.io/cheng-lingo/";
 // 勾選、編輯、刪除都照一般每日習慣。這個 id 是 Habits 分頁裡那一列的 id。
 const PRACTICE_HABIT_ID = "d6007d80-d570-4b49-a989-8af89401c395";
 
+// 「今日健康」習慣：列上多一個「記」連結，連到健康頁的「今日」分頁（睡眠＋體重＋餐點單一入口）；
+// 打卡由後端在儲存今日健康時自動做（Code.gs 的 HEALTH_HABIT_ID），也仍可手動勾。id 要跟 Habits 分頁那一列一致。
+const HEALTH_HABIT_ID = "daily-health";
+
 function updateHabitsCardVisibility() {
   const card = document.getElementById("habitsCard");
   const anyVisible = ["dailyHabitSection", "weeklyHabitSection", "monthlyHabitSection"]
@@ -610,6 +614,15 @@ function renderDailyHabits() {
       a.rel = "noopener";
       a.title = "產生可列印的描紅字帖（中文、英文、日文）";
       a.textContent = "字";
+      li.insertBefore(a, editBtn);
+    }
+    if (habit.id === HEALTH_HABIT_ID) {
+      const editBtn = li.querySelector(".habit-edit-btn");
+      const a = document.createElement("a");
+      a.className = "practice-link";
+      a.href = "health.html#today";
+      a.title = "記錄今日睡眠、體重、餐點";
+      a.textContent = "記";
       li.insertBefore(a, editBtn);
     }
     if (habit.id === LANG_HABIT_ID) {
