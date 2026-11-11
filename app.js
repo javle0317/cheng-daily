@@ -36,6 +36,7 @@ function formatDateLabel(dateStr) {
 }
 
 function splitTextAndLink(text) {
+  text = String(text); // Sheet 會把純數字備註（例如 4250）存成數字型態，讀回來不是字串
   const urlMatch = text.match(/https?:\/\/\S+/);
   const restText = urlMatch ? text.replace(urlMatch[0], "").trim() : text;
   return { restText, url: urlMatch ? urlMatch[0] : null };
