@@ -39,7 +39,7 @@
 - 完整計畫：`~/.claude/plans/sideproject-cheng-daily-github-dazzling-catmull.md`。
 
 ## 減重追蹤（健康頁「今日」分頁）
-睡眠＋體重＋餐點共用一個入口（`health-today.js`、後端 `addDailyHealth`，Sheet `SleepLog`／`MealLog`）；餐點照片不進 App，由 Claude 估熱量／蛋白質後產 JSON 貼上匯入（skill 的 `references/daily-health.md`）。目標值（終極體重、8 週計畫、每日熱量與蛋白質）集中在 `health-charts.js` 的 `HEALTH_GOALS`。缺資料是「未記錄」不是 0；不做醫療診斷。真實健康資料只放 Sheet，不進 repo。
+睡眠＋體重＋餐點共用一個入口（`health-today.js`、後端 `addDailyHealth`，Sheet `SleepLog`／`MealLog`）；餐點照片不進 App，由 Claude 估熱量／蛋白質後產 JSON 貼上匯入（skill 的 `references/daily-health.md`）。每週回顧（`health-weekly.js`、Sheet `WeekReview`）頁面只算數字，解讀交給 Claude：使用者貼「【每週健康摘要】」時照 skill 的 `references/weekly-review.md` 分析。目標值（終極體重、8 週計畫、每日熱量與蛋白質）集中在 `health-charts.js` 的 `HEALTH_GOALS`。缺資料是「未記錄」不是 0；不做醫療診斷。真實健康資料只放 Sheet，不進 repo。
 
 ## 「貼上匯入」JSON 格式（體組成、驗血、寵物驗血、水電瓦斯、想吃的店、食譜、裝潢報價、每日健康）
 使用者傳報告、帳單、截圖、店名、食譜時，要照 App 的匯入格式產出 JSON 給他貼。**格式與規則只有一份來源：`.claude/skills/cheng-daily-import/`**（`SKILL.md` 判斷是哪一種、列共通規則；`references/*.md` 是各種格式）。這個專案裡的 Claude Code 會自動載入它；Claude app 用的是同一份打包成的 `.skill`（`sh scripts/package-skill.sh` 重新打包後上傳）。

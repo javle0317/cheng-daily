@@ -1100,5 +1100,38 @@ console.log("健康「今日」：睡眠、餐點、體重平均");
   be.ensureSheet = realEnsure; be.getSheet = realGet;
 }
 
+console.log("健康：每週回顧（週一到週日、平均、缺資料）");
+{
+  const wk = loadFrontend(["shared.js", "health-charts.js", "health-today.js", "health-weekly.js"], "// ====== UI");
+  check("週一：週日 → 同一週的週一；週一 → 自己；跨月", wk.weekStartOf("2026-11-15") === "2026-11-09" && wk.weekStartOf("2026-11-16") === "2026-11-16" && wk.weekStartOf("2026-12-02") === "2026-11-30");
+  const data = {
+    inbody: [{ date: "2026-11-09", weight: "110" }, { date: "2026-11-11", weight: "109" }, { date: "2026-11-16", weight: "108" }, { date: "2026-11-18", weight: "" }],
+    sleep: [{ date: "2026-11-16", bedtime: "23:30", hours: 7.5, nap: true, cpap: "yes", energy: 6 }, { date: "2026-11-17", bedtime: "01:00", hours: 6.5, nap: false, cpap: "", energy: "" }],
+    meals: [
+      { date: "2026-11-16", meal: "lunch", kcal: 700, protein: 40, eatOut: true, complete: true }, { date: "2026-11-16", meal: "dinner", kcal: 600, protein: 30, complete: true },
+      { date: "2026-11-17", meal: "lunch", kcal: 800, protein: 35 },
+      { date: "2026-11-18", meal: "lunch", kcal: "", protein: "", complete: true },
+    ],
+    exercise: [{ date: "2026-11-18", type: "pickleball", minutes: 120, rpe: 7 }, { date: "2026-11-19", type: "walk", minutes: 30, rpe: "" }],
+    bp: [{ date: "2026-11-16", systolic: 150, diastolic: 80 }, { date: "2026-11-17", systolic: 120, diastolic: 70 }, { date: "2026-11-10", systolic: 200, diastolic: 100 }],
+  };
+  const sm = wk.buildWeeklySummary(data, "2026-11-16");
+  check("週報體重：本週平均 108（空白不算）、上週 109.5、變化 −1.5", sm.weight.avg === 108 && sm.weight.n === 1 && sm.weight.prevAvg === 109.5 && sm.weight.prevN === 2 && sm.weight.change === -1.5, sm.weight);
+  check("週報睡眠：平均 7 小時、上床 00:15、打瞌睡 1 天、CPAP 有戴 1 晚（其餘未記錄）", sm.sleep.avgHours === 7 && sm.sleep.bedtimeAvg === "00:15" && sm.sleep.napDays === 1 && sm.sleep.cpapYes === 1 && sm.sleep.cpapNo === 0 && sm.sleep.energyAvg === 6, sm.sleep);
+  check("週報飲食：只有「記完且熱量完整」的那天納入平均（1 天 1300 kcal）、沒標記的與沒估熱量的不算；外食 1 餐", sm.meals.loggedDays === 3 && sm.meals.completeDays === 1 && sm.meals.avgKcal === 1300 && sm.meals.avgProtein === 70 && sm.meals.eatOut === 1, sm.meals);
+  check("週報運動：2 次 150 分鐘、打球 1 次 120 分、強度只算有填的", sm.exercise.sessions === 2 && sm.exercise.minutes === 150 && sm.exercise.pickleMinutes === 120 && sm.exercise.otherMinutes === 30 && sm.exercise.rpeAvg === 7, sm.exercise);
+  check("週報血壓：只算本週（不含 11/10）、平均 135/75、偏高 1 次", sm.bp.n === 2 && sm.bp.avgSys === 135 && sm.bp.avgDia === 75 && sm.bp.highCount === 1, sm.bp);
+  const empty = wk.buildWeeklySummary({ inbody: [], sleep: [], meals: [], exercise: [], bp: [] }, "2026-11-16");
+  const emptyText = wk.weeklySummaryText(empty);
+  check("週報：整週沒資料 → 全部是「未記錄」或 0 次，平均不是 0", empty.weight.avg === null && empty.sleep.avgHours === null && empty.meals.avgKcal === null && empty.bp.avgSys === null && emptyText.includes("本週平均 未記錄 kg") && emptyText.includes("weekly-review"), emptyText);
+  check("週報提醒：量得太少／記完天數太少會提醒", wk.weeklyHints(empty).length >= 2 && wk.weeklyHints(sm).some(t => t.includes("只量了 1 次")));
+  const realEnsure2 = be.ensureSheet, realGet2 = be.getSheet;
+  let touched2 = 0;
+  be.ensureSheet = () => { touched2++; throw new Error("不該碰到分頁"); };
+  be.getSheet = be.ensureSheet;
+  check("教練備註：非週一、壞日期、備註超過 2000 字都丟錯且沒碰分頁", [{ weekStart: "2026-11-17", note: "a" }, { weekStart: "x", note: "a" }, { weekStart: "2026-11-16", note: "a".repeat(2001) }].every(o => throws(() => be.addWeekReview(o))) && touched2 === 0, touched2);
+  be.ensureSheet = realEnsure2; be.getSheet = realGet2;
+}
+
 console.log(failed ? `\n${failed} 項失敗` : "\n全部通過");
 process.exit(failed ? 1 : 0);

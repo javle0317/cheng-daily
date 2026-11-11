@@ -145,6 +145,15 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
 - `type` 是 pickleball／lowimpact／strength／walk／other；`minutes` 必填整數；`rpe`（1–10）、`kcal`（估計消耗）選填。同一天同 type 重送＝覆蓋。表單固定一列打球、一列其他運動；打球沒填消耗時前端自動帶入粗估（每分鐘 3.75 kcal，`pickleKcalEstimate`，6 人一面場輪替、約 110 kg）
 - 運動消耗只是參考，**不加進每日熱量預算**（每日 2,200 kcal 的估算已包含每週 2 次打球）
 
+**WeekReview**（每週回顧的教練備註，健康頁「今日」分頁；分頁自動建立，欄位寫死在 `WEEK_REVIEW_HEADERS`）
+
+| id | weekStart | note | createdAt |
+|----|-----------|------|-----------|
+
+- `weekStart` 是該週**週一**，一週一列，重送＝覆蓋、備註空白＝刪除；`note` 最長 2000 字。內容是 Claude 分析後使用者貼回來的文字
+- **每週回顧**（`health-weekly.js`）：週一到週日為一週，頁面算體重（週平均與變化）、睡眠、飲食（只算標記「記完」的日子）、運動、血壓（讀血壓分頁）並寫出計算依據；「複製本週摘要」產生只含日期與數字的純文字，貼給 Claude（skill 的 `references/weekly-review.md` 規定分析步驟：先看資料夠不夠、兩週以上才反推實際消耗、最多 2 個建議），再把教練備註貼回存起來。不經任何第三方服務，資料每次由使用者決定要不要貼
+- 純邏輯 `buildWeeklySummary`／`weeklySummaryText` 有回歸檢查
+
 **LabResults**（驗血，健康頁「驗血」分頁）
 
 | id | date | glucose | hba1c | cholesterol | ldl | hdl | triglyceride | ast | alt | creatinine | egfr | uricAcid | tsh | ck | bun | sodium | potassium | createdAt |

@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261111131951">
+<link rel="stylesheet" href="style.css?v=20261111133011">
 </head>
 <body data-page="health">
 
@@ -55,6 +55,24 @@
       <section class="card health-main-card" data-tab="today">
         <h2>目標進度</h2>
         <div id="goalBox" class="goal-box"></div>
+      </section>
+
+      <section class="card health-main-card" data-tab="today">
+        <div class="bp-list-header">
+          <h2>每週回顧 <button type="button" id="weekInfoBtn" class="info-btn" title="說明" aria-label="說明">ⓘ</button></h2>
+          <select id="weekSel"></select>
+        </div>
+        <div id="weekInfoBox" class="info-box hidden">一週是週一到週日。這裡只算數字並列出計算依據；解讀與建議請按「複製本週摘要」貼給 Claude（摘要只有日期與數字），再把 Claude 給的「教練備註」貼回下面的欄位存起來，累積成每週的紀錄。沒記的項目是「未記錄」，不是 0；建議僅供參考，不是醫療診斷。</div>
+        <p id="weekOpenHint" class="progress-line"></p>
+        <div id="weeklyBody"></div>
+        <div class="form-row">
+          <button id="weekCopyBtn" type="button" class="add-primary">複製本週摘要給 Claude</button>
+        </div>
+        <h3 class="sub-heading">教練備註（Claude 分析後貼回來）</h3>
+        <textarea id="weekNote" rows="5" maxlength="2000" placeholder="貼上 Claude 給的教練備註，存起來下週還看得到（清空後儲存＝刪除）"></textarea>
+        <div class="form-row">
+          <button id="weekNoteSave" type="button" class="ghost-btn">儲存備註</button>
+        </div>
       </section>
 
       <section class="card health-main-card" data-tab="today">
@@ -370,12 +388,13 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261111131951"></script>
-  <script src="health-charts.js?v=20261111131951"></script>
-  <script src="health.js?v=20261111131951"></script>
-  <script src="health-today.js?v=20261111131951"></script>
-  <script src="health-body.js?v=20261111131951"></script>
-  <script src="health-labs.js?v=20261111131951"></script>
+  <script src="shared.js?v=20261111133011"></script>
+  <script src="health-charts.js?v=20261111133011"></script>
+  <script src="health.js?v=20261111133011"></script>
+  <script src="health-today.js?v=20261111133011"></script>
+  <script src="health-weekly.js?v=20261111133011"></script>
+  <script src="health-body.js?v=20261111133011"></script>
+  <script src="health-labs.js?v=20261111133011"></script>
   <script>initAuth();</script>
 </body>
 </html>

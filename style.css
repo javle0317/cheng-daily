@@ -1384,3 +1384,5 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .check-field input { width: auto; }
 .goal-box .progress-text { margin: 0 0 6px; font-size: 14px; }
 .goal-box .progress-bar { margin-bottom: 12px; }
+.weekly-lines { margin: 0 0 10px; padding-left: 18px; font-size: 14px; line-height: 1.7; }
+#weekNote { width: 100%; box-sizing: border-box; }

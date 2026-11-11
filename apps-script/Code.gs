@@ -12,7 +12,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十七個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十八個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -54,6 +54,9 @@
  *   ExerciseLog     欄位: id | date | type | minutes | rpe | kcal | note | createdAt
  *                   （運動紀錄，健康頁「今日」分頁；ensureSheet 自動建立，寫死在 EXERCISE_HEADERS；type 是 pickleball／lowimpact／strength／walk／other；
  *                   minutes 必填；rpe 自覺強度 1–10、kcal 估計消耗都選填；同一天同 type 重送＝覆蓋）
+ *   WeekReview      欄位: id | weekStart | note | createdAt
+ *                   （每週回顧的「教練備註」，健康頁「今日」分頁；ensureSheet 自動建立，寫死在 WEEK_REVIEW_HEADERS；
+ *                   weekStart 是該週週一 yyyy-MM-dd，一週一列，重送＝覆蓋；note 是 Claude 分析後使用者貼回來的文字，最長 2000 字）
  *   PetSkipped      欄位: id | eventId | createdAt
  *                   （寵物「待登記」清單裡按「略過」的事件 id，之後不再出現在待登記；ensureSheet 自動建立）
  *   PetLabs         欄位: id | pet | date | name | value | unit | refLow | refHigh | createdAt
@@ -225,6 +228,10 @@ function dispatch_(p) {
         return respond({ ok: true, data: getDailyHealth() });
       case "addDailyHealth":
         return respond({ ok: true, data: addDailyHealth(p) });
+      case "getWeekReviews":
+        return respond({ ok: true, data: getWeekReviews() });
+      case "addWeekReview":
+        return respond({ ok: true, data: addWeekReview(p) });
       case "deleteExercise":
         return respond({ ok: true, data: deleteExercise(p.id) });
       case "deleteMeal":
@@ -404,7 +411,7 @@ function sheetToObjects(sheet) {
       if (Object.prototype.toString.call(v) === "[object Date]") {
         if (h === "time" || h === "endTime" || h === "bedtime" || h === "sleepTime" || h === "wakeTime") {
           v = Utilities.formatDate(v, TIME_ZONE, "HH:mm");
-        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt" || h === "finishedAt" || h === "visitedAt") {
+        } else if (h === "date" || h === "periodKey" || h === "endDate" || h === "lastCookedAt" || h === "finishedAt" || h === "visitedAt" || h === "weekStart") {
           // periodKey 對 daily/weekly 習慣來說也是 yyyy-MM-dd 格式的日期字串，
           // Google Sheets 常會把這種格子自動判斷成日期型態存，讀回來要轉回純
           // 文字，不然跟前端送來的字串比對會對不起來（誤判成「還沒有這一列」
@@ -2348,6 +2355,42 @@ function parseJsonArg_(v, label) {
 
 function getDailyHealth() {
   return { sleep: getSleepData(), meals: getMealData(), exercise: getExerciseData() };
+}
+
+// ====== 每週回顧的教練備註（WeekReview）======
+var WEEK_REVIEW_HEADERS = ["id", "weekStart", "note", "createdAt"];
+
+function weekReviewSheet_() {
+  return ensureSheet("WeekReview", WEEK_REVIEW_HEADERS);
+}
+
+function getWeekReviews() {
+  return sheetToObjects(weekReviewSheet_());
+}
+
+// weekStart 必須是週一；備註空白＝刪除那一週的備註
+function addWeekReview(p) {
+  var weekStart = dateArg_(p.weekStart, "週起始");
+  var d = new Date(Number(weekStart.slice(0, 4)), Number(weekStart.slice(5, 7)) - 1, Number(weekStart.slice(8, 10)));
+  if (d.getDay() !== 1) throw new Error("週起始日必須是星期一");
+  var note = textArg_(p.note, "備註", { max: 2000 });
+  var sheet = weekReviewSheet_();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var wc = headers.indexOf("weekStart");
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (normalizeDateCell_(values[i][wc]) === weekStart) sheet.deleteRow(i + 1);
+  }
+  if (note !== "") {
+    var vals = { id: Utilities.getUuid(), weekStart: weekStart, note: note, createdAt: new Date() };
+    var row = headers.map(function (h) { return Object.prototype.hasOwnProperty.call(vals, h) ? vals[h] : ""; });
+    var r = sheet.getLastRow() + 1;
+    row.forEach(function (v, idx) {
+      if (headers[idx] === "weekStart" || needsTextGuard_(v)) sheet.getRange(r, idx + 1).setNumberFormat("@");
+    });
+    sheet.getRange(r, 1, 1, row.length).setValues([row]);
+  }
+  return getWeekReviews();
 }
 
 // ====== 運動（ExerciseLog）======

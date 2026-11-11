@@ -577,6 +577,7 @@ function dateAddDays(dateStr, n) {
   }
 
   function renderAll() {
+    window.dispatchEvent(new CustomEvent("health:data", { detail: { sleep: state.sleep, meals: state.meals, exercise: state.exercise, inbody: state.inbody } }));
     renderGoals();
     renderStats();
     renderChart();
