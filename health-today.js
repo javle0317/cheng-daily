@@ -74,6 +74,25 @@ function pickleKcalEstimate(minutes) {
   return Number.isFinite(m) && m > 0 ? Math.round(m * 3.75) : null;
 }
 
+// 點心匯入：加到表單原本的點心後面（描述用「；」連起來、熱量與蛋白質相加，只加有數字的；旗標取聯集）；
+// 原本已經有同樣的內容就略過（同一份 JSON 貼兩次不會重複加）。回傳 { row, skipped }
+function mergeSnack(old, add) {
+  if (!old || !old.desc) return { row: add, skipped: false };
+  const parts = old.desc.split("；");
+  if (parts.includes(add.desc) || old.desc.includes(add.desc)) return { row: old, skipped: true };
+  const sum = (a, b) => (a === null && b === null ? null : (a || 0) + (b || 0));
+  return {
+    row: {
+      desc: old.desc + "；" + add.desc,
+      kcal: sum(old.kcal, add.kcal),
+      protein: sum(old.protein, add.protein),
+      eatOut: !!(old.eatOut || add.eatOut),
+      sugarDrink: !!(old.sugarDrink || add.sugarDrink),
+    },
+    skipped: false,
+  };
+}
+
 function dateAddDays(dateStr, n) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + n);
@@ -281,22 +300,33 @@ function dateAddDays(dateStr, n) {
   ["dayBed", "dayWake", "daySleepTime", "exPickleMin"].forEach(id => $(id).addEventListener("input", updatePreview));
   $("dayInfoBtn").addEventListener("click", () => $("dayInfoBox").classList.toggle("hidden"));
 
-  // ---- 貼上匯入：{ date, weight, sleep:{bedtime,wakeTime,...}, meals:[{meal,desc,kcal,protein,eatOut,sugarDrink,note}] } ----
+  // ---- 貼上匯入：只改 JSON 裡有給的項目，其他保留（睡眠、每一餐可以分開匯入）----
+  // { date, weight, sleep:{bedtime,wakeTime,...}, mealsComplete, exercise:[...], meals:[{meal,desc,kcal,protein,eatOut,sugarDrink,note}] }
+  // 早／午／晚餐：匯入的那一餐取代表單裡同一餐（有舊內容會提醒）；點心：加到原本的點心後面（同樣的內容不重複加）。
+  function readMealRow(key) {
+    const row = mealRow(key);
+    const desc = row.querySelector(".meal-desc").value.trim();
+    if (!desc) return null;
+    return {
+      desc,
+      kcal: toNum(row.querySelector(".meal-kcal").value),
+      protein: toNum(row.querySelector(".meal-protein").value),
+      eatOut: row.querySelector(".meal-eatout").checked,
+      sugarDrink: row.querySelector(".meal-sugar").checked,
+    };
+  }
+
   $("dayImportBtn").addEventListener("click", () => {
     const msg = $("dayImportMsg");
     let data;
     try { data = JSON.parse($("dayImportText").value); } catch (e) { msg.textContent = "格式不對，請整段貼上對話裡給你的資料"; return; }
     const problems = [];
+    const info = [];
     const date = data.date && /^\d{4}-\d{2}-\d{2}$/.test(String(data.date)) ? data.date : null;
     if (data.date && !date) problems.push(`日期「${data.date}」格式不對（要 yyyy-MM-dd），沿用目前選的日期`);
-    loadDate(date || $("dayDate").value || today());
-    // 先清乾淨再填：匯入的是「這一天的完整資料」，不能殘留表單原本的值
-    $("dayWeight").value = "";
-    ["dayBed", "dayWake", "daySleepTime", "dayQuality", "dayEnergy", "dayCpap", "daySleepNote"].forEach(id => { $(id).value = ""; });
-    $("dayNap").checked = false;
-    MEAL_ORDER.forEach(k => setMealRow(k, null));
-    $("dayMealsDone").checked = truthy(data.mealsComplete);
-    ["exPickleMin", "exPickleRpe", "exPickleKcal", "exOtherMin", "exOtherRpe", "exNote"].forEach(id => { $(id).value = ""; });
+    // 日期不同才重新載入那天已存的內容；同一天不重載，免得丟掉表單上還沒儲存的輸入
+    const target = date || $("dayDate").value || today();
+    if (target !== $("dayDate").value || !state.loadedDate) loadDate(target);
     let filled = 0;
     if (data.weight !== undefined && data.weight !== null && data.weight !== "") {
       const n = parseStrictNumber(data.weight);
@@ -305,20 +335,22 @@ function dateAddDays(dateStr, n) {
     const s = data.sleep;
     if (s) {
       const t = (v, label) => {
-        if (v === undefined || v === null || v === "") return "";
-        if (!/^\d{2}:\d{2}$/.test(String(v))) { problems.push(`${label}「${v}」格式不對（要 HH:mm）`); return ""; }
+        if (v === undefined || v === null || v === "") return null;
+        if (!/^\d{2}:\d{2}$/.test(String(v))) { problems.push(`${label}「${v}」格式不對（要 HH:mm）`); return null; }
         return v;
       };
-      $("dayBed").value = t(s.bedtime, "上床");
-      $("dayWake").value = t(s.wakeTime, "起床");
-      $("daySleepTime").value = t(s.sleepTime, "入睡");
+      const bed = t(s.bedtime, "上床"), wake = t(s.wakeTime, "起床"), asleep = t(s.sleepTime, "入睡");
+      if (bed !== null) $("dayBed").value = bed;
+      if (wake !== null) $("dayWake").value = wake;
+      if (asleep !== null) $("daySleepTime").value = asleep;
       if (s.quality) $("dayQuality").value = String(s.quality);
       if (s.energy) $("dayEnergy").value = String(s.energy);
       if (s.cpap === "yes" || s.cpap === "no") $("dayCpap").value = s.cpap;
-      $("dayNap").checked = truthy(s.nap);
-      $("daySleepNote").value = s.note || "";
+      if (s.nap !== undefined) $("dayNap").checked = truthy(s.nap);
+      if (s.note !== undefined) $("daySleepNote").value = s.note || "";
       filled++;
     }
+    if (data.mealsComplete !== undefined) $("dayMealsDone").checked = truthy(data.mealsComplete);
     const grouped = {};
     (data.meals || []).forEach(m => {
       if (!MEAL_ORDER.includes(m.meal)) { problems.push(`餐別「${m.meal}」不認得（要 breakfast／lunch／dinner／snack）`); return; }
@@ -327,13 +359,22 @@ function dateAddDays(dateStr, n) {
     Object.entries(grouped).forEach(([key, ms]) => {
       const kc = ms.map(m => toNum(m.kcal)).filter(v => v !== null);
       const pr = ms.map(m => toNum(m.protein)).filter(v => v !== null);
-      setMealRow(key, {
+      const incoming = {
         desc: ms.map(m => m.desc || "").filter(Boolean).join("；"),
         kcal: kc.length ? kc.reduce((a, b) => a + b, 0) : null,
         protein: pr.length ? pr.reduce((a, b) => a + b, 0) : null,
         eatOut: ms.some(m => truthy(m.eatOut)),
         sugarDrink: ms.some(m => truthy(m.sugarDrink)),
-      });
+      };
+      const old = readMealRow(key);
+      if (key === "snack") {
+        const r = mergeSnack(old, incoming);
+        setMealRow(key, r.row);
+        info.push(r.skipped ? "這筆點心原本就在表單裡，沒有重複加入" : old ? "點心已加到原本的點心後面" : "已填入點心");
+      } else {
+        setMealRow(key, incoming);
+        if (old && old.desc !== incoming.desc) info.push(`${MEAL_LABELS[key]}取代了原本的「${old.desc}」`);
+      }
       filled++;
     });
     const exs = Array.isArray(data.exercise) ? data.exercise : [];
@@ -356,10 +397,9 @@ function dateAddDays(dateStr, n) {
       filled++;
     });
     updatePreview();
-    const notes = [`已填入 ${filled} 項，請核對後按「儲存」（熱量、蛋白質是估計值）`];
+    const notes = [`已填入 ${filled} 項，其他欄位保持原樣；請核對後按「儲存」（熱量、蛋白質是估計值）`];
+    info.forEach(t => notes.push(t));
     problems.forEach(t => notes.push("⚠️ " + t));
-    const d = $("dayDate").value;
-    if (state.sleep.some(r => r.date === d) || state.meals.some(r => r.date === d) || state.exercise.some(r => r.date === d)) notes.push("⚠️ 這一天已經有紀錄，儲存會覆蓋有送出的睡眠與餐別");
     msg.textContent = notes.join("；");
   });
 
