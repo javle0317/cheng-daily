@@ -308,10 +308,10 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 
 // ====== 24 小時制的時間選擇 ======
 // <input type="time"> 的顯示格式跟著瀏覽器／系統（常常是上午／下午 12 小時制），網頁沒辦法強制。
-// 所以把頁面上的 type="time" 換成「時」「分」兩個下拉（00–23、分鐘預設每 5 分鐘，可用 step 改，例如健康頁用 10），一律 24 小時制；
+// 所以把頁面上的 type="time" 換成「時」「分」兩個下拉（00–23、每 5 分鐘），一律 24 小時制；
 // 換掉之後那個元素（同 id）仍然有 .value（"HH:mm" 或 ""），其他程式碼照舊用 .value 讀寫。
-function initTimeSelects(step = 5, root = document) {
-  root.querySelectorAll('input[type="time"]').forEach(input => {
+function initTimeSelects() {
+  document.querySelectorAll('input[type="time"]').forEach(input => {
     const wrap = document.createElement("span");
     wrap.className = "time24";
     wrap.id = input.id;
@@ -326,7 +326,7 @@ function initTimeSelects(step = 5, root = document) {
     };
     const pad = n => String(n).padStart(2, "0");
     const hour = mk("時", Array.from({ length: 24 }, (_, i) => pad(i)));
-    const minute = mk("分", Array.from({ length: Math.floor(60 / step) }, (_, i) => pad(i * step)));
+    const minute = mk("分", Array.from({ length: 12 }, (_, i) => pad(i * 5)));
     hour.addEventListener("change", () => { if (!hour.value) minute.value = ""; else if (!minute.value) minute.value = "00"; wrap.dispatchEvent(new Event("input", { bubbles: true })); });
     minute.addEventListener("change", () => { if (minute.value && !hour.value) hour.value = "00"; wrap.dispatchEvent(new Event("input", { bubbles: true })); });
     Object.defineProperty(wrap, "value", {
