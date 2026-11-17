@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261112224806">
+<link rel="stylesheet" href="style.css?v=20261117165833">
 </head>
 <body data-page="home">
 
@@ -115,6 +115,12 @@
       <section class="card new-recurring-card">
         <h2>循環行程<button id="addRecurringBtn" type="button" class="ghost-btn add-btn" title="新增循環行程" aria-label="新增循環行程">＋</button></h2>
         <ul id="recurringList" class="item-list"></ul>
+      </section>
+
+      <section class="card new-trip-card">
+        <h2>旅遊／外宿<button id="addTripBtn" type="button" class="ghost-btn add-btn" title="新增旅遊或外宿" aria-label="新增旅遊或外宿">＋</button></h2>
+        <ul id="tripList" class="item-list"></ul>
+        <p class="progress-line">承承或一起的旅遊期間，「僅工作日」的習慣會自動略過。</p>
       </section>
 
       <section class="card new-habit-card">
@@ -242,6 +248,39 @@
     </div>
   </div>
 
+  <div id="tripModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="tripHeading">新增旅遊／外宿</h2>
+        <button id="tripCloseBtn" class="ghost-btn" type="button">✕</button>
+      </div>
+      <form id="tripModalForm" class="entry-form entry-form-rows modal-form">
+        <label class="mf">標題<input id="tripTitle" type="text" placeholder="例如：東京、墾丁、咪嚕外宿…" required maxlength="200"></label>
+        <label class="mf">對象
+          <select id="tripOwner">
+            <option value="shared">🤝 一起</option>
+            <option value="me">🧑 承承</option>
+            <option value="wife">👩 君君</option>
+            <option value="林萌">🐕 林萌（外宿）</option>
+            <option value="咪嚕">🐈 咪嚕（外宿）</option>
+          </select>
+        </label>
+        <div class="form-row">
+          <label class="mf">開始日<input id="tripStart" type="date" required></label>
+          <label class="mf">結束日（含）<input id="tripEnd" type="date" required></label>
+        </div>
+        <label class="mf">備註／地點<input id="tripNote" type="text" placeholder="備註/地點…" maxlength="2000"></label>
+        <p id="tripHint" class="progress-line"></p>
+        <div class="dialog-actions modal-actions">
+          <button id="tripDeleteBtn" class="ghost-btn danger-btn hidden" type="button">刪除</button>
+          <span class="spacer"></span>
+          <button id="tripCancelBtn" class="ghost-btn" type="button">取消</button>
+          <button id="tripSaveBtn" type="submit">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="recurringModal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -361,7 +400,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261112224806"></script>
-  <script src="app.js?v=20261112224806"></script>
+  <script src="shared.js?v=20261117165833"></script>
+  <script src="app.js?v=20261117165833"></script>
 </body>
 </html>

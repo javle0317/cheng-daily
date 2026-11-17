@@ -12,7 +12,7 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十八個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這二十九個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
@@ -25,6 +25,9 @@
  *                   （exercise/synced 只有「每日運動挑戰」那個習慣會用到，其他習慣留空。舊的 cardId 欄位已經沒有用到，可以刪除）
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
+ *   Trips           欄位: id | owner | title | date | endDate | notes | createdAt
+ *                   （旅遊／寵物外宿等「跨天」行程，ensureSheet 自動建立，寫死在 TRIP_HEADERS；date＝開始日、endDate＝結束日（含），單日填同一天；
+ *                   owner 是 me／wife／shared 或寵物名字；owner 是 me／shared 的旅遊期間，「僅工作日」的每日習慣視為非工作日而略過）
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt | note（選填，懷疑偏高的原因；note 欄要手動加在最後面）
  *   InBody          欄位: id | date | weight | height | bmi | bodyFat | fatMass | skeletalMuscle | muscleMass |
@@ -199,6 +202,12 @@ function dispatch_(p) {
         return respond({ ok: true, data: addRecurringException(p.recurringId, p.date) });
       case "deleteRecurringException":
         return respond({ ok: true, data: deleteRecurringException(p.id) });
+      case "addTrip":
+        return respond({ ok: true, data: addTrip(p) });
+      case "updateTrip":
+        return respond({ ok: true, data: updateTrip(p) });
+      case "deleteTrip":
+        return respond({ ok: true, data: deleteTrip(p.id) });
       case "addShoppingItem":
         return respond({ ok: true, data: addShoppingItem(p.item, p.category) });
       case "toggleShoppingItem":
@@ -345,7 +354,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-11-11.1";
+var BACKEND_VERSION = "2026-11-17.1";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -442,6 +451,7 @@ function getData(keys) {
     if (!keys || keys.indexOf(k) >= 0) out[k] = sheetToObjects(getSheet(DATA_SHEETS_[k]));
   });
   if (!keys || keys.indexOf("habitNotes") >= 0) out.habitNotes = sheetToObjects(habitNotesSheet_());
+  if (!keys || keys.indexOf("trips") >= 0) out.trips = sheetToObjects(tripsSheet_());
   if (!keys || keys.indexOf("holidays") >= 0) out.holidays = getHolidaysSafe_();
   return out;
 }
@@ -581,6 +591,51 @@ function updateRecurringEvent(p) {
   updateRowByHeaders_("RecurringEvents", id, fields);
   markCalendarDirty_();
   return getData(["recurringEvents"]);
+}
+
+// ===== 旅遊／外宿（跨天行程）=====
+var TRIP_HEADERS = ["id", "owner", "title", "date", "endDate", "notes", "createdAt"];
+function tripsSheet_() { return ensureSheet("Trips", TRIP_HEADERS); }
+
+function tripFields_(p) {
+  var start = dateArg_(p.date, "開始");
+  var end = dateArg_(p.endDate, "結束", { optional: true }) || start;
+  if (end < start) throw new Error("結束日不能早於開始日");
+  return {
+    owner: enumArg_(p.owner, "對象", ["me", "wife", "shared"].concat(PET_NAMES)),
+    title: textArg_(p.title, "標題", { required: true, max: 200 }),
+    date: start,
+    endDate: end,
+    notes: textArg_(p.notes, "備註", { max: 2000 }),
+  };
+}
+
+function addTrip(p) {
+  var f = tripFields_(p);
+  appendRowSafe_(tripsSheet_(), [Utilities.getUuid(), f.owner, f.title, f.date, f.endDate, f.notes, new Date()]);
+  return getData(["trips"]);
+}
+
+function updateTrip(p) {
+  tripsSheet_();
+  updateRowByHeaders_("Trips", textArg_(p.id, "旅遊", { required: true, max: 100 }), tripFields_(p));
+  return getData(["trips"]);
+}
+
+function deleteTrip(id) {
+  var sheet = tripsSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (values[i][0] === id) { sheet.deleteRow(i + 1); break; }
+  }
+  return getData(["trips"]);
+}
+
+// 這天是不是「自己（me／shared）在旅遊」：僅工作日的習慣在這種日子要略過
+function isTripDay_(trips, ds) {
+  return trips.some(function (t) {
+    return (t.owner === "me" || t.owner === "shared") && ds >= String(t.date) && ds <= String(t.endDate || t.date);
+  });
 }
 
 function deleteEvent(id) {
@@ -1535,7 +1590,8 @@ function getWallpaperData_() {
 
   var holidayDates = {};
   getHolidaysSafe_().forEach(function (h) { holidayDates[h.date] = h.name; });
-  var isWorkday = new Date(todayStr + "T00:00:00").getDay() % 6 !== 0 && !holidayDates[todayStr];
+  var isWorkday = new Date(todayStr + "T00:00:00").getDay() % 6 !== 0 && !holidayDates[todayStr]
+    && !isTripDay_(sheetToObjects(tripsSheet_()), todayStr);
 
   var logs = sheetToObjects(getSheet("HabitLog"));
   var habits = sheetToObjects(getSheet("Habits")).filter(function (h) {

@@ -71,6 +71,25 @@ check("每日：前天漏做就斷", streakFor([0, -2, -3], false) === 1);
 }
 
 
+console.log("前端：旅遊／外宿（跨天行程，自己旅遊期間略過僅工作日的習慣）");
+{
+  // 今天固定 2026-10-07（週三）；10/05(一)–10/07(三) 承承旅遊，10/06 君君旅遊不該影響
+  const t = loadFrontend(["shared.js", "app.js"], "// ====== Boot ======", "2026-10-07T12:00:00");
+  const ev = code => vm.runInContext(code, t);
+  ev("state.holidayDates = new Set(); state.trips = [{ id: 't1', owner: 'me', title: '東京', date: '2026-10-05', endDate: '2026-10-07', notes: '' }, { id: 't2', owner: 'wife', title: '台南', date: '2026-10-09', endDate: '2026-10-09', notes: '' }, { id: 't3', owner: '咪嚕', title: '外宿', date: '2026-10-12', endDate: '2026-10-14', notes: '' }];");
+  check("旅遊期間（含頭尾）不是工作日", ev("isWorkday('2026-10-05') || isWorkday('2026-10-06') || isWorkday('2026-10-07')") === false);
+  check("旅遊前後的平日照常是工作日", ev("isWorkday('2026-10-02') && isWorkday('2026-10-08')") === true);
+  check("君君的旅遊、寵物外宿不影響工作日", ev("isWorkday('2026-10-09') && isWorkday('2026-10-13')") === true);
+  ev("state.habitLogs = [{ habitId: 'h', periodKey: '2026-10-02', count: 1 }, { habitId: 'h', periodKey: '2026-10-01', count: 1 }];");
+  check("旅遊期間不算斷連續（10/2、10/1 有做，10/5–10/7 旅遊略過 = 2）", ev("computeStreak({ id: 'h', target: 1, workdaysOnly: true })") === 2);
+  ev("state.selectedDate = '2026-10-06'; state.calendarYear = 2026; state.calendarMonth = 9;");
+  check("跨天旅遊在事件清單標出第幾天／共幾天", ev("tripEntriesForDate('2026-10-06')[0].title") === "東京（第 2 天／共 3 天）");
+  let rendered = true;
+  try { ev("renderEvents(); renderCalendar(); renderTrips(); openTripModal({ trip: state.trips[0] }); openTripModal();"); } catch (e) { rendered = false; }
+  check("事件清單、日曆、旅遊清單、旅遊彈窗都畫得出來（不丟錯）", rendered);
+  check("整個 10 月有旅遊的日子 = 7 天（3＋1＋3）", ev("Array.from({ length: 31 }, (_, i) => tripsOnDate('2026-10-' + String(i + 1).padStart(2, '0')).length > 0).filter(Boolean).length") === 7);
+}
+
 console.log("前端：每週／每月連續統計");
 {
   // 固定「今天」= 2026-10-05（週一）。本週 key = 2026-10-05，上週 = 2026-09-28，以此類推

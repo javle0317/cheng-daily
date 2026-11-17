@@ -1386,3 +1386,10 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .goal-box .progress-bar { margin-bottom: 12px; }
 .weekly-lines { margin: 0 0 10px; padding-left: 18px; font-size: 14px; line-height: 1.7; }
 #weekNote { width: 100%; box-sizing: border-box; }
+
+/* 旅遊／外宿：日曆格底部一條色帶、已結束的淡化 */
+.calendar-cell.has-trip {
+  background-image: linear-gradient(var(--trip-color), var(--trip-color));
+  background-size: 100% 4px; background-repeat: no-repeat; background-position: bottom;
+}
+.item-row.trip-past { opacity: .55; }

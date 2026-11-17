@@ -31,6 +31,9 @@
 - `BODY_HABIT_ID`：週活動，登記「新的一天」的體組成會自動打卡，同天補填不重複計次（只在 `Code.gs`，`addInBodyReading`）。
 - `HEALTH_HABIT_ID`（`daily-health`，要在 Habits 分頁手動加那一列）：今日健康，列上多「記」連結到 `health.html#today`；儲存今日健康（`addDailyHealth`）會自動打卡（`Code.gs` 與 `app.js` 兩邊都有）。
 
+## 旅遊／外宿（跨天行程）
+`Trips` 分頁（`ensureSheet`，`TRIP_HEADERS`）、首頁「旅遊／外宿」卡片。`me`／`shared` 的旅遊期間讓「僅工作日」習慣視為非工作日：前端判斷集中在 `app.js` 的 `isWorkday`（透過 `isTripDay`），後端桌布頁用 `isTripDay_`，兩邊規則要一致。尚未同步到 Google 行事曆與 LINE 提醒。
+
 ## 與 cheng-lingo 的關係
 姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。
 - 語言練習：**不聯動**。練習在 lingo 做（自己抽卡、自己看進度），daily 的語言練習習慣就是一般的手動打卡習慣（`LANG_HABIT_ID` 那一列只多一個「語」連結連到 lingo）。想分成英文、日文各一個習慣，直接在 Sheet 的 Habits 分頁加列即可（不需要改程式）。之前的抽卡／同步（`drawLanguageCard`、`syncLanguageCard`、`LANG_URL` / `LANG_TOKEN`）已經拿掉。

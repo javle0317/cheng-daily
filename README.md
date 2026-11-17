@@ -95,6 +95,17 @@ icon、顏色可以跟這些內部值不一樣（例如 `me` 顯示成「承承�
   組合——目前網頁上只能新增跳過紀錄（點當日事件裡的循環行程，在編輯視窗按「只跳過這一次」），沒有「復原」
   的介面，想復原要自己去 Sheet 刪那一列
 
+**Trips**（旅遊／寵物外宿等「跨天」行程；`ensureSheet` 自動建立，欄位寫死在 `TRIP_HEADERS`，不能改名或調順序）
+
+| id | owner | title | date | endDate | notes | createdAt |
+|----|-------|-------|------|---------|-------|-----------|
+
+- `date` 是開始日、`endDate` 是結束日（含當天），單日填同一天；`owner` 是 `me`／`wife`／`shared` 或寵物名字（寵物＝外宿，圖示 🏨，其餘 ✈️）
+- 網頁首頁「旅遊／外宿」卡片（＋ 新增，點一列編輯／刪除）；行事曆那幾天格子底部有對象顏色的色帶，點那天的事件清單會出現「東京（第 2 天／共 5 天）」
+- **習慣聯動**：`owner` 是 `me`／`shared` 的旅遊期間，「僅工作日」的每日習慣視為非工作日——不顯示、不計入、不斷連續（前端 `isWorkday` 與桌布頁後端 `isTripDay_` 同一條規則）。君君或寵物的行程不影響。沒勾「僅工作日」的習慣不受影響
+- 目前**不會**同步到 Google 行事曆、也不進每日 LINE 提醒（只在 App 與桌布的習慣判斷生效）
+- 新增了後端動作 `addTrip`／`updateTrip`／`deleteTrip`（BACKEND 2026-11-17.1，要重新貼 Code.gs 部署新版本）
+
 **BloodPressure**（血壓量測紀錄，獨立頁面 `health.html`）
 
 | id | date | period | systolic | diastolic | pulse | createdAt | note |
@@ -337,7 +348,7 @@ Repo 的 Settings → Pages → Source 選 `main` 分支 `/ (root)`，存檔後�
 
 - [app.js](app.js) 最上面的 `OWNER_META`（`me`／`wife`／寵物各一筆的 `label`、`icon`、`color`）。
 - [shared.js](shared.js) 的 `PET_NAMES`、`PET_ICON`，以及 [apps-script/Code.gs](apps-script/Code.gs) 的 `PET_NAMES`（兩邊要一致；沒有寵物就留空陣列，寵物頁可以不用）。
-- [index.html](index.html) 的兩組擁有者下拉選單（新增事件、新增循環行程各一組）。
+- [index.html](index.html) 的三組擁有者下拉選單（新增事件、新增循環行程、新增旅遊／外宿各一組）。
 - `Code.gs` 的 `CAL_OWNER_LABELS`（同步到 Google 行事曆時事件前面的標籤）。
 - **`me`／`wife` 這兩個值不要改**：它們是存在 Sheet 的資料 key，只改畫面上的 `label` 就好（你自己就是 `me`，另一半是 `wife`）。
 - 改了寵物名字，[scripts/regression-check.js](scripts/regression-check.js) 裡的測試資料也寫死了「林萌」「咪嚕」，記得一起換，不然回歸檢查會失敗。

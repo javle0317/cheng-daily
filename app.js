@@ -19,6 +19,7 @@ let state = {
   habitNotes: [],
   recurringEvents: [],
   recurringExceptions: [],
+  trips: [],
   shoppingList: [],
   shoppingLoaded: false,
   holidayDates: new Set(),
@@ -63,9 +64,20 @@ function appendTextAndLink(li, text, { textPrefix = "", linkIcon = "🔗" } = {}
   return { restText, url };
 }
 
+// 跨天的旅遊／寵物外宿（Trips）：涵蓋這一天的那幾筆
+function tripsOnDate(dateStr) {
+  return state.trips.filter(t => dateStr >= String(t.date) && dateStr <= String(t.endDate || t.date));
+}
+
+// 自己（承承／一起）在旅遊的日子：「僅工作日」的習慣視為非工作日而略過（不計入、也不斷連續）。
+// 君君或寵物的行程不影響。Code.gs 的 isTripDay_ 是同一條規則。
+function isTripDay(dateStr) {
+  return tripsOnDate(dateStr).some(t => t.owner === "me" || t.owner === "shared");
+}
+
 function isWorkday(dateStr) {
   const day = new Date(dateStr + "T00:00:00").getDay();
-  return day >= 1 && day <= 5 && !state.holidayDates.has(dateStr);
+  return day >= 1 && day <= 5 && !state.holidayDates.has(dateStr) && !isTripDay(dateStr);
 }
 
 function getWeekStart(dateStr) {
@@ -261,6 +273,7 @@ function applyData(data) {
   if (data.habitNotes) state.habitNotes = data.habitNotes;
   if (data.recurringEvents) state.recurringEvents = data.recurringEvents;
   if (data.recurringExceptions) state.recurringExceptions = data.recurringExceptions;
+  if (data.trips) state.trips = data.trips;
   if (data.shoppingList) { state.shoppingList = data.shoppingList; state.shoppingLoaded = true; }
   if (data.holidays) state.holidayDates = new Set(data.holidays.map(h => h.date));
 }
@@ -269,7 +282,7 @@ function applyData(data) {
 // 與 logoutBtn 監聽都在 shared.js，這裡只提供 shared.js 需要呼叫的進入點。
 window.loadPageData = async function () {
   // 清單（購物/想法）要打開 📝 才看得到，登入時先不讀，打開時再載入
-  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,habitNotes,recurringEvents,recurringExceptions,holidays" }));
+  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,habitNotes,recurringEvents,recurringExceptions,trips,holidays" }));
   renderAll();
   refreshCalSync(); // Google 行事曆同步狀態（沒設定 CALENDAR_ID 就不顯示），不擋登入
   refreshPetPending(); // 寵物圖示上的「待登記」紅點，同樣不擋登入
@@ -408,6 +421,7 @@ function renderAll() {
   renderHabitsAll();
   renderCalendar();
   renderRecurringList();
+  renderTrips();
   renderShoppingList();
 }
 
@@ -821,6 +835,7 @@ function renderEvents() {
   const events = state.events
     .filter(e => e.date === state.selectedDate && !e.hideFromCalendar)
     .concat(expandRecurringForDate(state.selectedDate))
+    .concat(tripEntriesForDate(state.selectedDate))
     .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
 
   if (!events.length) {
@@ -830,7 +845,7 @@ function renderEvents() {
 
   events.forEach(ev => {
     const li = document.createElement("li");
-    li.className = "item-row" + (ev.recurring ? " recurring-row" : "");
+    li.className = "item-row" + (ev.recurring ? " recurring-row" : "") + (ev.trip ? " trip-row" : "");
     const metaRow = document.createElement("div");
     metaRow.className = "item-meta-row";
 
@@ -849,7 +864,7 @@ function renderEvents() {
 
     const textSpan = document.createElement("span");
     textSpan.className = "item-text";
-    textSpan.textContent = ev.title;
+    textSpan.textContent = ev.trip ? `${tripIcon(ev)} ${ev.title}` : ev.title;
 
     const meta = OWNER_META[ev.owner] || { label: ev.owner || "", icon: "", color: "var(--accent)" };
     const badge = document.createElement("span");
@@ -887,7 +902,8 @@ function renderEvents() {
     li.classList.add("clickable");
     li.addEventListener("click", (e) => {
       if (e.target.closest("a, button")) return; // 連結、📝 按鈕照原本的行為
-      if (ev.recurring) openRecurringModal({ rule: state.recurringEvents.find(r => r.id === ev.ruleId), occurrenceDate: ev.date });
+      if (ev.trip) { const tr = state.trips.find(t => t.id === ev.tripId); if (tr) openTripModal({ trip: tr }); }
+      else if (ev.recurring) openRecurringModal({ rule: state.recurringEvents.find(r => r.id === ev.ruleId), occurrenceDate: ev.date });
       else openEventModal({ event: state.events.find(x => x.id === ev.id) || ev });
     });
 
@@ -950,6 +966,13 @@ function renderCalendar() {
       recurringColors.add((OWNER_META[ev.owner] || {}).color || "var(--accent)");
     });
 
+    const tripsToday = tripsOnDate(dateStr);
+    if (tripsToday.length) {
+      cell.classList.add("has-trip");
+      cell.style.setProperty("--trip-color", (OWNER_META[tripsToday[0].owner] || {}).color || "var(--accent)");
+      cell.title = tripsToday.map(t => t.title).join("、");
+    }
+
     const allColors = new Set([...solidColors, ...recurringColors]);
     if (allColors.size) {
       const dotsWrap = document.createElement("div");
@@ -971,6 +994,60 @@ function renderCalendar() {
     });
     grid.appendChild(cell);
   }
+}
+
+// ====== 旅遊／外宿（跨天行程）======
+function tripIcon(t) { return PET_NAMES.includes(t.owner) ? "🏨" : "✈️"; }
+
+function tripDayCount(t) {
+  return Math.round((new Date(String(t.endDate || t.date) + "T00:00:00") - new Date(String(t.date) + "T00:00:00")) / 86400000) + 1;
+}
+
+// 把涵蓋某天的旅遊變成「事件」一列，標出第幾天／共幾天
+function tripEntriesForDate(dateStr) {
+  return tripsOnDate(dateStr).map(t => {
+    const total = tripDayCount(t);
+    const nth = Math.round((new Date(dateStr + "T00:00:00") - new Date(String(t.date) + "T00:00:00")) / 86400000) + 1;
+    return {
+      id: `trip_${t.id}_${dateStr}`, tripId: t.id, trip: true, date: dateStr, owner: t.owner, time: "", endTime: "",
+      title: total > 1 ? `${t.title}（第 ${nth} 天／共 ${total} 天）` : t.title, notes: t.notes,
+    };
+  });
+}
+
+function renderTrips() {
+  const list = $id("tripList");
+  list.innerHTML = "";
+  const today = toDateStr(new Date());
+  const upcoming = state.trips.filter(t => String(t.endDate || t.date) >= today)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const past = state.trips.filter(t => String(t.endDate || t.date) < today)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5);
+  if (!upcoming.length && !past.length) {
+    list.innerHTML = `<li class="empty-hint">還沒有旅遊或外宿</li>`;
+    return;
+  }
+  [...upcoming, ...past].forEach(t => {
+    const li = document.createElement("li");
+    li.className = "item-row clickable";
+    const meta = OWNER_META[t.owner] || { label: t.owner || "", icon: "", color: "var(--accent)" };
+    const text = document.createElement("span");
+    text.className = "item-text";
+    text.textContent = `${tripIcon(t)} ${t.title}`;
+    const range = document.createElement("span");
+    range.className = "item-time";
+    const start = String(t.date).slice(5), end = String(t.endDate || t.date).slice(5);
+    range.textContent = (start === end ? start : `${start} ～ ${end}`) + `（${tripDayCount(t)} 天）`;
+    const badge = document.createElement("span");
+    badge.className = "owner-badge";
+    badge.textContent = `${meta.icon} ${meta.label}`.trim();
+    badge.style.color = meta.color;
+    badge.style.background = meta.color + "22";
+    li.append(text, range, badge);
+    if (String(t.endDate || t.date) < today) li.classList.add("trip-past");
+    li.addEventListener("click", () => openTripModal({ trip: t }));
+    list.appendChild(li);
+  });
 }
 
 const RECURRING_WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
@@ -1237,6 +1314,73 @@ $id("listEditForm").addEventListener("submit", async (e) => {
     modalError("leHint", "儲存失敗：" + err.message);
   } finally {
     setFormBusy(e.target, false);
+  }
+});
+
+let editingTrip = null;
+
+function openTripModal({ trip = null } = {}) {
+  editingTrip = trip;
+  $id("tripHeading").textContent = trip ? "編輯旅遊／外宿" : "新增旅遊／外宿";
+  modalError("tripHint", "");
+  $id("tripTitle").value = trip ? (trip.title || "") : "";
+  $id("tripOwner").value = (trip && trip.owner) || "shared";
+  $id("tripStart").value = trip ? String(trip.date) : state.selectedDate;
+  $id("tripEnd").value = trip ? String(trip.endDate || trip.date) : state.selectedDate;
+  $id("tripNote").value = trip ? (trip.notes || "") : "";
+  $id("tripDeleteBtn").classList.toggle("hidden", !trip);
+  openModalEl("tripModal");
+  if (!trip) setTimeout(() => $id("tripTitle").focus(), 0);
+}
+
+function closeTripModal() { closeModalEl("tripModal"); editingTrip = null; }
+function renderAfterTripChange() { renderTrips(); renderEvents(); renderCalendar(); renderHabitsAll(); }
+
+$id("tripCloseBtn").addEventListener("click", closeTripModal);
+$id("tripCancelBtn").addEventListener("click", closeTripModal);
+$id("tripModal").addEventListener("click", (e) => { if (e.target.id === "tripModal") closeTripModal(); });
+$id("addTripBtn").addEventListener("click", () => openTripModal());
+// 開始日往後改時，結束日不能比開始日早：自動跟上
+$id("tripStart").addEventListener("change", () => {
+  if ($id("tripStart").value && $id("tripEnd").value < $id("tripStart").value) $id("tripEnd").value = $id("tripStart").value;
+});
+
+$id("tripModalForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $id("tripTitle").value.trim();
+  const date = $id("tripStart").value;
+  const endDate = $id("tripEnd").value || date;
+  const problem = !title ? "請填標題" : !date ? "請選開始日" : endDate < date ? "結束日不能早於開始日" : "";
+  if (problem) { modalError("tripHint", problem); return; }
+  const params = { owner: $id("tripOwner").value, title, date, endDate, notes: $id("tripNote").value.trim() };
+  const wasEdit = !!editingTrip;
+  if (wasEdit) params.id = editingTrip.id;
+  setFormBusy(e.target, true);
+  try {
+    applyData(await api(wasEdit ? "updateTrip" : "addTrip", params));
+    closeTripModal();
+    renderAfterTripChange();
+    showToast(wasEdit ? "已儲存" : "已新增");
+  } catch (err) {
+    modalError("tripHint", (wasEdit ? "儲存失敗：" : "新增失敗：") + err.message);
+  } finally {
+    setFormBusy(e.target, false);
+  }
+});
+
+$id("tripDeleteBtn").addEventListener("click", async () => {
+  if (!editingTrip) return;
+  if (!(await showConfirm("確定要刪除這筆旅遊／外宿嗎？"))) return;
+  setFormBusy($id("tripModalForm"), true);
+  try {
+    applyData(await api("deleteTrip", { id: editingTrip.id }));
+    closeTripModal();
+    renderAfterTripChange();
+    showToast("已刪除");
+  } catch (err) {
+    modalError("tripHint", "刪除失敗：" + err.message);
+  } finally {
+    setFormBusy($id("tripModalForm"), false);
   }
 });
 
