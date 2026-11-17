@@ -80,11 +80,9 @@ function isWorkday(dateStr) {
   return day >= 1 && day <= 5 && !state.holidayDates.has(dateStr);
 }
 
-// 這個習慣「旅遊期間要略過」嗎：skipOnTrip 有設定（TRUE／FALSE）就照設定；空白＝沒設定過，沿用 workdaysOnly
+// 這個習慣「旅遊期間要略過」嗎：只看 skipOnTrip（TRUE 才略過，空白＝FALSE），跟 workdaysOnly 無關
 function habitSkipsOnTrip(habit) {
-  const v = habit.skipOnTrip;
-  if (v === undefined || v === null || v === "") return isTruthy(habit.workdaysOnly);
-  return isTruthy(v);
+  return isTruthy(habit.skipOnTrip);
 }
 
 // 這個每日習慣在這天要不要做：僅工作日 → 要是工作日；旅遊期間略過 → 不能在旅遊。

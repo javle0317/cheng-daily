@@ -16,8 +16,8 @@
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt | skipOnTrip
- *                   （skipOnTrip 是後來加的，已存在的 Habits 要手動在表頭最後面補上 skipOnTrip；TRUE＝承承／一起旅遊期間略過這個每日習慣、FALSE＝不略過、
- *                   空白＝沒設定過，沿用 workdaysOnly（勾了僅工作日就略過旅遊）。沒有這欄時新增習慣照樣能用，但編輯習慣存這個選項會丟錯）
+ *                   （skipOnTrip 是後來加的，已存在的 Habits 要手動在表頭最後面補上 skipOnTrip；TRUE＝承承／一起旅遊期間略過這個每日習慣、
+ *                   FALSE 或空白＝不略過，跟 workdaysOnly 各自獨立。沒有這欄時新增習慣照樣能用，但編輯習慣存這個選項會丟錯）
  *   HabitNotes      欄位: habitId | detail | updatedAt（ensureSheet 自動建立；習慣的細節說明／步驟，一個習慣一列，沒填就沒有那一列）
  *   HabitPaused     欄位: habitId | pausedAt（ensureSheet 自動建立，寫死在 HABIT_PAUSED_HEADERS；暫停中的習慣一個一列，沒有那一列＝正常；暫停不刪紀錄，恢復＝刪掉那一列）
  *   RenoItems       欄位: id | vendor | name | qty | unit | listPrice | dealPrice | status | note | createdAt | updatedAt（ensureSheet 自動建立；裝潢報價的品項現況，價格是「單價」，小計＝qty × 單價；status: quoted/signed/paid/dropped）
@@ -359,7 +359,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-11-17.4";
+var BACKEND_VERSION = "2026-11-17.5";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -640,11 +640,10 @@ function deleteTrip(id) {
   return getData(["trips"]);
 }
 
-// 習慣今天要不要出現：僅工作日 → 要是工作日；旅遊期間略過 → 不能在旅遊（skipOnTrip 空白＝沒設定過，沿用 workdaysOnly）。前端 habitActiveOn 是同一條規則
+// 習慣今天要不要出現：僅工作日 → 要是工作日；旅遊期間略過（skipOnTrip＝TRUE，空白＝FALSE）→ 不能在旅遊。前端 habitActiveOn 是同一條規則
 function habitActiveToday_(h, isWorkday, onTrip) {
   var wd = h.workdaysOnly === true || String(h.workdaysOnly).toUpperCase() === "TRUE";
-  var v = h.skipOnTrip;
-  var skip = v === undefined || v === null || v === "" ? wd : (v === true || String(v).toUpperCase() === "TRUE");
+  var skip = h.skipOnTrip === true || String(h.skipOnTrip).toUpperCase() === "TRUE";
   return (!wd || isWorkday) && !(skip && onTrip);
 }
 
