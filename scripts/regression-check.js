@@ -71,6 +71,20 @@ check("每日：前天漏做就斷", streakFor([0, -2, -3], false) === 1);
 }
 
 
+console.log("前端：習慣暫停（HabitPaused）");
+{
+  const t = loadFrontend(["shared.js", "app.js"], "// ====== Boot ======", "2026-10-07T12:00:00");
+  const ev = code => vm.runInContext(code, t);
+  ev("state.habits = [{ id: 'a', name: '手沖咖啡', frequency: 'daily', workdaysOnly: false, target: 1 }, { id: 'b', name: '週目標', frequency: 'weekly', workdaysOnly: false, target: 3 }]; state.habitPaused = [{ habitId: 'a', pausedAt: '2026-10-07' }];");
+  check("isHabitPaused：只認暫停的那個 id", ev("isHabitPaused('a') && !isHabitPaused('b')") === true);
+  let ok = true;
+  try { ev("renderHabitsAll(); renderPausedHabits(); state.habitPaused = []; renderHabitsAll();"); } catch (e) { ok = false; }
+  check("有暫停、沒暫停兩種狀態都畫得出來（不丟錯）", ok);
+  const src = read("app.js");
+  check("每日、每週／每月清單都排除暫停中的習慣", (src.match(/!isHabitPaused\(h\.id\)/g) || []).length >= 2);
+  check("後端：桌布的今日習慣排除暫停中的", /pausedIds\[String\(h\.id\)\]/.test(read("apps-script/Code.gs")));
+}
+
 console.log("前端：旅遊／外宿（跨天行程，自己旅遊期間略過僅工作日的習慣）");
 {
   // 今天固定 2026-10-07（週三）；10/05(一)–10/07(三) 承承旅遊，10/06 君君旅遊不該影響

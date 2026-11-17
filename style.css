@@ -1387,6 +1387,9 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 .weekly-lines { margin: 0 0 10px; padding-left: 18px; font-size: 14px; line-height: 1.7; }
 #weekNote { width: 100%; box-sizing: border-box; }
 
+/* 已暫停的習慣淡化 */
+.item-row.paused-row { opacity: .7; }
+
 /* 旅遊／外宿：日曆格底部一條色帶、已結束的淡化 */
 .calendar-cell.has-trip {
   background-image: linear-gradient(var(--trip-color), var(--trip-color));

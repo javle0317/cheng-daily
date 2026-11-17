@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261117165833">
+<link rel="stylesheet" href="style.css?v=20261117182743">
 </head>
 <body data-page="home">
 
@@ -71,6 +71,11 @@
         <div id="monthlyHabitSection">
           <h3 class="sub-heading">每月目標</h3>
           <ul id="monthlyHabitList" class="item-list"></ul>
+        </div>
+
+        <div id="pausedHabitSection" class="hidden">
+          <h3 class="sub-heading">已暫停</h3>
+          <ul id="pausedHabitList" class="item-list"></ul>
         </div>
       </section>
 
@@ -166,6 +171,7 @@
         <textarea id="habitEditDetail" rows="5" maxlength="2000" placeholder="細節（選填）：該做到什麼、步驟…，填了列上會出現 ⓘ"></textarea>
         <p class="progress-line">頻率不能修改（紀錄會對不起來），要換請刪掉重加</p>
         <button id="habitEditSubmitBtn" type="submit">儲存</button>
+        <button id="habitPauseBtn" class="ghost-btn" type="button">暫停這個習慣</button>
       </form>
     </div>
   </div>
@@ -400,7 +406,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261117165833"></script>
-  <script src="app.js?v=20261117165833"></script>
+  <script src="shared.js?v=20261117182743"></script>
+  <script src="app.js?v=20261117182743"></script>
 </body>
 </html>

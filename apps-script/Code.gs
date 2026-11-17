@@ -12,11 +12,12 @@
  *   CALENDAR_ID    - 同步用的專用 Google 行事曆 id（沒設就不同步）
  *   （CAL_DIRTY / CAL_LAST_SYNC / CAL_LAST_ERROR 是行事曆同步自己寫的狀態，不用手動設定）
  *
- * Sheet 需要這二十九個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
+ * Sheet 需要這三十個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
  *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
  *   HabitNotes      欄位: habitId | detail | updatedAt（ensureSheet 自動建立；習慣的細節說明／步驟，一個習慣一列，沒填就沒有那一列）
+ *   HabitPaused     欄位: habitId | pausedAt（ensureSheet 自動建立，寫死在 HABIT_PAUSED_HEADERS；暫停中的習慣一個一列，沒有那一列＝正常；暫停不刪紀錄，恢復＝刪掉那一列）
  *   RenoItems       欄位: id | vendor | name | qty | unit | listPrice | dealPrice | status | note | createdAt | updatedAt（ensureSheet 自動建立；裝潢報價的品項現況，價格是「單價」，小計＝qty × 單價；status: quoted/signed/paid/dropped）
  *   RenoQuoteLog    欄位: id | itemId | vendor | name | round | date | qty | unit | listPrice | dealPrice | note | createdAt（ensureSheet 自動建立；每次報價內容有變就新增一列，不覆蓋，history 靠這個；vendor/name 冗餘存一份，品項刪了紀錄仍看得懂）
  *   RenoPayments    欄位: id | vendor | kind | amount | date | note | createdAt（ensureSheet 自動建立；裝潢每家商家的付款紀錄，可多筆；kind: deposit定金/installment期款/final尾款/other其他；date 可空；尚餘＝該商家品項總額 − 付款合計，由前端算）
@@ -185,6 +186,8 @@ function dispatch_(p) {
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
       case "updateHabit":
         return respond({ ok: true, data: updateHabit(p.id, p.name, p.workdaysOnly, p.target, p.detail) });
+      case "setHabitPaused":
+        return respond({ ok: true, data: setHabitPaused(p.id, p.paused) });
       case "deleteHabit":
         return respond({ ok: true, data: deleteHabit(p.id) });
       case "addRecurringEvent":
@@ -354,7 +357,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-11-17.1";
+var BACKEND_VERSION = "2026-11-17.2";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -451,6 +454,7 @@ function getData(keys) {
     if (!keys || keys.indexOf(k) >= 0) out[k] = sheetToObjects(getSheet(DATA_SHEETS_[k]));
   });
   if (!keys || keys.indexOf("habitNotes") >= 0) out.habitNotes = sheetToObjects(habitNotesSheet_());
+  if (!keys || keys.indexOf("habitPaused") >= 0) out.habitPaused = sheetToObjects(habitPausedSheet_());
   if (!keys || keys.indexOf("trips") >= 0) out.trips = sheetToObjects(tripsSheet_());
   if (!keys || keys.indexOf("holidays") >= 0) out.holidays = getHolidaysSafe_();
   return out;
@@ -1241,6 +1245,34 @@ function setHabitNote_(habitId, detail) {
   if (text) appendRowSafe_(sheet, [habitId, text, new Date()]);
 }
 
+// 暫停習慣：不動 Habits 的欄位，另放 HabitPaused 分頁。暫停期間不顯示、不進桌布；紀錄與細節都保留，恢復就回來。
+var HABIT_PAUSED_HEADERS = ["habitId", "pausedAt"];
+function habitPausedSheet_() { return ensureSheet("HabitPaused", HABIT_PAUSED_HEADERS); }
+
+function pausedHabitIds_() {
+  var ids = {};
+  sheetToObjects(habitPausedSheet_()).forEach(function (r) { if (r.habitId) ids[String(r.habitId)] = true; });
+  return ids;
+}
+
+function setHabitPaused(id, paused) {
+  id = textArg_(id, "習慣", { required: true, max: 100 });
+  var exists = getSheet("Habits").getDataRange().getValues().some(function (r, i) { return i > 0 && r[0] === id; });
+  if (!exists) throw new Error("找不到這個習慣");
+  if (boolArg_(paused)) {
+    if (!pausedHabitIds_()[id]) appendRowSafe_(habitPausedSheet_(), [id, new Date()]);
+  } else {
+    clearHabitPaused_(id);
+  }
+  return getData(["habitPaused"]);
+}
+
+function clearHabitPaused_(id) {
+  var sheet = habitPausedSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) if (values[i][0] === id) sheet.deleteRow(i + 1);
+}
+
 function addHabit(name, frequency, workdaysOnly, target) {
   var sheet = getSheet("Habits");
   frequency = enumArg_(frequency, "頻率", ["daily", "weekly", "monthly"]);
@@ -1285,10 +1317,11 @@ function deleteHabit(id) {
     if (values[i][0] === id) {
       sheet.deleteRow(i + 1);
       setHabitNote_(id, "");
+      clearHabitPaused_(id);
       break;
     }
   }
-  return getData(["habits", "habitNotes"]);
+  return getData(["habits", "habitNotes", "habitPaused"]);
 }
 
 // 讀取現有列、決定要遞增/刪除還是新增一列、再寫回去——這整段「讀了再寫」如果
@@ -1594,8 +1627,9 @@ function getWallpaperData_() {
     && !isTripDay_(sheetToObjects(tripsSheet_()), todayStr);
 
   var logs = sheetToObjects(getSheet("HabitLog"));
+  var pausedIds = pausedHabitIds_();
   var habits = sheetToObjects(getSheet("Habits")).filter(function (h) {
-    if (h.frequency !== "daily") return false;
+    if (h.frequency !== "daily" || pausedIds[String(h.id)]) return false;
     var wd = h.workdaysOnly === true || String(h.workdaysOnly).toUpperCase() === "TRUE";
     return !wd || isWorkday;
   }).map(function (h) {

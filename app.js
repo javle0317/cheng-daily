@@ -17,6 +17,7 @@ let state = {
   habits: [],
   habitLogs: [],
   habitNotes: [],
+  habitPaused: [],
   recurringEvents: [],
   recurringExceptions: [],
   trips: [],
@@ -271,6 +272,7 @@ function applyData(data) {
   if (data.habits) state.habits = data.habits;
   if (data.habitLogs) state.habitLogs = data.habitLogs;
   if (data.habitNotes) state.habitNotes = data.habitNotes;
+  if (data.habitPaused) state.habitPaused = data.habitPaused;
   if (data.recurringEvents) state.recurringEvents = data.recurringEvents;
   if (data.recurringExceptions) state.recurringExceptions = data.recurringExceptions;
   if (data.trips) state.trips = data.trips;
@@ -282,7 +284,7 @@ function applyData(data) {
 // 與 logoutBtn 監聽都在 shared.js，這裡只提供 shared.js 需要呼叫的進入點。
 window.loadPageData = async function () {
   // 清單（購物/想法）要打開 📝 才看得到，登入時先不讀，打開時再載入
-  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,habitNotes,recurringEvents,recurringExceptions,trips,holidays" }));
+  applyData(await api("getData", { keys: "goals,events,habits,habitLogs,habitNotes,habitPaused,recurringEvents,recurringExceptions,trips,holidays" }));
   renderAll();
   refreshCalSync(); // Google 行事曆同步狀態（沒設定 CALENDAR_ID 就不顯示），不擋登入
   refreshPetPending(); // 寵物圖示上的「待登記」紅點，同樣不擋登入
@@ -402,8 +404,48 @@ function renderHabitDateBar() {
   document.getElementById("habitsCard").classList.toggle("backfill", back > 0);
 }
 
+// 暫停中的習慣：不在每日／每週／每月清單出現，也不算連續；紀錄、細節都保留，恢復就回來（Sheet：HabitPaused）
+function isHabitPaused(habitId) {
+  return state.habitPaused.some(r => String(r.habitId) === String(habitId));
+}
+
+function renderPausedHabits() {
+  const section = document.getElementById("pausedHabitSection");
+  const list = document.getElementById("pausedHabitList");
+  list.innerHTML = "";
+  const paused = state.habits.filter(h => isHabitPaused(h.id));
+  section.classList.toggle("hidden", paused.length === 0);
+  updateHabitsCardVisibility();
+  paused.forEach(habit => {
+    const li = document.createElement("li");
+    li.className = "item-row paused-row";
+    const text = document.createElement("span");
+    text.className = "item-text";
+    text.textContent = splitTextAndLink(habit.name).restText;
+    const resume = document.createElement("button");
+    resume.type = "button";
+    resume.className = "ghost-btn";
+    resume.textContent = "恢復";
+    resume.addEventListener("click", async () => {
+      await withRowLock(li, async () => {
+        try {
+          applyData(await api("setHabitPaused", { id: habit.id, paused: false }));
+          renderHabitsAll();
+          showToast("已恢復習慣");
+        } catch (err) {
+          setStatus("恢復失敗：" + err.message, true);
+        }
+      });
+    });
+    li.append(text, resume);
+    li.dataset.lockKey = `habit-paused:${habit.id}`;
+    list.appendChild(li);
+  });
+}
+
 function renderHabitsAll() {
   renderHabitDateBar();
+  renderPausedHabits();
   renderDailyHabits();
   renderWeeklyHabits();
   renderMonthlyHabits();
@@ -533,7 +575,7 @@ const HEALTH_HABIT_ID = "daily-health";
 
 function updateHabitsCardVisibility() {
   const card = document.getElementById("habitsCard");
-  const anyVisible = ["dailyHabitSection", "weeklyHabitSection", "monthlyHabitSection"]
+  const anyVisible = ["dailyHabitSection", "weeklyHabitSection", "monthlyHabitSection", "pausedHabitSection"]
     .some(id => !document.getElementById(id).classList.contains("hidden"));
   card.classList.toggle("hidden", !anyVisible);
 }
@@ -579,7 +621,7 @@ function renderDailyHabits() {
   list.innerHTML = "";
 
   const habits = state.habits.filter(h =>
-    h.frequency === "daily" &&
+    h.frequency === "daily" && !isHabitPaused(h.id) &&
     (!isTruthy(h.workdaysOnly) || isWorkday(habitDate()))
   );
 
@@ -702,7 +744,7 @@ function renderPeriodHabits(frequency, listId, sectionId) {
   const list = document.getElementById(listId);
   list.innerHTML = "";
 
-  const habits = state.habits.filter(h => h.frequency === frequency);
+  const habits = state.habits.filter(h => h.frequency === frequency && !isHabitPaused(h.id));
 
   section.classList.toggle("hidden", habits.length === 0);
   updateHabitsCardVisibility();
@@ -1825,6 +1867,23 @@ document.getElementById("habitInfoModal").addEventListener("click", (e) => {
 document.getElementById("habitEditCloseBtn").addEventListener("click", closeHabitEdit);
 document.getElementById("habitEditModal").addEventListener("click", (e) => {
   if (e.target.id === "habitEditModal") closeHabitEdit();
+});
+
+document.getElementById("habitPauseBtn").addEventListener("click", async () => {
+  if (!editingHabit) return;
+  if (!(await showConfirm("暫停這個習慣？暫停期間不會顯示，紀錄都保留，之後可以在「已暫停」恢復。"))) return;
+  const habit = editingHabit;
+  setFormBusy(document.getElementById("habitEditForm"), true);
+  try {
+    applyData(await api("setHabitPaused", { id: habit.id, paused: true }));
+    closeHabitEdit();
+    renderHabitsAll();
+    showToast("已暫停習慣");
+  } catch (err) {
+    setStatus("暫停失敗：" + err.message, true);
+  } finally {
+    setFormBusy(document.getElementById("habitEditForm"), false);
+  }
 });
 
 document.getElementById("habitEditForm").addEventListener("submit", async (e) => {
