@@ -1129,6 +1129,14 @@ console.log("健康「今日」：睡眠、餐點、體重平均");
   const mA = th.mergeSnack({ desc: "珍奶", kcal: 350, protein: null, eatOut: false, sugarDrink: true }, { desc: "洋芋片", kcal: 150, protein: 2, eatOut: false, sugarDrink: false });
   check("點心匯入：加到原本後面（熱量相加、旗標取聯集、只有一邊有蛋白質就用那一邊）", mA.row.desc === "珍奶；洋芋片" && mA.row.kcal === 500 && mA.row.protein === 2 && mA.row.sugarDrink === true && !mA.skipped, mA);
   check("點心匯入：同樣內容貼兩次不重複加；原本沒有點心就直接用新的；兩邊都沒熱量維持空白", th.mergeSnack({ desc: "珍奶；洋芋片", kcal: 500 }, { desc: "洋芋片", kcal: 150 }).skipped === true && th.mergeSnack(null, { desc: "a", kcal: 1 }).row.desc === "a" && th.mergeSnack({ desc: "x", kcal: null, protein: null }, { desc: "y", kcal: null, protein: null }).row.kcal === null);
+  {
+    const src = read("health-today.js");
+    const iTs = src.indexOf("initTimeSelects();"), iBind = src.indexOf('["dayBed", "dayWake", "daySleepTime"');
+    check("全站 24 小時制：健康頁的上床／起床／入睡時間要先換成 24 小時制下拉（initTimeSelects），再綁事件", iTs > 0 && iBind > iTs && /id="dayBed" type="time"/.test(read("health.html")));
+    const pagesWithTime = fs.readdirSync(root).filter(f => f.endsWith(".html") && /type="time"/.test(read(f)));
+    const jsFor = { "index.html": "app.js", "health.html": "health-today.js" };
+    check("全站 24 小時制：每個有 type=\"time\" 的頁面都有呼叫 initTimeSelects", pagesWithTime.every(f => jsFor[f] && read(jsFor[f]).includes("initTimeSelects()")), pagesWithTime);
+  }
   check("打球消耗粗估：120 分 ≈ 450 kcal、空白或 0 → null（不是 0）", th.pickleKcalEstimate(120) === 450 && th.pickleKcalEstimate("") === null && th.pickleKcalEstimate(0) === null);
   const ef = be.exerciseFields_({ type: "pickleball", minutes: "120", rpe: "7", kcal: "450" }, "2026-11-12");
   check("運動欄位：分鐘與強度轉整數、消耗轉數字；選填空白維持空白", ef.minutes === 120 && ef.rpe === 7 && ef.kcal === 450 && be.exerciseFields_({ type: "walk", minutes: "30" }, "2026-11-12").rpe === "");
