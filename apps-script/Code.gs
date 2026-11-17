@@ -27,7 +27,7 @@
  *   RecurringEvents 欄位: id | owner | title | time | notes | frequency | dayOfWeek | dayOfMonth | createdAt | endDate（選填，yyyy-MM-dd，含當天；空白=無限期）| endTime（選填，HH:mm，同一天內晚於 time）
  *   RecurringExceptions 欄位: id | recurringId | date | createdAt
  *   Trips           欄位: id | owner | title | date | endDate | notes | createdAt
- *                   （旅遊／寵物外宿等「跨天」行程，ensureSheet 自動建立，寫死在 TRIP_HEADERS；date＝開始日、endDate＝結束日（含），單日填同一天；
+ *                   （旅遊／寵物外宿等「跨天」行程，會同步成 Google 行事曆的跨天全天事件，ensureSheet 自動建立，寫死在 TRIP_HEADERS；date＝開始日、endDate＝結束日（含），單日填同一天；
  *                   owner 是 me／wife／shared 或寵物名字；owner 是 me／shared 的旅遊期間，「僅工作日」的每日習慣視為非工作日而略過）
  *   ShoppingList    欄位: id | item | done | createdAt | category（shopping/idea，空白視為 shopping）
  *   BloodPressure   欄位: id | date | period | systolic | diastolic | pulse | createdAt | note（選填，懷疑偏高的原因；note 欄要手動加在最後面）
@@ -357,7 +357,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-11-17.2";
+var BACKEND_VERSION = "2026-11-17.3";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -617,12 +617,14 @@ function tripFields_(p) {
 function addTrip(p) {
   var f = tripFields_(p);
   appendRowSafe_(tripsSheet_(), [Utilities.getUuid(), f.owner, f.title, f.date, f.endDate, f.notes, new Date()]);
+  markCalendarDirty_();
   return getData(["trips"]);
 }
 
 function updateTrip(p) {
   tripsSheet_();
   updateRowByHeaders_("Trips", textArg_(p.id, "旅遊", { required: true, max: 100 }), tripFields_(p));
+  markCalendarDirty_();
   return getData(["trips"]);
 }
 
@@ -632,6 +634,7 @@ function deleteTrip(id) {
   for (var i = values.length - 1; i >= 1; i--) {
     if (values[i][0] === id) { sheet.deleteRow(i + 1); break; }
   }
+  markCalendarDirty_();
   return getData(["trips"]);
 }
 
@@ -1755,7 +1758,7 @@ function calEndTime_(time, endTime) {
 
 // 純函式：App 裡「應該出現在 Google 行事曆上」的事件清單。
 // 回傳 [{ key, title, date, time, description }]；time 為空 = 全天事件。
-function desiredCalendarEvents_(events, rules, exceptions, todayStr) {
+function desiredCalendarEvents_(events, rules, exceptions, todayStr, trips) {
   var out = [];
   var from = calAddDays_(todayStr, -CAL_PAST_DAYS);
   var oneOffTo = calAddDays_(todayStr, CAL_ONEOFF_DAYS);
@@ -1766,6 +1769,13 @@ function desiredCalendarEvents_(events, rules, exceptions, todayStr) {
     var date = String(e.date || "");
     if (hidden || !e.id || date < from || date > oneOffTo) return;
     out.push({ key: "e:" + e.id, title: calTitle_(e.owner, e.title), date: date, time: e.time ? String(e.time) : "", endTime: calEndTime_(e.time, e.endTime), description: String(e.notes || "") });
+  });
+
+  // 旅遊／寵物外宿：跨天的全天事件（endDate＝結束日含當天，單日時留空）
+  (trips || []).forEach(function (t) {
+    var start = String(t.date || ""), end = String(t.endDate || start);
+    if (!t.id || !start || end < from || start > oneOffTo) return;
+    out.push({ key: "t:" + t.id, title: calTitle_(t.owner, t.title), date: start, endDate: end > start ? end : "", time: "", endTime: "", description: String(t.notes || "") });
   });
 
   var skipped = {};
@@ -1796,7 +1806,7 @@ function planCalendarSync_(desired, existing) {
     wanted[d.key] = true;
     var ex = byKey[d.key];
     if (!ex) { plan.create.push(d); return; }
-    var same = ex.title === d.title && ex.date === d.date && ex.time === d.time && ex.endTime === d.endTime && ex.description === d.description;
+    var same = ex.title === d.title && ex.date === d.date && (ex.endDate || "") === (d.endDate || "") && ex.time === d.time && ex.endTime === d.endTime && ex.description === d.description;
     if (same) plan.unchanged++; else plan.update.push({ existing: ex, desired: d });
   });
   Object.keys(byKey).forEach(function (k) { if (!wanted[k]) plan.del.push(byKey[k]); });
@@ -1826,10 +1836,14 @@ function readExistingCalendarEvents_(cal, todayStr) {
     var key = ev.getTag(CAL_TAG);
     if (!key) return; // 不是本 App 同步出去的，不碰
     var allDay = ev.isAllDayEvent();
+    var startDay = allDay ? Utilities.formatDate(ev.getAllDayStartDate(), Session.getScriptTimeZone(), "yyyy-MM-dd") : "";
+    // 全天事件的結束日在 Google 是「不含」的（隔天 0 點），換成含當天；單日留空
+    var lastDay = allDay ? calAddDays_(Utilities.formatDate(ev.getAllDayEndDate(), Session.getScriptTimeZone(), "yyyy-MM-dd"), -1) : "";
     out.push({
       key: key,
       title: ev.getTitle(),
-      date: allDay ? Utilities.formatDate(ev.getAllDayStartDate(), Session.getScriptTimeZone(), "yyyy-MM-dd") : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "yyyy-MM-dd"),
+      endDate: allDay && lastDay > startDay ? lastDay : "",
+      date: allDay ? startDay : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "yyyy-MM-dd"),
       time: allDay ? "" : Utilities.formatDate(ev.getStartTime(), TIME_ZONE, "HH:mm"),
       endTime: allDay ? "" : Utilities.formatDate(ev.getEndTime(), TIME_ZONE, "HH:mm"),
       description: ev.getDescription() || "",
@@ -1844,7 +1858,9 @@ function createCalendarEvent_(cal, d) {
   if (d.time) {
     ev = cal.createEvent(d.title, calStart_(d), calEnd_(d), { description: d.description });
   } else {
-    ev = cal.createAllDayEvent(d.title, calDay_(d.date), { description: d.description });
+    ev = d.endDate
+      ? cal.createAllDayEvent(d.title, calDay_(d.date), calDay_(calAddDays_(d.endDate, 1)), { description: d.description }) // 結束日在 Google 是「不含」
+      : cal.createAllDayEvent(d.title, calDay_(d.date), { description: d.description });
   }
   ev.setTag(CAL_TAG, d.key);
   return ev;
@@ -1863,15 +1879,16 @@ function applyCalendarPlan_(cal, plan) {
     ex.ref.setDescription(d.description);
     if (d.time) {
       ex.ref.setTime(calStart_(d), calEnd_(d));
-    } else if (ex.date !== d.date) {
-      ex.ref.setAllDayDate(calDay_(d.date));
+    } else if (ex.date !== d.date || (ex.endDate || "") !== (d.endDate || "")) {
+      if (d.endDate) ex.ref.setAllDayDates(calDay_(d.date), calDay_(calAddDays_(d.endDate, 1)));
+      else ex.ref.setAllDayDate(calDay_(d.date));
     }
   });
   plan.del.forEach(function (ex) { ex.ref.deleteEvent(); });
 }
 
 function summarizePlan_(plan, dryRun) {
-  var short = function (d) { return d.date + (d.time ? " " + d.time + (d.endTime ? "–" + d.endTime : "") : "") + " " + d.title; };
+  var short = function (d) { return d.date + (d.endDate ? "～" + d.endDate : "") + (d.time ? " " + d.time + (d.endTime ? "–" + d.endTime : "") : "") + " " + d.title; };
   return {
     dryRun: !!dryRun,
     created: plan.create.length, updated: plan.update.length, deleted: plan.del.length, unchanged: plan.unchanged,
@@ -1885,7 +1902,7 @@ function summarizePlan_(plan, dryRun) {
 
 // 對帳（cal 可注入，測試用）。dryRun 只算不動。
 function reconcileWith_(cal, data, todayStr, dryRun) {
-  var desired = desiredCalendarEvents_(data.events, data.rules, data.exceptions, todayStr);
+  var desired = desiredCalendarEvents_(data.events, data.rules, data.exceptions, todayStr, data.trips);
   var existing = readExistingCalendarEvents_(cal, todayStr);
   var plan = planCalendarSync_(desired, existing);
   // 保險：沒確認資料表讀取正常（data.verified）、desired 又全空卻要刪掉一堆事件，八成是讀取出問題，中止而不是清空行事曆。
@@ -1906,6 +1923,7 @@ function reconcileCalendar_(dryRun) {
     events: sheetToObjects(getSheet("Events")),
     rules: sheetToObjects(getSheet("RecurringEvents")),
     exceptions: sheetToObjects(getSheet("RecurringExceptions")),
+    trips: sheetToObjects(tripsSheet_()),
   };
   // 三個分頁都找得到、表頭第一格是 id，才算「成功讀到資料」（getSheet 讀不到會直接丟錯，不會走到這裡）
   data.verified = ["Events", "RecurringEvents", "RecurringExceptions"].every(function (n) {

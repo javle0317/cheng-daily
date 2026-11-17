@@ -1392,7 +1392,7 @@ form[data-busy="1"] button { pointer-events: none; opacity: 0.6; }
 
 /* 旅遊／外宿：日曆格底部一條色帶、已結束的淡化 */
 .calendar-cell.has-trip {
-  background-image: linear-gradient(var(--trip-color), var(--trip-color));
+  background-image: var(--trip-bar);
   background-size: 100% 4px; background-repeat: no-repeat; background-position: bottom;
 }
 .item-row.trip-past { opacity: .55; }

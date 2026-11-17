@@ -35,7 +35,7 @@
 `HabitPaused` 分頁（`ensureSheet`）。暫停＝前端 `isHabitPaused` 過濾、後端桌布 `pausedHabitIds_` 過濾；Habits 的欄位不動。刪習慣時一併清掉暫停列。
 
 ## 旅遊／外宿（跨天行程）
-`Trips` 分頁（`ensureSheet`，`TRIP_HEADERS`）、首頁「旅遊／外宿」卡片。`me`／`shared` 的旅遊期間讓「僅工作日」習慣視為非工作日：前端判斷集中在 `app.js` 的 `isWorkday`（透過 `isTripDay`），後端桌布頁用 `isTripDay_`，兩邊規則要一致。尚未同步到 Google 行事曆與 LINE 提醒。
+`Trips` 分頁（`ensureSheet`，`TRIP_HEADERS`）、首頁「旅遊／外宿」卡片。`me`／`shared` 的旅遊期間讓「僅工作日」習慣視為非工作日：前端判斷集中在 `app.js` 的 `isWorkday`（透過 `isTripDay`），後端桌布頁用 `isTripDay_`，兩邊規則要一致。會同步成 Google 行事曆的跨天全天事件（`desiredCalendarEvents_` 第 5 個參數 trips、key `t:<id>`；Google 全天結束日不含，要 +1／-1 換算）。尚未進 LINE 提醒。
 
 ## 與 cheng-lingo 的關係
 姊妹專案在 `../cheng-lingo`（英日語練習，獨立 Sheet / Apps Script，網址 https://javle0317.github.io/cheng-lingo/）。

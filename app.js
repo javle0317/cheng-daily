@@ -1011,7 +1011,10 @@ function renderCalendar() {
     const tripsToday = tripsOnDate(dateStr);
     if (tripsToday.length) {
       cell.classList.add("has-trip");
-      cell.style.setProperty("--trip-color", (OWNER_META[tripsToday[0].owner] || {}).color || "var(--accent)");
+      // 同一天有好幾筆（人、寵物各一）：色帶依序切段，每段是各自對象的顏色
+      const colors = tripsToday.map(t => (OWNER_META[t.owner] || {}).color || "var(--accent)");
+      const step = 100 / colors.length;
+      cell.style.setProperty("--trip-bar", `linear-gradient(to right, ${colors.map((c, i) => `${c} ${i * step}% ${(i + 1) * step}%`).join(", ")})`);
       cell.title = tripsToday.map(t => t.title).join("、");
     }
 

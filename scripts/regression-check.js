@@ -787,15 +787,15 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   const mkEvent = (title, start, allDay, desc, end) => {
     const e = { title, start, end: end || start, allDay, desc: desc || "", tag: null, deleted: false };
     return Object.assign(e, {
-      getTag: () => e.tag, setTag: (k, v) => { e.tag = v; }, isAllDayEvent: () => e.allDay, getTitle: () => e.title, getAllDayStartDate: () => e.start,
+      getTag: () => e.tag, setTag: (k, v) => { e.tag = v; }, isAllDayEvent: () => e.allDay, getTitle: () => e.title, getAllDayStartDate: () => e.start, getAllDayEndDate: () => e.allEnd || new Date(e.start.getTime() + 86400000),
       getStartTime: () => e.start, getEndTime: () => e.end, getDescription: () => e.desc, setTitle: v => { e.title = v; }, setDescription: v => { e.desc = v; },
-      setTime: (s, en) => { e.start = s; e.end = en; }, setAllDayDate: s => { e.start = s; }, deleteEvent: () => { e.deleted = true; },
+      setTime: (s, en) => { e.start = s; e.end = en; }, setAllDayDate: s => { e.start = s; e.allEnd = null; }, setAllDayDates: (s, en) => { e.start = s; e.allEnd = en; }, deleteEvent: () => { e.deleted = true; },
     });
   };
   const fakeCal = {
     getEvents: () => calEvents.filter(e => !e.deleted),
     createEvent: (title, start, end, o) => { const e = mkEvent(title, start, false, o.description, end); calEvents.push(e); return e; },
-    createAllDayEvent: (title, day, o) => { const e = mkEvent(title, day, true, o.description); calEvents.push(e); return e; },
+    createAllDayEvent: (title, day, a, b) => { const e = mkEvent(title, day, true, (b || a).description); if (b) e.allEnd = a; calEvents.push(e); return e; },
   };
   const manual = mkEvent("太太自己加的", new Date("2026-10-12T10:00:00+08:00"), false); calEvents.push(manual); // 沒有標記
   const data = { events: [ev({ time: "08:30" }), ev({ id: "e2", date: "2026-10-11", title: "全天" })], rules: [], exceptions: [] };
@@ -815,6 +815,22 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   res = be.reconcileWith_(fakeCal, data, today, false);
   const alive = calEvents.filter(e => !e.deleted);
   check("App 改標題＋定時改全天（刪掉重建）、刪除事件 → 行事曆跟著變；別人手動加的事件不被動到", res.updated === 1 && res.deleted === 1 && alive.some(e => e.tag === "e:e1" && e.allDay && e.title === "[承承] 看牙醫（改）") && !alive.some(e => e.tag === "e:e2") && !manual.deleted, res);
+  // 旅遊／外宿 → 跨天全天事件
+  {
+    const tr = (over) => Object.assign({ id: "t1", owner: "咪嚕", title: "外宿", date: "2026-10-12", endDate: "2026-10-14", notes: "" }, over);
+    const dd = be.desiredCalendarEvents_([], [], [], today, [tr({}), tr({ id: "t2", owner: "me", title: "一日遊", date: "2026-10-20", endDate: "2026-10-20" }), tr({ id: "t3", date: "2026-01-01", endDate: "2026-01-05" })]);
+    check("旅遊轉成全天事件：跨天有 endDate（含當天）、單日留空、太舊的不同步、標題帶對象", dd.length === 2 && dd[0].key === "t:t1" && dd[0].endDate === "2026-10-14" && dd[0].time === "" && dd[0].title === "[咪嚕] 外宿" && dd[1].endDate === "", dd);
+    const tdata = { events: [], rules: [], exceptions: [], trips: [tr({})], verified: true };
+    be.reconcileWith_(fakeCal, tdata, today, false);
+    const te = calEvents.find(e => e.tag === "t:t1" && !e.deleted);
+    check("跨天旅遊在 Google 是 10/12–10/14 的全天事件（結束日不含，所以是 10/15 0 點）", te && te.allDay && te.start.getTime() === new Date(2026, 9, 12).getTime() && te.allEnd.getTime() === new Date(2026, 9, 15).getTime());
+    check("再對帳一次沒有動作（冪等，結束日換算不會來回跳）", (r => r.created === 0 && r.updated === 0 && r.deleted === 0)(be.reconcileWith_(fakeCal, tdata, today, false)));
+    tdata.trips[0].endDate = "2026-10-16";
+    const r2 = be.reconcileWith_(fakeCal, tdata, today, false);
+    check("延長旅遊 → 更新（setAllDayDates），Google 結束變 10/17 0 點", r2.updated === 1 && te.allEnd.getTime() === new Date(2026, 9, 17).getTime());
+    tdata.trips = [];
+    check("刪掉旅遊 → Google 上跟著刪", be.reconcileWith_(fakeCal, tdata, today, false).deleted === 1 && te.deleted === true);
+  }
   check("保險：資料表空卻要刪一大堆事件 → 中止，不清空行事曆", (() => { for (let i = 0; i < 6; i++) { const e = mkEvent("x" + i, new Date("2026-10-20T10:00:00+08:00"), false); e.tag = "z:" + i; calEvents.push(e); } return throws(() => be.reconcileWith_(fakeCal, { events: [], rules: [], exceptions: [] }, today, false)); })());
   check("已確認讀取正常（verified）、資料表真的沒事件了 → 放行刪除（刪掉最後一條循環行程）", (() => { const live = calEvents.filter(e => !e.deleted).length; const res = be.reconcileWith_(fakeCal, { events: [], rules: [], exceptions: [], verified: true }, today, false); return res.deleted >= 6 && calEvents.filter(e => !e.deleted && e.tag).length === 0 && !manual.deleted && live >= 6; })());
   // 狀態與旗標
@@ -827,7 +843,7 @@ console.log("後端：同步到 Google 行事曆（對帳）");
   check("設定 CALENDAR_ID 後：寫入會設待同步旗標，狀態可讀", propStore.CAL_DIRTY === "1" && be.getCalendarSyncStatus().enabled && be.getCalendarSyncStatus().dirty);
   const codeGs = read("apps-script/Code.gs");
   const bodyOf = (fn) => { const i = codeGs.indexOf("function " + fn + "("); return codeGs.slice(i, codeGs.indexOf("\n}\n", i)); };
-  check("寫入 Events／循環行程／跳過日的 7 個函式都會標記待同步（addEvent 走 addEventRow_；改花費金額不用）", ["addEventRow_", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"].every(fn => bodyOf(fn).includes("markCalendarDirty_();")) && !bodyOf("setEventAmount").includes("markCalendarDirty_"));
+  check("寫入 Events／循環行程／跳過日／旅遊的 10 個函式都會標記待同步（addEvent 走 addEventRow_；改花費金額不用）", ["addTrip", "updateTrip", "deleteTrip", "addEventRow_", "deleteEvent", "addRecurringEvent", "setRecurringEndDate", "deleteRecurringEvent", "addRecurringException", "deleteRecurringException"].every(fn => bodyOf(fn).includes("markCalendarDirty_();")) && !bodyOf("setEventAmount").includes("markCalendarDirty_"));
   be.PropertiesService.getScriptProperties = origProps; // 後面的傳輸測試要用原本的密碼屬性
 }
 
