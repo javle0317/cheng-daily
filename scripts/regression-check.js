@@ -91,11 +91,17 @@ console.log("前端：旅遊／外宿（跨天行程，自己旅遊期間略過�
   const t = loadFrontend(["shared.js", "app.js"], "// ====== Boot ======", "2026-10-07T12:00:00");
   const ev = code => vm.runInContext(code, t);
   ev("state.holidayDates = new Set(); state.trips = [{ id: 't1', owner: 'me', title: '東京', date: '2026-10-05', endDate: '2026-10-07', notes: '' }, { id: 't2', owner: 'wife', title: '台南', date: '2026-10-09', endDate: '2026-10-09', notes: '' }, { id: 't3', owner: '咪嚕', title: '外宿', date: '2026-10-12', endDate: '2026-10-14', notes: '' }];");
-  check("旅遊期間（含頭尾）不是工作日", ev("isWorkday('2026-10-05') || isWorkday('2026-10-06') || isWorkday('2026-10-07')") === false);
-  check("旅遊前後的平日照常是工作日", ev("isWorkday('2026-10-02') && isWorkday('2026-10-08')") === true);
-  check("君君的旅遊、寵物外宿不影響工作日", ev("isWorkday('2026-10-09') && isWorkday('2026-10-13')") === true);
+  const W = "{ id: 'h', target: 1, workdaysOnly: true }", P = "{ id: 'h', target: 1, workdaysOnly: false }";
+  check("旅遊不再影響 isWorkday（工作日只看週末與國定假日）", ev("isWorkday('2026-10-05') && isWorkday('2026-10-06')") === true);
+  check("沒設定過 skipOnTrip：勾了僅工作日的沿用舊行為，旅遊期間（含頭尾）略過；沒勾的不略過", ev(`habitActiveOn(${W}, '2026-10-05') || habitActiveOn(${W}, '2026-10-07')`) === false && ev(`habitActiveOn(${P}, '2026-10-06')`) === true);
+  check("旅遊前後的平日照常要做", ev(`habitActiveOn(${W}, '2026-10-02') && habitActiveOn(${W}, '2026-10-08')`) === true);
+  check("skipOnTrip=TRUE：不管有沒有勾僅工作日，旅遊期間都略過（週末旅遊也略過）", ev(`habitActiveOn({ id: 'h', workdaysOnly: false, skipOnTrip: 'TRUE' }, '2026-10-06')`) === false);
+  check("skipOnTrip=FALSE：勾了僅工作日也不因旅遊略過（平日旅遊照常要做）", ev(`habitActiveOn({ id: 'h', workdaysOnly: true, skipOnTrip: 'FALSE' }, '2026-10-06')`) === true);
+  check("僅工作日仍要排除週末（skipOnTrip=FALSE 也一樣）", ev(`habitActiveOn({ id: 'h', workdaysOnly: true, skipOnTrip: 'FALSE' }, '2026-10-10')`) === false);
+  check("君君的旅遊、寵物外宿不影響習慣", ev(`habitActiveOn({ id: 'h', workdaysOnly: false, skipOnTrip: 'TRUE' }, '2026-10-09') && habitActiveOn({ id: 'h', workdaysOnly: false, skipOnTrip: 'TRUE' }, '2026-10-13')`) === true);
   ev("state.habitLogs = [{ habitId: 'h', periodKey: '2026-10-02', count: 1 }, { habitId: 'h', periodKey: '2026-10-01', count: 1 }];");
-  check("旅遊期間不算斷連續（10/2、10/1 有做，10/5–10/7 旅遊略過 = 2）", ev("computeStreak({ id: 'h', target: 1, workdaysOnly: true })") === 2);
+  check("旅遊期間不算斷連續（10/2、10/1 有做，10/5–10/7 旅遊略過 = 2）", ev(`computeStreak(${W})`) === 2);
+  check("設 skipOnTrip=FALSE 時旅遊那幾天沒做就斷（連續 0，今天 10/7 還沒做不算斷、但 10/6 沒做）", ev("computeStreak({ id: 'h', target: 1, workdaysOnly: true, skipOnTrip: 'FALSE' })") === 0);
   ev("state.selectedDate = '2026-10-06'; state.calendarYear = 2026; state.calendarMonth = 9;");
   check("跨天旅遊在事件清單標出第幾天／共幾天", ev("tripEntriesForDate('2026-10-06')[0].title") === "東京（第 2 天／共 3 天）");
   let rendered = true;
@@ -507,6 +513,10 @@ vm.runInContext(read("apps-script/Code.gs"), be, { filename: "Code.gs" });
 check('後端 "1,000" → 1000', be.parseNumStrict_("1,000") === 1000);
 check('後端 "12abc" → NaN', Number.isNaN(be.parseNumStrict_("12abc")));
 check("後端 空白 → null", be.parseNumStrict_("") === null && be.parseNumStrict_(undefined) === null);
+check("後端 habitActiveToday_ 與前端同一條規則（沿用 workdaysOnly／TRUE／FALSE／週末）",
+    be.habitActiveToday_({ workdaysOnly: true, skipOnTrip: "" }, true, true) === false && be.habitActiveToday_({ workdaysOnly: false, skipOnTrip: "" }, true, true) === true
+    && be.habitActiveToday_({ workdaysOnly: false, skipOnTrip: true }, true, true) === false && be.habitActiveToday_({ workdaysOnly: true, skipOnTrip: "FALSE" }, true, true) === true
+    && be.habitActiveToday_({ workdaysOnly: true, skipOnTrip: "FALSE" }, false, false) === false && be.habitActiveToday_({ workdaysOnly: true }, true, false) === true);
 check("公式開頭會被偵測", ["=1+1", "+1", "-1", "@SUM(A1)"].every(be.needsTextGuard_) && !be.needsTextGuard_("鉀 K"));
 const fakeSheet = {
   getLastRow: () => 4,

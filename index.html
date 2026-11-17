@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261117215313">
+<link rel="stylesheet" href="style.css?v=20261117221454">
 </head>
 <body data-page="home">
 
@@ -142,6 +142,10 @@
             <input id="habitWorkdaysOnly" type="checkbox">
             僅工作日
           </label>
+          <label id="habitSkipTripLabel" class="checkbox-label">
+            <input id="habitSkipTrip" type="checkbox">
+            旅遊期間略過
+          </label>
           <button id="habitSubmitBtn" type="submit" disabled>新增</button>
         </form>
       </section>
@@ -167,6 +171,10 @@
         <label id="habitEditWorkdaysLabel" class="checkbox-label">
           <input id="habitEditWorkdaysOnly" type="checkbox">
           只算工作日
+        </label>
+        <label id="habitEditSkipTripLabel" class="checkbox-label">
+          <input id="habitEditSkipTrip" type="checkbox">
+          旅遊期間略過（承承或一起旅遊的日子不顯示、不斷連續）
         </label>
         <textarea id="habitEditDetail" rows="5" maxlength="2000" placeholder="細節（選填）：該做到什麼、步驟…，填了列上會出現 ⓘ"></textarea>
         <p class="progress-line">頻率不能修改（紀錄會對不起來），要換請刪掉重加</p>
@@ -406,7 +414,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20261117215313"></script>
-  <script src="app.js?v=20261117215313"></script>
+  <script src="shared.js?v=20261117221454"></script>
+  <script src="app.js?v=20261117221454"></script>
 </body>
 </html>

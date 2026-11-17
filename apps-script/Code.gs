@@ -15,7 +15,9 @@
  * Sheet 需要這三十個分頁（新功能的新分頁用 ensureSheet 自動建立，並要登記在這份清單）：
  *   Goals           欄位: id | date | text | done | createdAt
  *   Events          欄位: id | date | owner | time | title | notes | createdAt | amount | hideFromCalendar | endTime
- *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt
+ *   Habits          欄位: id | name | frequency | workdaysOnly | target | createdAt | skipOnTrip
+ *                   （skipOnTrip 是後來加的，已存在的 Habits 要手動在表頭最後面補上 skipOnTrip；TRUE＝承承／一起旅遊期間略過這個每日習慣、FALSE＝不略過、
+ *                   空白＝沒設定過，沿用 workdaysOnly（勾了僅工作日就略過旅遊）。沒有這欄時新增習慣照樣能用，但編輯習慣存這個選項會丟錯）
  *   HabitNotes      欄位: habitId | detail | updatedAt（ensureSheet 自動建立；習慣的細節說明／步驟，一個習慣一列，沒填就沒有那一列）
  *   HabitPaused     欄位: habitId | pausedAt（ensureSheet 自動建立，寫死在 HABIT_PAUSED_HEADERS；暫停中的習慣一個一列，沒有那一列＝正常；暫停不刪紀錄，恢復＝刪掉那一列）
  *   RenoItems       欄位: id | vendor | name | qty | unit | listPrice | dealPrice | status | note | createdAt | updatedAt（ensureSheet 自動建立；裝潢報價的品項現況，價格是「單價」，小計＝qty × 單價；status: quoted/signed/paid/dropped）
@@ -177,7 +179,7 @@ function dispatch_(p) {
       case "setEventAmount":
         return respond({ ok: true, data: setEventAmount(p.id, p.amount) });
       case "addHabit":
-        return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target) });
+        return respond({ ok: true, data: addHabit(p.name, p.frequency, p.workdaysOnly, p.target, p.skipOnTrip) });
       case "drawChallenge":
         return respond({ ok: true, data: drawChallenge() });
       case "completeChallenge":
@@ -185,7 +187,7 @@ function dispatch_(p) {
       case "toggleHabitLog":
         return respond({ ok: true, data: toggleHabitLog(p.habitId, p.periodKey, p.target) });
       case "updateHabit":
-        return respond({ ok: true, data: updateHabit(p.id, p.name, p.workdaysOnly, p.target, p.detail) });
+        return respond({ ok: true, data: updateHabit(p.id, p.name, p.workdaysOnly, p.target, p.detail, p.skipOnTrip) });
       case "setHabitPaused":
         return respond({ ok: true, data: setHabitPaused(p.id, p.paused) });
       case "deleteHabit":
@@ -357,7 +359,7 @@ function dispatch_(p) {
 
 // 後端版本：每次改 Code.gs 並且前端需要新行為時加一（前端 shared.js 的 BACKEND_MIN_VERSION 要跟著改），
 // 每個回應都帶 v，前端發現後端比它需要的舊就會提醒「還沒部署到新版本」。
-var BACKEND_VERSION = "2026-11-17.3";
+var BACKEND_VERSION = "2026-11-17.4";
 
 function respond(obj) {
   obj.v = BACKEND_VERSION;
@@ -636,6 +638,14 @@ function deleteTrip(id) {
   }
   markCalendarDirty_();
   return getData(["trips"]);
+}
+
+// 習慣今天要不要出現：僅工作日 → 要是工作日；旅遊期間略過 → 不能在旅遊（skipOnTrip 空白＝沒設定過，沿用 workdaysOnly）。前端 habitActiveOn 是同一條規則
+function habitActiveToday_(h, isWorkday, onTrip) {
+  var wd = h.workdaysOnly === true || String(h.workdaysOnly).toUpperCase() === "TRUE";
+  var v = h.skipOnTrip;
+  var skip = v === undefined || v === null || v === "" ? wd : (v === true || String(v).toUpperCase() === "TRUE");
+  return (!wd || isWorkday) && !(skip && onTrip);
 }
 
 // 這天是不是「自己（me／shared）在旅遊」：僅工作日的習慣在這種日子要略過
@@ -1276,8 +1286,9 @@ function clearHabitPaused_(id) {
   for (var i = values.length - 1; i >= 1; i--) if (values[i][0] === id) sheet.deleteRow(i + 1);
 }
 
-function addHabit(name, frequency, workdaysOnly, target) {
+function addHabit(name, frequency, workdaysOnly, target, skipOnTrip) {
   var sheet = getSheet("Habits");
+  var hasSkipCol = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].indexOf("skipOnTrip") >= 0;
   frequency = enumArg_(frequency, "頻率", ["daily", "weekly", "monthly"]);
   var finalTarget = frequency === "daily" ? 1 : numArg_(target, "目標次數", { emptyValue: 1, int: true, min: 1, max: 31 });
   appendRowSafe_(sheet, [
@@ -1287,15 +1298,18 @@ function addHabit(name, frequency, workdaysOnly, target) {
     boolArg_(workdaysOnly),
     finalTarget,
     new Date(),
-  ]);
+  ].concat(hasSkipCol ? [frequency === "daily" ? boolArg_(skipOnTrip) : ""] : []));
   return getData(["habits"]);
 }
 
 // 編輯習慣：可改名稱、daily 的「只算工作日」、weekly/monthly 的目標次數。
 // 故意不開放改 frequency——HabitLog 的 periodKey 格式依頻率而定（日期/週一/月份），
 // 改了之前的紀錄就對不起來，要換頻率請刪掉重加。daily 的 target 固定 1。
-function updateHabit(id, name, workdaysOnly, target, detail) {
+function updateHabit(id, name, workdaysOnly, target, detail, skipOnTrip) {
   var sheet = getSheet("Habits");
+  var skipCol = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].indexOf("skipOnTrip") + 1;
+  if (skipOnTrip !== undefined && !skipCol) throw new Error("Habits 缺少 skipOnTrip 欄位，請先在表頭最後面補上");
+  var skipVal = skipOnTrip === undefined ? undefined : boolArg_(skipOnTrip);
   var newName = textArg_(name, "習慣名稱", { required: true, max: 200 });
   if (detail !== undefined) textArg_(detail, "習慣細節", { max: 2000 }); // 先驗證，不過就整筆不寫
   var values = sheet.getDataRange().getValues();
@@ -1306,6 +1320,7 @@ function updateHabit(id, name, workdaysOnly, target, detail) {
       setTextSafe_(sheet.getRange(i + 1, 2), newName);
       sheet.getRange(i + 1, 4).setValue(frequency === "daily" ? boolArg_(workdaysOnly) : values[i][3]);
       sheet.getRange(i + 1, 5).setValue(finalTarget);
+      if (skipVal !== undefined && frequency === "daily") sheet.getRange(i + 1, skipCol).setValue(skipVal);
       if (detail !== undefined) setHabitNote_(id, detail);
       break;
     }
@@ -1626,15 +1641,15 @@ function getWallpaperData_() {
 
   var holidayDates = {};
   getHolidaysSafe_().forEach(function (h) { holidayDates[h.date] = h.name; });
-  var isWorkday = new Date(todayStr + "T00:00:00").getDay() % 6 !== 0 && !holidayDates[todayStr]
-    && !isTripDay_(sheetToObjects(tripsSheet_()), todayStr);
+  var isWorkday = new Date(todayStr + "T00:00:00").getDay() % 6 !== 0 && !holidayDates[todayStr];
+  var onTrip = isTripDay_(sheetToObjects(tripsSheet_()), todayStr);
 
   var logs = sheetToObjects(getSheet("HabitLog"));
   var pausedIds = pausedHabitIds_();
   var habits = sheetToObjects(getSheet("Habits")).filter(function (h) {
     if (h.frequency !== "daily" || pausedIds[String(h.id)]) return false;
     var wd = h.workdaysOnly === true || String(h.workdaysOnly).toUpperCase() === "TRUE";
-    return !wd || isWorkday;
+    return habitActiveToday_(h, isWorkday, onTrip);
   }).map(function (h) {
     var count = 0, exercise = "";
     logs.forEach(function (l) {

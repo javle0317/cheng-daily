@@ -70,15 +70,29 @@ function tripsOnDate(dateStr) {
   return state.trips.filter(t => dateStr >= String(t.date) && dateStr <= String(t.endDate || t.date));
 }
 
-// 自己（承承／一起）在旅遊的日子：「僅工作日」的習慣視為非工作日而略過（不計入、也不斷連續）。
-// 君君或寵物的行程不影響。Code.gs 的 isTripDay_ 是同一條規則。
+// 自己（承承／一起）在旅遊的日子；君君或寵物的行程不影響。Code.gs 的 isTripDay_ 是同一條規則。
 function isTripDay(dateStr) {
   return tripsOnDate(dateStr).some(t => t.owner === "me" || t.owner === "shared");
 }
 
 function isWorkday(dateStr) {
   const day = new Date(dateStr + "T00:00:00").getDay();
-  return day >= 1 && day <= 5 && !state.holidayDates.has(dateStr) && !isTripDay(dateStr);
+  return day >= 1 && day <= 5 && !state.holidayDates.has(dateStr);
+}
+
+// 這個習慣「旅遊期間要略過」嗎：skipOnTrip 有設定（TRUE／FALSE）就照設定；空白＝沒設定過，沿用 workdaysOnly
+function habitSkipsOnTrip(habit) {
+  const v = habit.skipOnTrip;
+  if (v === undefined || v === null || v === "") return isTruthy(habit.workdaysOnly);
+  return isTruthy(v);
+}
+
+// 這個每日習慣在這天要不要做：僅工作日 → 要是工作日；旅遊期間略過 → 不能在旅遊。
+// 不要做的日子不顯示、不計入、也不斷連續。Code.gs 的 habitActiveToday_ 是同一條規則。
+function habitActiveOn(habit, dateStr) {
+  if (isTruthy(habit.workdaysOnly) && !isWorkday(dateStr)) return false;
+  if (habitSkipsOnTrip(habit) && isTripDay(dateStr)) return false;
+  return true;
 }
 
 function getWeekStart(dateStr) {
@@ -139,7 +153,7 @@ function computeStreak(habit) {
   const todayStr = toDateStr(cursor);
   for (let i = 0; i < 365; i++) {
     const dateStr = toDateStr(cursor);
-    if (workdaysOnly && !isWorkday(dateStr)) {
+    if (!habitActiveOn(habit, dateStr)) {
       cursor.setDate(cursor.getDate() - 1);
       continue;
     }
@@ -175,7 +189,7 @@ function computeHabitStats(habit) {
   for (let guard = 0; guard < 3700; guard++) {
     const dateStr = toDateStr(cursor);
     if (dateStr > todayStr) break;
-    if (!(workdaysOnly && !isWorkday(dateStr))) {
+    if (habitActiveOn(habit, dateStr)) {
       if (doneDates.has(dateStr)) {
         run++;
         if (run > longest) longest = run;
@@ -622,7 +636,7 @@ function renderDailyHabits() {
 
   const habits = state.habits.filter(h =>
     h.frequency === "daily" && !isHabitPaused(h.id) &&
-    (!isTruthy(h.workdaysOnly) || isWorkday(habitDate()))
+    habitActiveOn(h, habitDate())
   );
 
   section.classList.toggle("hidden", habits.length === 0);
@@ -1745,9 +1759,11 @@ function updateHabitFrequencyFields() {
   const frequency = document.getElementById("habitFrequency").value;
   const targetInput = document.getElementById("habitTarget");
   const workdaysLabel = document.getElementById("habitWorkdaysLabel");
+  const skipLabel = document.getElementById("habitSkipTripLabel");
   const isDaily = frequency === "daily";
   targetInput.style.display = isDaily ? "none" : "";
   workdaysLabel.style.display = isDaily ? "" : "none";
+  skipLabel.style.display = isDaily ? "" : "none";
 }
 
 document.getElementById("habitName").addEventListener("input", updateHabitFormValidity);
@@ -1760,6 +1776,7 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
   const frequencySelect = document.getElementById("habitFrequency");
   const targetInput = document.getElementById("habitTarget");
   const workdaysCheckbox = document.getElementById("habitWorkdaysOnly");
+  const skipCheckbox = document.getElementById("habitSkipTrip");
   const name = nameInput.value.trim();
   if (!name) return;
   setFormBusy(e.target, true);
@@ -1768,11 +1785,13 @@ document.getElementById("habitForm").addEventListener("submit", async (e) => {
       name,
       frequency: frequencySelect.value,
       workdaysOnly: workdaysCheckbox.checked,
+      skipOnTrip: skipCheckbox.checked,
       target: targetInput.value || 1,
     }));
     nameInput.value = "";
     targetInput.value = "1";
     workdaysCheckbox.checked = false;
+    skipCheckbox.checked = false;
     renderDailyHabits();
     renderWeeklyHabits();
     renderMonthlyHabits();
@@ -1854,6 +1873,8 @@ function openHabitEdit(habit) {
   document.getElementById("habitEditWorkdaysOnly").checked = habit.workdaysOnly === true || habit.workdaysOnly === "TRUE";
   document.getElementById("habitEditTargetLabel").style.display = isDaily ? "none" : "";
   document.getElementById("habitEditWorkdaysLabel").style.display = isDaily ? "" : "none";
+  document.getElementById("habitEditSkipTrip").checked = habitSkipsOnTrip(habit);
+  document.getElementById("habitEditSkipTripLabel").style.display = isDaily ? "" : "none";
   document.getElementById("habitEditModal").classList.remove("hidden");
 }
 
@@ -1896,10 +1917,11 @@ document.getElementById("habitEditForm").addEventListener("submit", async (e) =>
   if (!name) return;
   const target = document.getElementById("habitEditTarget").value || 1;
   const workdaysOnly = document.getElementById("habitEditWorkdaysOnly").checked;
+  const skipOnTrip = document.getElementById("habitEditSkipTrip").checked;
   const detail = document.getElementById("habitEditDetail").value.trim();
   setFormBusy(e.target, true);
   try {
-    applyData(await api("updateHabit", { id: editingHabit.id, name, workdaysOnly, target, detail }));
+    applyData(await api("updateHabit", { id: editingHabit.id, name, workdaysOnly, skipOnTrip, target, detail }));
     closeHabitEdit();
     renderDailyHabits();
     renderWeeklyHabits();
