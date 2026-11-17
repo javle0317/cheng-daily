@@ -101,9 +101,9 @@ function dateAddDays(dateStr, n) {
 
 // ====== UI ======
 (function () {
-  // 上床／起床／入睡的 type="time" 換成 24 小時制的「時」「分」下拉（全站一律 24 小時制，見 shared.js initTimeSelects）；
-  // 要在下面綁事件之前換，換完同 id 的元素仍有 .value（"HH:mm" 或 ""）
-  initTimeSelects();
+  // 上床／起床／入睡的 type="time" 換成 24 小時制的「時」「分」下拉（全站一律 24 小時制，見 shared.js initTimeSelects；
+  // 睡眠時間不用太精準，分鐘 10 分鐘一格）。要在下面綁事件之前換，換完同 id 的元素仍有 .value（"HH:mm" 或 ""）
+  initTimeSelects(10, document.getElementById("dayForm"));
   const state = { sleep: [], meals: [], exercise: [], inbody: [], range: 7, chartKey: "sleep", version: 0, loadedDate: "" };
   const $ = (id) => document.getElementById(id);
 
